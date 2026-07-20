@@ -1,0 +1,25 @@
+* text=auto eol=lf
+
+*.a binary
+*.aar binary
+*.class binary
+*.dll binary
+*.dylib binary
+*.gif binary
+*.ico binary
+*.jar binary
+*.jpeg binary
+*.jpg binary
+*.keystore binary
+*.klib binary
+*.o binary
+*.pdf binary
+*.png binary
+*.so binary
+*.wasm binary
+*.webp binary
+*.zip binary
+
+# Canonical fixtures and render-tree goldens are byte-exact UTF-8 text.
+packages/tex-core/tests/fixtures/** text eol=lf
+specs/render-tree/** text eol=lf
