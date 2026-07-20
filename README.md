@@ -1,10 +1,11 @@
 # TeX Core
 
-TeX Core is a cross-platform TeX math renderer: a C engine that turns
-TeX/LaTeX math-mode source into an immutable, platform-neutral **render tree**
-with fully resolved layout, plus idiomatic bindings for Swift, Kotlin
-Multiplatform, and ECMAScript/TypeScript. One release gives every platform the
-same parsing, layout, metrics, and canonical dump behavior.
+TeX Core is a cross-platform LaTeX renderer: a C engine that turns
+self-contained LaTeX source — a single file or a single block — into an
+immutable, platform-neutral **render tree** with fully resolved layout, plus
+idiomatic bindings for Swift, Kotlin Multiplatform, and
+ECMAScript/TypeScript. One release gives every platform the same parsing,
+layout, metrics, and canonical dump behavior.
 
 TeX Core deliberately stops at the render tree. It does not rasterize, load
 font files, or draw. Consumers map the tree onto their platform's native
@@ -34,12 +35,30 @@ Nothing is published yet and no platform support is claimed.
 
 | Platform | Coordinate | Entry point |
 | --- | --- | --- |
-| C | `tex-core` (CMake/pkg-config; GitHub Release archives) | `tex_core_formula_render` |
-| Swift | SwiftPM `https://github.com/nouprax/tex-core`, product `TexCore` | `Formula.render` |
-| Kotlin Multiplatform | `com.nouprax:kotlin-tex-core` (Maven Central) | `Formula.render` |
-| ECMAScript / WASM | `@nouprax/es-tex-core` (npm) | `Formula.render` |
+| C | `tex-core` (CMake/pkg-config; GitHub Release archives) | `tex_core_document_render` |
+| Swift | SwiftPM `https://github.com/nouprax/tex-core`, product `TexCore` | `Document.render` |
+| Kotlin Multiplatform | `com.nouprax:kotlin-tex-core` (Maven Central) | `Document.render` |
+| ECMAScript / WASM | `@nouprax/es-tex-core` (npm) | `Document.render` |
 
 All packages release the same version from the same protected `vX.Y.Z` tag.
+
+## Roadmap
+
+Capability grows along a fixed major-version ladder:
+
+- **1.0.0 — Full LaTeX rendering of self-contained input.** A single file or
+  single block renders completely; mathematics, chemistry, physics, biology,
+  and other domain notations are subsets of that one LaTeX surface. The
+  programmable TeX layer (user macros), reference resolution, package/module
+  loading, multi-file input, and page breaking are deliberately out — output
+  is one continuous galley.
+- **2.0.0 — Incremental rendering.** Markdown-core-v2-style sessions: mutate
+  the input and receive the updated render tree as fast as possible, with
+  immutable structurally-shared snapshots, deltas, and damage-proportional
+  commit cost.
+- **3.0.0 — Full TeXbook support.** The programmable TeX layer, modules,
+  multi-file projects, references, and page building: a product-ready core
+  for a TeX project editor.
 
 ## Documents
 
