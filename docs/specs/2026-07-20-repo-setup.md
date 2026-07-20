@@ -108,14 +108,17 @@ All names are fixed now; audits added in later phases enforce them.
 
 Public entry point, uniform across platforms:
 
-- C: `tex_core_document_render(source, options)` → owned render tree with
+- C: `tex_core_document_compile(source, options)` → owned render tree with
   borrowed node views; `tex_core_render_tree_dump(...)` for the canonical dump.
-- Swift / Kotlin / ES: `Document.render(source, options) -> RenderTree`, and
+- Swift / Kotlin / ES: `Document.compile(source, options) -> RenderTree`, and
   `RenderTree.dump()`. Bindings copy the tree into platform values and retain
-  no native handle after `render` returns (markdown-core binding-ownership
-  model). `Document.render` deliberately mirrors markdown-core's
-  `Document.parse` (superseding the bootstrap's `Formula.render`, which no
-  longer fits a full-LaTeX 1.0.0).
+  no native handle after `compile` returns (markdown-core binding-ownership
+  model). `Document.compile` mirrors markdown-core's `Document.parse` family
+  shape and is the verb TeX users already use ("compile the document"). It
+  supersedes the bootstrap's `Formula.render`: "Formula" no longer fits a
+  full-LaTeX 1.0.0, and "render" reads as drawing on screen — exactly what
+  this library never does. The *RenderTree* noun stays: the tree is the
+  compiled artifact consumers render from.
 - `options.mode` selects the input form: `document` (self-contained LaTeX
   file or block) or `mathInline`/`mathDisplay` (a bare math fragment with
   delimiters already stripped — the Markdown Core companion path).
@@ -303,7 +306,7 @@ Mirrors markdown-core's C facade:
   `./tex-core.wasm`), `sideEffects: false`, `files: ["dist", "README.md"]`,
   Node ≥ 20 engine floor.
 - TypeScript type definitions for the full render-tree model; API mirrors
-  §3 (`Document.render`, `dump`).
+  §3 (`Document.compile`, `dump`).
 - Tests run on Node and a real browser runtime; conformance runner bundles the
   shared fixtures; benchmark script.
 - Consumer: `npm pack` → install the tarball into a clean temp project →
@@ -516,7 +519,7 @@ Tasks:
       atoms and explicit spacing only*, producing a real render tree
       (glyph/kern/hbox nodes with metrics from an initial embedded metrics
       table for a minimal glyph set).
-- [ ] `tex_core_document_render` (with the `options.mode` input forms),
+- [ ] `tex_core_document_compile` (with the `options.mode` input forms),
       `tex_core_render_tree_dump`, `tex_core_render_tree_free`, version API,
       structured error type with source ranges.
 - [ ] `tex-core` CLI (stdin/args → dump), correctness CTest suite including
@@ -770,7 +773,7 @@ reviewed change-set per §5.5, with fixtures first.
 | M3 | Text-mode galley: paragraphs with Knuth–Plass line breaking, font/style commands, sectioning headings, lists, `tabular`, `verbatim`, quotes, document skeleton (`\documentclass` subset, `\begin{document}`, title block) rendered as one continuous galley | blocks `1.0.0` |
 | M4 | Domain notation coverage as built-in commands: chemistry (`\ce`, mhchem subset), physics (units/braket subsets), extended math alphabets, symbol-coverage sweep with a pinned coverage inventory tied to fixtures | blocks `1.0.0` |
 | M5 | Error-tolerant mode (structured error boxes in-tree, KaTeX-style opt-in) | 1.x minor, post-`1.0.0` |
-| M6 | Incremental sessions: spec first (sessions-and-deltas style), session API on all platforms, dump-equality with a from-scratch render under replay/random-edit/coverage-guided fuzzing, damage-proportional cost gates | blocks `2.0.0` |
+| M6 | Incremental sessions: spec first (sessions-and-deltas style), session API on all platforms, dump-equality with a from-scratch compile under replay/random-edit/coverage-guided fuzzing, damage-proportional cost gates | blocks `2.0.0` |
 | M7 | The programmable TeX layer: `\def`/`\newcommand`, expansion engine, conditionals, registers, catcode changes, `\halign` core | blocks `3.0.0` |
 | M8 | Project features: multi-file input (`\input`/`\include`), package/module model, reference and citation resolution (`\label`/`\ref`/`\cite` with aux-equivalent fixpoint), counters, page building and output routines; editor-product contract (stable node identity, complete source mapping) | blocks `3.0.0` |
 
