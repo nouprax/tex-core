@@ -1,8 +1,13 @@
-> Provenance: imported verbatim from
+> Provenance: imported from
 > [`nouprax/markdown-core`](https://github.com/nouprax/markdown-core) at commit
 > `bb3b7fab62a6f3b1aa43ab78d18f2f31b5e7b680` (`docs/repository-setup-template.md`,
-> 2026-07-20). The "design evidence" links in section 1 refer to structures this
-> repository replicates in the phases of [`docs/specs/2026-07-20-repo-setup.md`](specs/2026-07-20-repo-setup.md);
+> 2026-07-20). The body is verbatim except §14.15, a tex-core addendum recording
+> the CI-stability fixes markdown-core landed in `ci.yml` and its emulator runner
+> (PRs #19 and #27, 2026-07-18/19) after the template body was last updated
+> upstream (2026-07-16). Where the body (§5.2.2, §12.2, §14.11) and §14.15
+> disagree on device/emulator consumers, §14.15 wins. The "design evidence" links
+> in section 1 refer to structures this repository replicates in the phases of
+> [`docs/specs/2026-07-20-repo-setup.md`](specs/2026-07-20-repo-setup.md);
 > until those phases land, consult the markdown-core originals.
 
 # 跨平台仓库 Setup 模板
@@ -1460,6 +1465,61 @@ snapshot、当前 lockfile/plugin graph 和发布产物都不再出现该组件�
 | 从 main dispatch 后只在 step checkout tag | tag-only environment 仍看到 main ref | rerun tag run，或以受保护 tag 作为 dispatch ref |
 | active ruleset 先于远端演练 | 新 repo 可能被永久阻塞 | evaluate 验证后再 active |
 | sole reviewer + prevent self-review | release 永远无法批准 | 增加独立 reviewer/team 或暂时关闭 |
+
+### 14.15 Addendum（tex-core，2026-07-20）：移动的运行时依赖必须 pin，所有运行阶段必须有界
+
+> 本节是 tex-core 导入本模板后追加的经验，来源于 markdown-core PR #19 与 #27
+> （2026-07-18/19）中已合入 `ci.yml` 与 emulator runner 脚本、但尚未回写进上游模板正文的
+> CI 稳定性修复。实现 §5.2.2 的 device consumer 或迁移 §14.11 的 Android 结构时，必须同时
+> 满足本节；两处描述冲突时以本节为准。
+
+**走过的弯路**：Android 16 KB emulator consumer 长期 flaky，且一次全绿的运行仍吃满
+job timeout。根因有三类：
+
+1. **移动的外部依赖**：consumer 每次 run 用 `sdkmanager` 重新下载 emulator 与 ~1.7 GB 的
+   system image。Google 会在同一路径下原地修订该包（16 KB image 已到第七个 revision），
+   因此相邻两次 run 可能执行不同字节；下载本身也出现过 digest-mismatch 损坏。
+2. **单次机会对抗已知瞬态崩溃**：instrumentation 只有一次尝试，而 emulator stack 存在已知
+   瞬态崩溃，任何一次崩溃都要人工 rerun 整个 job。
+3. **无界等待**：`am instrument -w` 在 wedged stack 上可以永远挂起；teardown 中无界的
+   `wait "$emulator_pid"` 会在 qemu 忽略 console kill 与 SIGTERM（netsim/bluetooth 关闭
+   挂起）时把一个已经全绿的 run 拖到 job timeout。job-timeout kill 走的是 cancelled 路径，
+   只在 `failure()` 上传证据的 job 会同时丢失诊断证据。
+
+**被否决的表面修复**：靠人工 rerun 吸收 flaky；只调大 job timeout 而不给各阶段设界；用
+retry 对抗 hang（retry 只吸收失败，吸收不了挂起）；使用组合 cache action 的 post-step
+save（只在 job 成功时保存，冷缓存 + 一次 flaky 失败 = 每次 rerun 重新下载移动字节，恰好
+击穿 pin 的目的）。
+
+**形成的规则**：
+
+1. 可变的外部运行时依赖（emulator、system image 等）必须从显式 key 的 cache 恢复，key 带
+   `-r<N>` 后缀；采纳上游新 revision 是一次有意的、可 review 的 key bump，绝不是 rerun 的
+   隐式副作用。
+2. cache 采用 restore/save 拆分，save 紧跟在下载完成之后执行，而不是 post step；共享同一
+   image 的 sibling legs 竞争 save 时，落败方的 "cache already exists" 无害。
+3. consumer 的每个运行阶段（adb 等待、boot、instrumentation）都必须有显式 timeout；不允许
+   存在任何无界等待。hang 必须转化为有界、可 retry 的失败。
+4. 恰好一次有界 retry，每次 attempt 使用全新 runtime lifecycle（fresh AVD）；真实回归必须
+   让两次 attempt 都失败。job timeout 必须容纳两次 worst-case attempt 的总预算，并把该算术
+   写进 workflow 注释。
+5. teardown 按 SIGTERM → 有界探测 → SIGKILL 升级，绝不阻塞在 reap 上；step 结束后由 runner
+   清扫残留进程。
+6. 失败证据上传条件是 `failure() || cancelled()`：job-timeout kill 取消而不是失败当前 step。
+
+**验证方法**：制造一次瞬态失败，确认第二次 attempt 以 fresh AVD 通过且无需人工 rerun；
+制造真实回归，确认两次 attempt 都失败；wedge instrumentation 或 teardown，确认 job 在阶段
+timeout 内失败而不是吃满 job timeout，且 cancelled 路径仍留下 emulator/logcat/
+instrumentation 证据；对同一 cache key 的第二条 leg 确认命中且不再下载。
+
+| 错误 | 后果 | 修复 |
+| --- | --- | --- |
+| 每次 run 重新下载可变 system image | 相邻 run 执行不同字节，下载可损坏 | 显式 cache key pin，revision 走 key bump |
+| 组合 cache action 只在成功后 save | 冷缓存 + flaky 失败 = 每次 rerun 重新下载 | restore/save 拆分，下载后立即 save |
+| 无界 instrumentation / teardown wait | 全绿 run 也吃满 job timeout | 所有阶段有界；teardown 升级且不阻塞 reap |
+| 只在 `failure()` 上传证据 | timeout-kill 的 cancelled 路径丢证据 | `failure() \|\| cancelled()` |
+| 用 retry 对抗 hang | hang 不产生失败，retry 永不触发 | 先有界，后 retry |
+| job timeout 未按两次 attempt 预算 | 首次失败后 retry 没有执行空间 | timeout 覆盖两次 worst-case attempt |
 
 ## 15. Definition of Done
 
