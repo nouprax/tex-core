@@ -379,6 +379,15 @@ manual builds for C/C++, Java/Kotlin, Swift and `none` for JS/TS, benchmarks
 as required leaves with informational numbers, fork-safe metrics
 (`pr-metrics-comment.yml`, optional), and controlled dependency submission.
 
+Device/emulator consumers additionally follow the template's §14.15 addendum
+(post-template stability fixes from markdown-core PRs #19/#27): mutable
+runtime dependencies restored from explicit `-r<N>` cache keys with the save
+landing right after download, every runtime phase bounded by a timeout, one
+bounded retry with a fresh device lifecycle, job timeouts budgeted for two
+full attempts, escalating never-blocking teardown, and evidence upload on
+`failure() || cancelled()`. Where §14.15 and the older template body
+disagree, §14.15 wins.
+
 `scripts/audit-ci-policy.sh` enforces template §13 from Phase 4 onward.
 
 ## 11. Release contract
@@ -589,12 +598,23 @@ consumers, model smoke, `mvnw`), root lanes (`test:kotlin-*`,
 Kotlin health check, Linux/macOS publication producers, host-test producers,
 JVM/Android-host/Native test consumers, x86_64 instrumentation APK producer +
 `{4 KB,16 KB} × {correctness,conformance}` emulator consumers (KVM + image +
-ABI verification, stacktrace on), CodeQL Java/Kotlin manual build with
-`--no-build-cache --rerun-tasks`.
+ABI verification, stacktrace on; per template §14.15: emulator and system
+image restored from an explicit `-r<N>` cache key with restore/save split and
+the save right after download, bounded adb/boot/instrumentation phases, one
+bounded retry with a fresh AVD per attempt, job timeout budgeted for two full
+attempts, SIGTERM → bounded probes → SIGKILL teardown that never blocks on
+reaping, evidence upload on `failure() || cancelled()`), CodeQL Java/Kotlin
+manual build with `--no-build-cache --rerun-tasks`.
 
 Acceptance:
 
 - [ ] All Kotlin lanes green on both hosts; emulator suites green in CI.
+- [ ] Template §14.15 stability probes pass: a warm sibling leg hits the
+      image cache without downloading; a wedged instrumentation or teardown
+      fails within its phase bound (not the job timeout) and still uploads
+      evidence on the cancelled path; a transient first-attempt failure is
+      absorbed by the fresh-AVD retry while a real regression fails both
+      attempts.
 - [ ] Kotlin dump of every shared fixture matches the C goldens on every
       target.
 - [ ] `publishKotlinToMavenLocal` + all four staged consumers pass;
