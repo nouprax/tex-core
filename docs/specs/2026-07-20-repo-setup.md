@@ -15,11 +15,19 @@
 
 ## 2. Project positioning
 
-TeX Core is a cross-platform TeX math renderer that turns TeX/LaTeX math-mode
-source into an immutable, platform-neutral **render tree** with fully resolved
-layout. The C engine and every binding live in this repository, so one release
-gives every platform identical parsing, layout, metrics, and canonical dump
-behavior.
+TeX Core is a cross-platform LaTeX renderer that turns self-contained LaTeX
+source — a single file or a single block — into an immutable, platform-neutral
+**render tree** with fully resolved layout. The C engine and every binding
+live in this repository, so one release gives every platform identical
+parsing, layout, metrics, and canonical dump behavior.
+
+Capability grows along a fixed major-version ladder (§13): **1.0.0** renders
+the full LaTeX surface of self-contained input — mathematics, chemistry,
+physics, biology, and other domain notations are subsets of that surface —
+without the programmable TeX layer; **2.0.0** adds markdown-core-v2-style
+incremental rendering, so a consumer that mutates the input gets the updated
+render tree as fast as possible; **3.0.0** completes full TeXbook semantics
+as a product-ready core for a TeX project editor.
 
 TeX Core deliberately stops at the render tree. It does not rasterize, load
 font files, touch the file system or network, or draw anything. Consumers map
@@ -50,9 +58,10 @@ independently consumable; neither depends on the other at build or run time.
 
 ### 2.2 Non-goals
 
-- Full TeX typesetting (paragraphs, pages, `\halign`, generic TeX programs).
-  The scope is math-mode formula rendering; see §5.1 for the supported input
-  language and §15 for staged growth.
+- Reaching past the current major's rung ahead of the ladder: 1.0.0 excludes
+  the programmable TeX layer (user macros), reference resolution,
+  package/module loading, multi-file projects, and page breaking (§5.1).
+  Those are the 3.0.0 rung, not gaps to backfill in 1.x.
 - Rasterization, font file parsing/embedding, or shipping font binaries.
 - Text/HTML output formats. MathML/SVG generation belongs to consumers (or to
   future separate packages), not to the core.
@@ -67,9 +76,9 @@ Changing any of them requires editing this document first.
 | --- | --- | --- |
 | D1 | Implementation origin | Written from scratch; no upstream C baseline. If an upstream is later imported, add `UPSTREAM.md` + `COPYING` per markdown-core practice |
 | D2 | License | BSD-2-Clause, copyright Nouprax (keeps the family license-compatible with markdown-core) |
-| D3 | Input scope v1 | TeX math mode only, inline + display styles (§5.1) |
-| D4 | Error model v1 | Fail-fast: structured error with source range; no partial output. Error-tolerant "error box" mode is milestone M3, not v1 |
-| D5 | Font model | Font metrics compiled into the C core as static tables; glyphs exposed as Unicode codepoints + math-font style; no file I/O (§5.4) |
+| D3 | Release ladder | 1.0.0 = full LaTeX rendering of self-contained input (single file or block; no user macros, reference resolution, modules, multi-file, or pages); 2.0.0 = incremental rendering (sessions/deltas, markdown-core v2 style); 3.0.0 = full TeXbook support, product-ready for a TeX project editor (§5.1, §13) |
+| D4 | Error model v1 | Fail-fast: structured error with source range; no partial output. Error-tolerant "error box" mode is milestone M5, not 1.0.0 |
+| D5 | Font model | Font metrics compiled into the C core as static tables (math and text faces); glyphs exposed as Unicode codepoints + face style; no file I/O (§5.4) |
 | D6 | Concurrency | No process-global mutable state; render trees are immutable and safely shareable across threads (markdown-core 2.0 contract) |
 | D7 | Version line | `VERSION` starts at `0.1.0`; first coordinated public release is `1.0.0` (Phase 11) |
 | D8 | npm bootstrap | First npm publish is an interactive trusted-publisher bootstrap (`0.1.0`), mirroring markdown-core's npm `1.0.0` bootstrap; first coordinated OIDC publish is `1.0.0` |
@@ -99,12 +108,17 @@ All names are fixed now; audits added in later phases enforce them.
 
 Public entry point, uniform across platforms:
 
-- C: `tex_core_formula_render(source, options)` → owned render tree with
+- C: `tex_core_document_render(source, options)` → owned render tree with
   borrowed node views; `tex_core_render_tree_dump(...)` for the canonical dump.
-- Swift / Kotlin / ES: `Formula.render(source, options) -> RenderTree`, and
+- Swift / Kotlin / ES: `Document.render(source, options) -> RenderTree`, and
   `RenderTree.dump()`. Bindings copy the tree into platform values and retain
   no native handle after `render` returns (markdown-core binding-ownership
-  model).
+  model). `Document.render` deliberately mirrors markdown-core's
+  `Document.parse` (superseding the bootstrap's `Formula.render`, which no
+  longer fits a full-LaTeX 1.0.0).
+- `options.mode` selects the input form: `document` (self-contained LaTeX
+  file or block) or `mathInline`/`mathDisplay` (a bare math fragment with
+  delimiters already stripped — the Markdown Core companion path).
 
 ## 4. Versioning and coordinated release
 
@@ -123,23 +137,30 @@ Public entry point, uniform across platforms:
 
 ## 5. Architecture and public contract
 
-### 5.1 Input language (v1)
+### 5.1 Input language and the 1.0.0 scope boundary
 
 - Encoding: UTF-8. Invalid bytes are a structured error (D4), never silently
   replaced.
-- One formula per call, math mode only. `options.displayStyle` selects
-  inline/display; delimiters (`$`, `$$`, `\(`, `\[`) are **not** consumed by
-  the core — callers pass bare math content. (Markdown Core's formula
-  extension already strips delimiters; other callers must do the same.)
-- v1 grammar (milestone M1, §15): ordinary atoms, TeX math classes
-  (ord/op/bin/rel/open/close/punct/inner) with correct inter-atom spacing,
-  superscripts/subscripts, fractions (`\frac`, `\dfrac`, `\tfrac`, `\binom`),
-  radicals (`\sqrt`, optional index), delimiters (`\left`/`\right`, explicit
-  sizes), standard function names (`\sin` … `\lim` with limits placement),
-  big operators (`\sum`, `\int`, …), accents, common symbol macros (Greek,
-  arrows, relations), text style switches (`\mathbf`, `\mathit`, `\mathrm`,
-  `\mathcal`, `\mathfrak`, `\mathbb`, `\text`), and explicit spacing
-  (`\,`, `\;`, `\quad`, `\!`, …).
+- One self-contained input per call: a single LaTeX file or a single block,
+  selected by `options.mode` (§3). In the math-fragment modes, delimiters
+  (`$`, `$$`, `\(`, `\[`) are **not** consumed by the core — callers pass
+  bare math content (Markdown Core's formula extension already strips them);
+  in `document` mode the ordinary LaTeX math delimiters and environments work
+  as in LaTeX.
+- 1.0.0 renders the **full LaTeX surface of self-contained input**: text-mode
+  galley typesetting and math, with domain notations (mathematics, chemistry,
+  physics, biology, …) delivered as built-in command coverage — subsets of
+  the one LaTeX surface, not separate products. The surface is staged through
+  milestones M1–M4 (§13).
+- 1.0.0 exclusions (the 3.0.0 rung, decision D3):
+  - the programmable TeX layer — `\def`/`\newcommand`, expansion,
+    conditionals, registers, catcode changes;
+  - reference resolution — `\label`/`\ref`/`\cite` (explicit `\tag`
+    numbering works);
+  - package/module loading — `\usepackage` is recognized only for the
+    built-in covered set, never loads code or definitions;
+  - multi-file input — `\input`/`\include`;
+  - page breaking — 1.0.0 lays out one continuous galley, not pages.
 - Unsupported input is a structured error naming the offending token and its
   source range — never a silent skip (template §4.3: no drift-swallowing
   normalization).
@@ -147,20 +168,23 @@ Public entry point, uniform across platforms:
 ### 5.2 Pipeline
 
 ```text
-UTF-8 TeX source
-      │ tokenizer (catcodes fixed for math mode)
+UTF-8 LaTeX source
+      │ tokenizer (fixed catcodes; user catcode changes arrive with 3.0.0)
       ▼
 token stream
-      │ parser (macro subset expansion, grouping, atoms)
+      │ parser (built-in command set, grouping, environments,
+      │         text/math mode tracking)
       ▼
-math list (semantic tree: atoms with classes, nuclei/scripts, structures)
+semantic lists (horizontal/vertical/math lists: atoms with classes,
+      │         paragraphs, environment structures)
       │ layout (TeX box-and-glue model over embedded font metrics;
-      │         style resolution D/T/S/SS, cramped variants)
+      │         math style resolution D/T/S/SS, cramped variants;
+      │         Knuth–Plass paragraph line breaking; continuous galley)
       ▼
 render tree (semantic structure + resolved geometry, immutable)
 ```
 
-The math list is internal. The public contract is the render tree only.
+The semantic lists are internal. The public contract is the render tree only.
 
 ### 5.3 Render tree
 
@@ -170,7 +194,9 @@ it needs:
 - **Semantic view**: every layout node carries a `role` (e.g. `numerator`,
   `denominator`, `radicand`, `superscript`, `operatorLimit`, …) and structure
   nodes preserve the source construct (`fraction`, `radical`, `scripts`,
-  `delimited`, `row`). MathML generators walk this.
+  `delimited`, `row`, joined by text-mode structures — `paragraph`, `line`,
+  `heading`, `list`, `tabular`, `environment` — as milestone M3 lands).
+  MathML generators walk this.
 - **Geometric view**: every node has resolved metrics — `width`, `ascent`,
   `descent`, `italicCorrection` where applicable — and children carry offsets
   relative to their parent's reference point. Leaf kinds are `glyph`
@@ -186,8 +212,8 @@ it needs:
 ### 5.4 Fonts
 
 - The core embeds metrics tables (advance, height, depth, italic correction,
-  kerning, larger-variant and extensible-recipe data) for one default math
-  font family, generated offline into checked-in C tables by a maintenance
+  kerning, larger-variant and extensible-recipe data) for the default math
+  and text faces, generated offline into checked-in C tables by a maintenance
   script (like markdown-core's tracked re2c outputs: generated files are
   committed; generation never runs during build/test).
 - v1 metrics source: the KaTeX/Computer Modern metrics data (MIT-licensed
@@ -277,7 +303,7 @@ Mirrors markdown-core's C facade:
   `./tex-core.wasm`), `sideEffects: false`, `files: ["dist", "README.md"]`,
   Node ≥ 20 engine floor.
 - TypeScript type definitions for the full render-tree model; API mirrors
-  §3 (`Formula.render`, `dump`).
+  §3 (`Document.render`, `dump`).
 - Tests run on Node and a real browser runtime; conformance runner bundles the
   shared fixtures; benchmark script.
 - Consumer: `npm pack` → install the tarball into a clean temp project →
@@ -490,9 +516,9 @@ Tasks:
       atoms and explicit spacing only*, producing a real render tree
       (glyph/kern/hbox nodes with metrics from an initial embedded metrics
       table for a minimal glyph set).
-- [ ] `tex_core_formula_render`, `tex_core_render_tree_dump`,
-      `tex_core_render_tree_free`, version API, structured error type with
-      source ranges.
+- [ ] `tex_core_document_render` (with the `options.mode` input forms),
+      `tex_core_render_tree_dump`, `tex_core_render_tree_free`, version API,
+      structured error type with source ranges.
 - [ ] `tex-core` CLI (stdin/args → dump), correctness CTest suite including
       error paths and allocation-failure injection hooks, benchmark
       executable (trivial workload), libFuzzer harness target.
@@ -516,8 +542,9 @@ Tasks:
 - [ ] `specs/render-tree/`: schema document (every node kind, field, type,
       unit, nullability, default, child ordering), canonical dump format
       spec, `manifest.json` (schemaVersion + fixture inventory), fixture
-      pairs (`<name>.tex` + `<name>.tree`) covering every v1 construct plus
-      empty/error/boundary cases (template §4.3 checklist).
+      pairs (`<name>.tex` + `<name>.tree`) covering every construct shipped
+      so far — growing with each §13 milestone — plus empty/error/boundary
+      cases (template §4.3 checklist).
 - [ ] `docs/specs/c-naming.md` and `docs/specs/render-tree-dump.md`
       (repo-facing spec docs mirroring markdown-core's spec set).
 - [ ] C conformance runner consumes the fixtures; goldens are byte-exact.
@@ -724,20 +751,28 @@ Tasks:
 Acceptance: all four channels serve `1.0.0` from the same tag commit; the
 verification evidence is recorded in `docs/releases/1.0.0.md`'s PR.
 
-## 13. Product milestones (parallel track)
+## 13. Release ladder and product milestones (parallel track)
 
-Engine depth grows on a separate milestone track; every milestone ships
-cross-platform in one reviewed change-set per §5.5, with fixtures first.
-Milestones M1–M2 gate Phase 11 (a `1.0.0` must render real-world formulas);
-M3+ are post-1.0.
+Majors are capability rungs. Engine depth grows on a milestone track parallel
+to the infrastructure phases; every milestone ships cross-platform in one
+reviewed change-set per §5.5, with fixtures first.
+
+| Release | Capability | Gated by |
+| --- | --- | --- |
+| `1.0.0` | Full LaTeX rendering of self-contained input — a single file or single block; math, chemistry, physics, biology and other domain notations as subsets of one LaTeX surface; no programmable TeX layer, reference resolution, modules, multi-file input, or pages (§5.1) | M1–M4 + Phases 1–10 |
+| `2.0.0` | Incremental rendering, markdown-core v2 style: the consumer mutates the input and receives the updated render tree as fast as possible — sessions, immutable structurally-shared snapshots, deltas, damage-proportional commit cost | M6 |
+| `3.0.0` | Full TeXbook support, product-ready as the core of a TeX project editor: the programmable TeX layer, modules, multi-file projects, references, page building | M7–M8 |
 
 | Milestone | Scope | Gate |
 | --- | --- | --- |
-| M1 | Full §5.1 v1 grammar with correct TeX spacing/style rules; complete default-font metrics tables; allocation-failure + fuzz clean | blocks Phase 11 |
-| M2 | Environments: `matrix`/`pmatrix`/…, `cases`, `aligned`; stretchy delimiters and extensible recipes; `\operatorname`, `\overset`/`\underset`, over/under braces | blocks Phase 11 |
-| M3 | Error-tolerant mode (structured error boxes in-tree, KaTeX-style opt-in) | post-1.0 |
-| M4 | User macro definitions (`\newcommand` subset) with expansion limits; color/size switches | post-1.0 |
-| M5 | Incremental/session API parity with markdown-core if profiling justifies it | post-1.0, needs its own spec |
+| M1 | Math core: ordinary atoms, TeX math classes (ord/op/bin/rel/open/close/punct/inner) with correct inter-atom spacing, superscripts/subscripts, fractions (`\frac`/`\dfrac`/`\tfrac`/`\binom`), radicals, `\left`/`\right` + explicit sizes, function names with limits placement, big operators, accents, Greek/arrow/relation symbol sets, style switches (`\mathbf` … `\mathbb`, `\text`), explicit spacing; complete default-face metrics tables; allocation-failure + fuzz clean | blocks `1.0.0` |
+| M2 | Math environments and extensibility: `matrix` family, `cases`, `aligned`; stretchy delimiters and extensible recipes; `\operatorname`, `\overset`/`\underset`, over/under braces; `\tag` numbering | blocks `1.0.0` |
+| M3 | Text-mode galley: paragraphs with Knuth–Plass line breaking, font/style commands, sectioning headings, lists, `tabular`, `verbatim`, quotes, document skeleton (`\documentclass` subset, `\begin{document}`, title block) rendered as one continuous galley | blocks `1.0.0` |
+| M4 | Domain notation coverage as built-in commands: chemistry (`\ce`, mhchem subset), physics (units/braket subsets), extended math alphabets, symbol-coverage sweep with a pinned coverage inventory tied to fixtures | blocks `1.0.0` |
+| M5 | Error-tolerant mode (structured error boxes in-tree, KaTeX-style opt-in) | 1.x minor, post-`1.0.0` |
+| M6 | Incremental sessions: spec first (sessions-and-deltas style), session API on all platforms, dump-equality with a from-scratch render under replay/random-edit/coverage-guided fuzzing, damage-proportional cost gates | blocks `2.0.0` |
+| M7 | The programmable TeX layer: `\def`/`\newcommand`, expansion engine, conditionals, registers, catcode changes, `\halign` core | blocks `3.0.0` |
+| M8 | Project features: multi-file input (`\input`/`\include`), package/module model, reference and citation resolution (`\label`/`\ref`/`\cite` with aux-equivalent fixpoint), counters, page building and output routines; editor-product contract (stable node identity, complete source mapping) | blocks `3.0.0` |
 
 ## 14. Definition of done
 
