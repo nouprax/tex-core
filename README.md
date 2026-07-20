@@ -35,10 +35,10 @@ Nothing is published yet and no platform support is claimed.
 
 | Platform | Coordinate | Entry point |
 | --- | --- | --- |
-| C | `tex-core` (CMake/pkg-config; GitHub Release archives) | `tex_core_document_render` |
-| Swift | SwiftPM `https://github.com/nouprax/tex-core`, product `TexCore` | `Document.render` |
-| Kotlin Multiplatform | `com.nouprax:kotlin-tex-core` (Maven Central) | `Document.render` |
-| ECMAScript / WASM | `@nouprax/es-tex-core` (npm) | `Document.render` |
+| C | `tex-core` (CMake/pkg-config; GitHub Release archives) | `tex_core_document_compile` |
+| Swift | SwiftPM `https://github.com/nouprax/tex-core`, product `TexCore` | `Document.compile` |
+| Kotlin Multiplatform | `com.nouprax:kotlin-tex-core` (Maven Central) | `Document.compile` |
+| ECMAScript / WASM | `@nouprax/es-tex-core` (npm) | `Document.compile` |
 
 All packages release the same version from the same protected `vX.Y.Z` tag.
 
