@@ -28,8 +28,8 @@ typedef struct txc_arena {
 } txc_arena;
 
 void txc_arena_init(txc_arena *arena);
-/* Returns max_align_t-aligned zeroed storage, or NULL on allocation
- * failure; the arena stays valid and releasable either way. */
+/* Returns zeroed storage aligned for any scalar object, or NULL on
+ * allocation failure; the arena stays valid and releasable either way. */
 void *txc_arena_alloc(txc_arena *arena, size_t size);
 void txc_arena_release(txc_arena *arena);
 
