@@ -87,6 +87,21 @@ git ls-files | while IFS= read -r path; do
     fi
 done
 
+# The lockfile must resolve every package from the public npm registry.
+# Machine-level registry mirrors (corporate feeds, proxies) otherwise leak
+# environment-specific tarball URLs into pnpm-lock.yaml, and a fresh
+# contributor or CI host cannot install from them. pnpm omits the tarball
+# field entirely for the default registry, so any tarball host that is not
+# registry.npmjs.org is a leak.
+if [ -f pnpm-lock.yaml ]; then
+    foreign_tarballs=$(grep -Eo 'tarball: https?://[^/]+' pnpm-lock.yaml \
+        | grep -v '//registry\.npmjs\.org$' || true)
+    if [ -n "$foreign_tarballs" ]; then
+        printf '%s\n' "$foreign_tarballs" | sort -u >&2
+        fail "pnpm-lock.yaml resolves packages outside the public npm registry"
+    fi
+fi
+
 # TeX Core is a from-scratch implementation (plan decision D1): LICENSE is the
 # only required attribution file. If an upstream is ever imported, COPYING and
 # UPSTREAM.md become required here, per markdown-core practice.
