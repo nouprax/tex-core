@@ -563,27 +563,27 @@ Acceptance:
 - [x] `ctest --preset conformance` runs every manifest fixture and passes.
 - [x] Deliberately corrupting one golden fails conformance; deliberately
       removing a fixture from the manifest fails `check:contracts`.
-- [ ] Spec review sign-off recorded in the PR (schema is now versioned; §5.5
-      protocol active).
+- [x] Spec review sign-off recorded in the PR (schema is now versioned; §5.5
+      protocol active): PR #3 review and squash-merge on 2026-07-21.
 
 ### Phase 4 — CI phase A (C-only) and control plane in evaluate
 
 Tasks:
 
-- [ ] `.github/workflows/ci.yml` per template §5: triggers
+- [x] `.github/workflows/ci.yml` per template §5: triggers
       `workflow_call`/`pull_request`/push-main/`merge_group`/`workflow_dispatch`;
       event+PR concurrency lanes; Health Check (Repository, C), Build (4-way
       C matrix), Build Test (test trees + sanitizer trees + link consumer +
       package-content audit of the C archive), Test (correctness, conformance,
       sanitizers, benchmark), barriers, `Required gates` /
       `Development branch gates` naming rule.
-- [ ] `.github/workflows/codeql.yml`: `Security Scan - C and C++` manual
+- [x] `.github/workflows/codeql.yml`: `Security Scan - C and C++` manual
       product-only build + `CodeQL gate`.
-- [ ] `scripts/audit-ci-policy.sh` (template §13 checks that apply now),
+- [x] `scripts/audit-ci-policy.sh` (template §13 checks that apply now),
       `scripts/audit-test-topology.sh` skeleton, artifact-manifest
       producer/validator scripts (template §5.2.3), C consumer scripts
       (`build-c-test-artifact.sh`, `run-c-test-artifact.sh`).
-- [ ] `.github/rulesets/{main,release-tags}.json`,
+- [x] `.github/rulesets/{main,release-tags}.json`,
       `.github/environments/{release,release-tag-policy}.json` recipes;
       `scripts/bootstrap-repository.sh` copied from template §10.2.
 - [ ] Run bootstrap with `RULESET_ENFORCEMENT=evaluate`

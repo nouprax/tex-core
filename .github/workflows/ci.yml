@@ -1,0 +1,462 @@
+name: CI
+
+on:
+    workflow_call:
+    pull_request:
+    push:
+        branches:
+            - main
+    merge_group:
+    workflow_dispatch:
+
+permissions:
+    contents: read
+
+concurrency:
+    # Keep default-branch push, pull-request, merge-queue, and reusable release
+    # runs in separate lanes. GitHub can leave a cancelled runner in teardown
+    # indefinitely; cross-event SHA deduplication could then prevent another
+    # control-plane run from starting. Newer runs still replace older runs for
+    # the same PR or ref.
+    group: ci-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
+    cancel-in-progress: true
+
+jobs:
+    health-check-repository:
+        name: Health Check - Repository
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v7
+            - uses: actions/setup-node@v7
+              with:
+                  node-version: 26.5.0
+            - uses: pnpm/action-setup@v6
+              with:
+                  run_install: false
+                  version: 11.7.0
+            - name: Install JavaScript dependencies
+              run: pnpm install --frozen-lockfile
+            - name: Check prepared repository environment
+              run: scripts/init-environment.sh --check node dependencies
+            - name: Check cross-platform contracts
+              run: pnpm check:contracts
+            - name: Audit repository, CI policy, and test topology
+              run: |
+                  pnpm audit:repository:clean
+                  pnpm audit:ci
+                  pnpm audit:tests
+
+    health-check-c:
+        name: Health Check - C
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v7
+            - uses: actions/setup-node@v7
+              with:
+                  node-version: 26.5.0
+            - uses: pnpm/action-setup@v6
+              with:
+                  run_install: false
+                  version: 11.7.0
+            - name: Install repo-managed formatting tools
+              run: scripts/init-environment.sh --install tools
+            - name: Check C and CMake formatting
+              run: |
+                  pnpm format:c:check
+                  pnpm format:cmake:check
+            - name: Lint C
+              run: pnpm lint:c
+
+    health-checks-ready:
+        name: Health Checks - Ready
+        needs:
+            - health-check-repository
+            - health-check-c
+        runs-on: ubuntu-latest
+        steps:
+            - name: Release checked source to build producers
+              run: echo "Every repository and platform health check passed."
+
+    c-product-build:
+        name: Build - C / ${{ matrix.label }}
+        needs: health-checks-ready
+        runs-on: ${{ matrix.os }}
+        strategy:
+            fail-fast: false
+            matrix:
+                include:
+                    - os: ubuntu-latest
+                      label: Linux · Clang · Shared
+                      compiler: clang
+                      cc: clang
+                      cxx: clang++
+                      shared: "ON"
+                      variant: linux-clang-shared
+                    - os: ubuntu-latest
+                      label: Linux · GCC · Static
+                      compiler: gcc
+                      cc: gcc
+                      cxx: g++
+                      shared: "OFF"
+                      variant: linux-gcc-static
+                    - os: macos-latest
+                      label: macOS · Clang · Shared
+                      compiler: clang
+                      cc: clang
+                      cxx: clang++
+                      shared: "ON"
+                      variant: macos-clang-shared
+        env:
+            CC: ${{ matrix.cc }}
+            CXX: ${{ matrix.cxx }}
+        steps:
+            - uses: actions/checkout@v7
+            - name: Build immutable C product artifact
+              run: |
+                  scripts/build-c-product-artifact.sh \
+                      "${{ matrix.variant }}" \
+                      "${{ matrix.shared }}" \
+                      build/ci-artifacts/c-product
+            - uses: actions/upload-artifact@v7
+              with:
+                  name: c-product-${{ matrix.variant }}-${{ github.sha }}
+                  if-no-files-found: error
+                  retention-days: 7
+                  path: build/ci-artifacts/c-product
+
+    c-product-build-windows:
+        name: Build - C / Windows · Static
+        needs: health-checks-ready
+        runs-on: windows-latest
+        steps:
+            - uses: actions/checkout@v7
+            - name: Build immutable C product artifact
+              shell: bash
+              run: scripts/build-c-product-artifact.sh windows-static OFF build/ci-artifacts/c-product Release
+            - uses: actions/upload-artifact@v7
+              with:
+                  name: c-product-windows-static-${{ github.sha }}
+                  if-no-files-found: error
+                  retention-days: 7
+                  path: build/ci-artifacts/c-product
+
+    builds-ready:
+        name: Builds - Ready
+        needs:
+            - c-product-build
+            - c-product-build-windows
+        runs-on: ubuntu-latest
+        steps:
+            - name: Release immutable build artifacts to build tests
+              run: echo "Every platform build artifact is ready."
+
+    package-audit:
+        name: Build Test - Repository / Package Contents
+        needs: builds-ready
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v7
+            - uses: actions/setup-node@v7
+              with:
+                  node-version: 26.5.0
+            - uses: pnpm/action-setup@v6
+              with:
+                  run_install: false
+                  version: 11.7.0
+            - name: Install package-audit dependencies
+              run: |
+                  sudo apt-get update
+                  sudo apt-get install --yes pkg-config
+                  pnpm install --frozen-lockfile
+            - name: Audit installed package contents and link consumers
+              run: pnpm audit:packages
+
+    c-test-build:
+        name: Build Test - C / ${{ matrix.label }}
+        needs: builds-ready
+        runs-on: ${{ matrix.os }}
+        strategy:
+            fail-fast: false
+            matrix:
+                include:
+                    - os: ubuntu-latest
+                      label: Linux · Clang · Shared
+                      compiler: clang
+                      cc: clang
+                      cxx: clang++
+                      shared: "ON"
+                      product-variant: linux-clang-shared
+                    - os: ubuntu-latest
+                      label: Linux · GCC · Static
+                      compiler: gcc
+                      cc: gcc
+                      cxx: g++
+                      shared: "OFF"
+                      product-variant: linux-gcc-static
+                    - os: macos-latest
+                      label: macOS · Clang · Shared
+                      compiler: clang
+                      cc: clang
+                      cxx: clang++
+                      shared: "ON"
+                      product-variant: macos-clang-shared
+        env:
+            CC: ${{ matrix.cc }}
+            CXX: ${{ matrix.cxx }}
+        steps:
+            - uses: actions/checkout@v7
+            - uses: actions/download-artifact@v8
+              with:
+                  name: c-product-${{ matrix.product-variant }}-${{ github.sha }}
+                  path: build/ci-artifacts/c-product
+            - name: Restore C product tree
+              run: |
+                  cd build/ci-artifacts/c-product
+                  if command -v sha256sum >/dev/null 2>&1; then
+                      sha256sum --check SHA256SUMS
+                  else
+                      shasum -a 256 -c SHA256SUMS
+                  fi
+                  tar -xzf c-product-tree.tar.gz -C ../../..
+            - name: Build immutable C test artifact
+              run: scripts/build-c-test-artifact.sh default "${{ matrix.shared }}" build/ci-artifacts/c
+            - uses: actions/upload-artifact@v7
+              with:
+                  name: c-${{ matrix.os }}-${{ matrix.compiler }}-${{ matrix.shared }}-${{ github.sha }}
+                  if-no-files-found: error
+                  retention-days: 7
+                  path: build/ci-artifacts/c
+
+    c-test-build-windows:
+        name: Build Test - C / Windows · Static
+        needs: builds-ready
+        runs-on: windows-latest
+        steps:
+            - uses: actions/checkout@v7
+            - uses: actions/download-artifact@v8
+              with:
+                  name: c-product-windows-static-${{ github.sha }}
+                  path: build/ci-artifacts/c-product
+            - name: Restore C product tree
+              shell: bash
+              run: |
+                  cd build/ci-artifacts/c-product
+                  sha256sum --check SHA256SUMS
+                  tar -xzf c-product-tree.tar.gz -C ../../..
+            - name: Build immutable C test artifact
+              shell: bash
+              run: scripts/build-c-test-artifact.sh default OFF build/ci-artifacts/c Release
+            - uses: actions/upload-artifact@v7
+              with:
+                  name: c-windows-static-${{ github.sha }}
+                  if-no-files-found: error
+                  retention-days: 7
+                  path: build/ci-artifacts/c
+
+    c-sanitizer-test-build:
+        name: Build Test - C Sanitizer / ${{ matrix.label }}
+        needs: builds-ready
+        runs-on: ubuntu-latest
+        strategy:
+            fail-fast: false
+            matrix:
+                include:
+                    - sanitizer: asan
+                      label: ASan
+                    - sanitizer: ubsan
+                      label: UBSan
+                    - sanitizer: tsan
+                      label: TSan
+        env: { CC: clang, CXX: clang++ }
+        steps:
+            - uses: actions/checkout@v7
+            - name: Build immutable sanitizer test artifact
+              run: scripts/build-c-test-artifact.sh "${{ matrix.sanitizer }}" - build/ci-artifacts/c
+            - uses: actions/upload-artifact@v7
+              with:
+                  name: c-${{ matrix.sanitizer }}-${{ github.sha }}
+                  if-no-files-found: error
+                  retention-days: 7
+                  path: build/ci-artifacts/c
+
+    build-tests-ready:
+        name: Build Tests - Ready
+        needs:
+            - package-audit
+            - c-test-build
+            - c-test-build-windows
+            - c-sanitizer-test-build
+        runs-on: ubuntu-latest
+        steps:
+            - name: Release build-tested artifacts to parallel test consumers
+              run: echo "Every platform build test passed."
+
+    c-test:
+        name: Test - C / ${{ matrix.label }}
+        needs: build-tests-ready
+        runs-on: ${{ matrix.os }}
+        strategy:
+            fail-fast: false
+            matrix:
+                include:
+                    - os: ubuntu-latest
+                      compiler: clang
+                      shared: "ON"
+                      suite: correctness
+                      label: Linux · Clang · Shared · Correctness
+                    - os: ubuntu-latest
+                      compiler: clang
+                      shared: "ON"
+                      suite: conformance
+                      label: Linux · Clang · Shared · Conformance
+                    - os: ubuntu-latest
+                      compiler: gcc
+                      shared: "OFF"
+                      suite: correctness
+                      label: Linux · GCC · Static · Correctness
+                    - os: ubuntu-latest
+                      compiler: gcc
+                      shared: "OFF"
+                      suite: conformance
+                      label: Linux · GCC · Static · Conformance
+                    - os: macos-latest
+                      compiler: clang
+                      shared: "ON"
+                      suite: correctness
+                      label: macOS · Clang · Shared · Correctness
+                    - os: macos-latest
+                      compiler: clang
+                      shared: "ON"
+                      suite: conformance
+                      label: macOS · Clang · Shared · Conformance
+        steps:
+            - uses: actions/checkout@v7
+            - uses: actions/download-artifact@v8
+              with:
+                  name: c-${{ matrix.os }}-${{ matrix.compiler }}-${{ matrix.shared }}-${{ github.sha }}
+                  path: build/ci-artifacts/c
+            - name: Run CTest suite without building
+              run: scripts/run-c-test-artifact.sh build/ci-artifacts/c "${{ matrix.suite }}"
+
+    c-test-windows:
+        name: Test - C / ${{ matrix.label }}
+        needs: build-tests-ready
+        runs-on: windows-latest
+        strategy:
+            fail-fast: false
+            matrix:
+                include:
+                    - suite: correctness
+                      label: Windows · Static · Correctness
+                    - suite: conformance
+                      label: Windows · Static · Conformance
+        steps:
+            - uses: actions/checkout@v7
+            - uses: actions/download-artifact@v8
+              with:
+                  name: c-windows-static-${{ github.sha }}
+                  path: build/ci-artifacts/c
+            - name: Run CTest suite without building
+              shell: bash
+              run: scripts/run-c-test-artifact.sh build/ci-artifacts/c "${{ matrix.suite }}" Release
+
+    # ThreadSanitizer gates the frozen concurrency contract. All sanitizer
+    # consumers execute a prebuilt instrumented tree on a fresh runner.
+    c-sanitizer-test:
+        name: Test - C Sanitizer / ${{ matrix.label }}
+        needs: build-tests-ready
+        runs-on: ubuntu-latest
+        strategy:
+            fail-fast: false
+            matrix:
+                include:
+                    - sanitizer: asan
+                      preset: correctness-asan
+                      label: ASan
+                    - sanitizer: ubsan
+                      preset: correctness-ubsan
+                      label: UBSan
+                    - sanitizer: tsan
+                      preset: correctness-tsan
+                      label: TSan
+        env:
+            ASAN_OPTIONS: halt_on_error=1:abort_on_error=1:detect_leaks=1
+            UBSAN_OPTIONS: halt_on_error=1:abort_on_error=1:print_stacktrace=1
+            TSAN_OPTIONS: halt_on_error=1:abort_on_error=1
+        steps:
+            - uses: actions/checkout@v7
+            - uses: actions/download-artifact@v8
+              with:
+                  name: c-${{ matrix.sanitizer }}-${{ github.sha }}
+                  path: build/ci-artifacts/c
+            - name: Run sanitizer suite without building
+              run: scripts/run-c-test-artifact.sh build/ci-artifacts/c "${{ matrix.preset }}"
+
+    benchmark-c:
+        name: Test - C / Linux · Benchmark
+        needs: build-tests-ready
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v7
+            - uses: actions/download-artifact@v8
+              with:
+                  name: c-ubuntu-latest-clang-ON-${{ github.sha }}
+                  path: build/ci-artifacts/c
+            - name: Run C benchmark suite without building
+              run: scripts/run-c-test-artifact.sh build/ci-artifacts/c benchmark
+
+    benchmarks-ready:
+        name: Benchmarks - Ready
+        if: ${{ always() }}
+        needs: [benchmark-c]
+        runs-on: ubuntu-latest
+        steps:
+            - name: Require every platform benchmark
+              env:
+                  C: ${{ needs.benchmark-c.result }}
+              run: test "$C" = success
+
+    tests-ready:
+        name: Tests - Ready
+        if: ${{ always() }}
+        needs:
+            - c-test
+            - c-test-windows
+            - c-sanitizer-test
+        runs-on: ubuntu-latest
+        steps:
+            - name: Require every platform test
+              env:
+                  C_TEST: ${{ needs.c-test.result }}
+                  C_TEST_WINDOWS: ${{ needs.c-test-windows.result }}
+                  C_SANITIZER_TEST: ${{ needs.c-sanitizer-test.result }}
+              run: |
+                  for result in \
+                      "$C_TEST" \
+                      "$C_TEST_WINDOWS" \
+                      "$C_SANITIZER_TEST"
+                  do
+                      if [ "$result" != success ]; then
+                          echo "A required test dependency concluded: $result" >&2
+                          exit 1
+                      fi
+                  done
+
+    required-gates:
+        # Push runs use an independent, non-required context. PR and
+        # merge-queue runs alone own the name referenced by the ruleset.
+        name: ${{ (github.event_name == 'pull_request' || github.event_name == 'merge_group') && 'Required gates' || 'Development branch gates' }}
+        if: ${{ always() }}
+        needs:
+            - tests-ready
+            - benchmarks-ready
+        runs-on: ubuntu-latest
+        steps:
+            - name: Require the complete test and benchmark layers
+              env:
+                  TESTS_READY: ${{ needs.tests-ready.result }}
+                  BENCHMARKS_READY: ${{ needs.benchmarks-ready.result }}
+              run: |
+                  for result in "$TESTS_READY" "$BENCHMARKS_READY"; do
+                      test "$result" = success
+                  done

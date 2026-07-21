@@ -8,12 +8,12 @@
         "pnpm": "11.7.0"
     },
     "scripts": {
-        "audit:ci": "scripts/pending.sh 'Phase 4 (CI phase A)'",
-        "audit:packages": "scripts/pending.sh 'Phase 8 (CI phase B and audits)'",
+        "audit:ci": "scripts/audit-ci-policy.sh",
+        "audit:packages": "scripts/audit-package-contents.sh",
         "audit:repository": "scripts/audit-repository.sh",
         "audit:repository:clean": "scripts/audit-repository.sh --clean",
         "audit:surface": "scripts/pending.sh 'Phase 8 (CI phase B and audits)'",
-        "audit:tests": "scripts/pending.sh 'Phase 4 (CI phase A)'",
+        "audit:tests": "scripts/audit-test-topology.sh",
         "benchmark:c-host": "cmake --preset default && cmake --build --preset default --parallel && ctest --preset benchmark",
         "benchmark:swift-macos": "scripts/pending.sh 'Phase 5 (Swift binding)'",
         "benchmark:kotlin-jvm": "scripts/pending.sh 'Phase 6 (Kotlin binding)'",
@@ -61,7 +61,7 @@
         "test:kotlin-linux-x64": "scripts/pending.sh 'Phase 6 (Kotlin binding)'",
         "test:es-node": "scripts/pending.sh 'Phase 7 (ES binding)'",
         "test:es-browser": "scripts/pending.sh 'Phase 7 (ES binding)'",
-        "verify": "pnpm run format:check && pnpm run lint && pnpm run check:contracts && pnpm run audit:repository"
+        "verify": "pnpm run format:check && pnpm run lint && pnpm run check:contracts && pnpm run audit:repository && pnpm run audit:ci"
     },
     "devDependencies": {
         "@eslint/js": "10.0.1",

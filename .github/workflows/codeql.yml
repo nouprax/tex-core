@@ -1,0 +1,60 @@
+name: CodeQL
+
+on:
+    push:
+        branches: [main]
+    pull_request:
+        branches: [main]
+    merge_group:
+    schedule:
+        - cron: "45 15 * * 3"
+
+jobs:
+    analyze:
+        name: Security Scan - ${{ matrix.label }}
+        runs-on: ${{ matrix.os }}
+        permissions:
+            actions: read
+            contents: read
+            security-events: write
+        strategy:
+            fail-fast: false
+            matrix:
+                include:
+                    - language: c-cpp
+                      label: C and C++
+                      build-mode: manual
+                      os: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v7
+            - name: Initialize CodeQL
+              uses: github/codeql-action/init@v4
+              with:
+                  build-mode: ${{ matrix.build-mode }}
+                  languages: ${{ matrix.language }}
+            - name: Build C/C++ product
+              if: matrix.language == 'c-cpp'
+              run: |
+                  cmake -S . -B build/codeql -DTEX_CORE_TESTS=OFF
+                  cmake --build build/codeql --parallel
+            - name: Perform CodeQL analysis
+              uses: github/codeql-action/analyze@v4
+              with:
+                  category: /language:${{ matrix.language }}
+
+    codeql-gate:
+        name: CodeQL gate
+        if: ${{ always() }}
+        needs: analyze
+        runs-on: ubuntu-latest
+        permissions:
+            contents: read
+        steps:
+            - name: Require every CodeQL language
+              env:
+                  RESULT: ${{ needs.analyze.result }}
+              run: |
+                  if [ "$RESULT" != success ]; then
+                      echo "CodeQL matrix concluded: $RESULT" >&2
+                      exit 1
+                  fi
