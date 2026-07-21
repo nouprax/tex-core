@@ -94,7 +94,8 @@ All names are fixed now; audits added in later phases enforce them.
 | C library / pkg-config | `tex-core` |
 | C identifier prefix | `tex_core_` (functions/types), `TEX_CORE_` (macros/constants) |
 | Swift package directory | `packages/swift-tex-core` |
-| SwiftPM package identity | `tex-core` (derived from `https://github.com/nouprax/tex-core`) |
+| SwiftPM package identity | `tex-core` — SwiftPM derives it from the dependency URL `https://github.com/nouprax/tex-core`; consumers see this identity |
+| SwiftPM manifest name | `swift-tex-core` — the `name:` field in `Package.swift`, matching the package directory (markdown-core convention: manifest name and URL-derived identity are distinct fields, e.g. its `name: "swift-markdown-core"` with identity `markdown-core`); `audit:repository` enforces this value |
 | SwiftPM product / module | `TexCore` (C shim target: `TexCoreC`, never public API) |
 | Kotlin package directory | `packages/kotlin-tex-core` |
 | Maven root coordinate | `com.nouprax:kotlin-tex-core` |

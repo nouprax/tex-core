@@ -126,8 +126,12 @@ if [ -f packages/es-tex-core/package.json ]; then
         || fail "the npm package coordinate changed"
 fi
 if [ -f Package.swift ]; then
+    # This is the manifest `name:` field, not the SwiftPM identity: consumers
+    # resolve the identity `tex-core` from the repository URL, while the
+    # manifest name matches the package directory (plan section 3,
+    # markdown-core convention).
     grep -q 'name: "swift-tex-core"' Package.swift \
-        || fail "the Swift package identity changed"
+        || fail "the Swift package manifest name changed"
 fi
 if [ -f packages/tex-core/include/tex_core.h ]; then
     grep -q 'tex_core_document_compile' packages/tex-core/include/tex_core.h \

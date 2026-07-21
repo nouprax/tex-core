@@ -492,8 +492,14 @@ install_tools() {
         "$clang_directory/venv/bin/python" -m pip install --disable-pip-version-check --quiet \
             "clang-format==$CLANG_FORMAT_VERSION"
     fi
-    CMAKE_FORMAT_TOOL_DIR="$root/.tools/cmakelang/$CMAKE_FORMAT_VERSION" \
-        scripts/format-cmake.sh --check
+    cmake_format_venv="$root/.tools/cmakelang/$CMAKE_FORMAT_VERSION/venv"
+    if [ ! -x "$cmake_format_venv/bin/cmake-format" ] \
+        || ! "$cmake_format_venv/bin/python" -c 'import yaml' 2>/dev/null; then
+        python3 -m venv "$cmake_format_venv"
+        "$cmake_format_venv/bin/python" -m pip install --disable-pip-version-check --quiet \
+            "cmakelang==$CMAKE_FORMAT_VERSION" \
+            "PyYAML==6.0.3"
+    fi
     if landed_swift; then
         scripts/install-swiftlint.sh
     fi
