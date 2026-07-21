@@ -20,6 +20,14 @@ export default defineConfig(
         extends: [tseslint.configs.disableTypeChecked]
     },
     {
+        // The types consumer imports the published package name, which only
+        // resolves inside the packaging suite's temp project (where its own
+        // tsconfig type-checks it against the packed tarball); repo-side
+        // typed lint cannot resolve it.
+        files: ["packages/es-tex-core/tests/types/**/*.ts"],
+        extends: [tseslint.configs.disableTypeChecked]
+    },
+    {
         files: ["packages/es-tex-core/src/**/*.ts"],
         languageOptions: {
             globals: {
