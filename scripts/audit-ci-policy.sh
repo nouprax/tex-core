@@ -53,6 +53,24 @@ grep -Fq -- '-DTEX_CORE_TESTS=ON' scripts/build-c-test-artifact.sh
 grep -Fq 'Total Tests: [1-9][0-9]*' scripts/build-c-test-artifact.sh
 grep -Fq 'benchmark' scripts/run-c-test-artifact.sh
 
+test -x scripts/build-swift-product-artifact.sh
+test -x scripts/build-swift-test-artifact.sh
+test -x scripts/run-swift-test-artifact.sh
+test -x scripts/build-swift-deployment.sh
+test -x scripts/check-swift-source-archive.sh
+grep -Fq -- 'swift build --target TexCore' scripts/build-swift-product-artifact.sh
+grep -Fq 'Package.release.swift' scripts/check-swift-source-archive.sh
+if grep -Eq 'swift package archive-source|cp .*Tests|cp .*Benchmarks|swift test|specs/render-tree' \
+    scripts/check-swift-source-archive.sh; then
+    echo "Swift release staging still includes test, benchmark, or conformance source" >&2
+    exit 1
+fi
+if grep -Eq '\.testTarget|TexCoreBenchmarks|Conformance|Plugins|Tools' \
+    packages/swift-tex-core/Package.release.swift; then
+    echo "Swift release manifest contains non-product targets" >&2
+    exit 1
+fi
+
 for job in \
     health-check-repository \
     health-check-c \

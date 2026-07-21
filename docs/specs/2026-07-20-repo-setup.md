@@ -614,10 +614,15 @@ lane.
 Acceptance:
 
 - [ ] All Swift lanes green locally and in CI; consumer builds from a staged
-      source archive with no workspace fallback.
-- [ ] Swift dump of every shared fixture is byte-identical to the C golden.
-- [ ] `swift build` from a clean checkout needs no credentials or prebuilt
-      natives.
+      source archive with no workspace fallback (local lanes and
+      `check-swift-source-archive.sh` verified; CI rows land with this
+      phase's PR).
+- [x] Swift dump of every shared fixture is byte-identical to the C golden
+      (the conformance suite replays all 13 manifest cases, including the
+      error records, through the public Swift API).
+- [x] `swift build` from a clean checkout needs no credentials or prebuilt
+      natives (TexCoreC compiles the engine sources directly; the export
+      and version headers are committed).
 
 ### Phase 6 — Kotlin/KMP binding
 

@@ -6,6 +6,16 @@ not promised to remain compatible between releases.
 
 ## Unreleased
 
+- Land the Swift binding: the `TexCore` SwiftPM product (iOS 18+/macOS 15+)
+  with `Document.compile` over the three input modes, an immutable
+  `Sendable` render-tree value API with exhaustive typed visitors, the
+  structured `CompileError`, and a canonical dumper that reproduces the C
+  dump byte for byte; conformance tests replay the shared corpus through a
+  build-tool plugin, an external consumer package builds from the
+  product-only release manifest, and CI grows Swift health-check, product,
+  deployment-target, test-product, macOS/iOS test, and benchmark rows plus
+  a Swift CodeQL lane. The C export and version headers become committed
+  files so every build system compiles the same headers.
 - Stand up CI phase A (C-only): the fail-closed PR quality-gate DAG
   (`Health Check → Build → Build Test → Test → Required gates`) over a
   four-way C build matrix with sanitizer suites, immutable artifact handoff

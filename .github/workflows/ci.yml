@@ -67,11 +67,34 @@ jobs:
             - name: Lint C
               run: pnpm lint:c
 
+    health-check-swift:
+        name: Health Check - Swift
+        runs-on: macos-26
+        steps:
+            - uses: actions/checkout@v7
+            - uses: maxim-lobanov/setup-xcode@v1
+              with:
+                  xcode-version: "26.6"
+            - uses: actions/setup-node@v7
+              with:
+                  node-version: 26.5.0
+            - uses: pnpm/action-setup@v6
+              with:
+                  run_install: false
+                  version: 11.7.0
+            - name: Check prepared Swift environment
+              run: scripts/init-environment.sh --check swift
+            - name: Check Swift formatting
+              run: scripts/format-swift.sh --check
+            - name: Lint Swift
+              run: scripts/lint-swift.sh
+
     health-checks-ready:
         name: Health Checks - Ready
         needs:
             - health-check-repository
             - health-check-c
+            - health-check-swift
         runs-on: ubuntu-latest
         steps:
             - name: Release checked source to build producers
@@ -140,11 +163,64 @@ jobs:
                   retention-days: 7
                   path: build/ci-artifacts/c-product
 
+    swift-product-build:
+        name: Build - Swift / Product
+        needs: health-checks-ready
+        runs-on: macos-26
+        steps:
+            - uses: actions/checkout@v7
+            - uses: maxim-lobanov/setup-xcode@v1
+              with:
+                  xcode-version: "26.6"
+            - name: Build immutable Swift product artifact
+              run: scripts/build-swift-product-artifact.sh
+            - uses: actions/upload-artifact@v7
+              with:
+                  name: swift-product-${{ github.sha }}
+                  if-no-files-found: error
+                  retention-days: 7
+                  path: build/ci-artifacts/swift-product
+
+    # Declared deployment targets must actually build: oldest and current OS
+    # for each declared platform, on the generic destination.
+    swift-deployment-contract:
+        name: Build - Swift / ${{ matrix.label }}
+        needs: health-checks-ready
+        runs-on: macos-26
+        strategy:
+            fail-fast: false
+            matrix:
+                include:
+                    - platform: iOS
+                      version: "18.0"
+                      label: iOS 18
+                    - platform: iOS
+                      version: "26.0"
+                      label: iOS 26
+                    - platform: macOS
+                      version: "15.0"
+                      label: macOS 15
+                    - platform: macOS
+                      version: "26.0"
+                      label: macOS 26
+        steps:
+            - uses: actions/checkout@v7
+            - uses: maxim-lobanov/setup-xcode@v1
+              with:
+                  xcode-version: "26.6"
+            - name: Build declared deployment target
+              env:
+                  PLATFORM: ${{ matrix.platform }}
+                  VERSION: ${{ matrix.version }}
+              run: scripts/build-swift-deployment.sh "$PLATFORM" "$VERSION"
+
     builds-ready:
         name: Builds - Ready
         needs:
             - c-product-build
             - c-product-build-windows
+            - swift-product-build
+            - swift-deployment-contract
         runs-on: ubuntu-latest
         steps:
             - name: Release immutable build artifacts to build tests
@@ -279,6 +355,34 @@ jobs:
                   retention-days: 7
                   path: build/ci-artifacts/c
 
+    swift-test-build:
+        name: Build Test - Swift / Test Products
+        needs: builds-ready
+        runs-on: macos-26
+        timeout-minutes: 20
+        steps:
+            - uses: actions/checkout@v7
+            - uses: maxim-lobanov/setup-xcode@v1
+              with:
+                  xcode-version: "26.6"
+            - uses: actions/download-artifact@v8
+              with:
+                  name: swift-product-${{ github.sha }}
+                  path: build/ci-artifacts/swift-product
+            - name: Restore Swift product tree
+              run: |
+                  cd build/ci-artifacts/swift-product
+                  shasum -a 256 -c SHA256SUMS
+                  tar -xzf swift-product-tree.tar.gz -C ../../..
+            - name: Build immutable macOS and iOS test products
+              run: scripts/build-swift-test-artifact.sh
+            - uses: actions/upload-artifact@v7
+              with:
+                  name: swift-test-${{ github.sha }}
+                  if-no-files-found: error
+                  retention-days: 7
+                  path: build/ci-artifacts/swift
+
     build-tests-ready:
         name: Build Tests - Ready
         needs:
@@ -286,6 +390,7 @@ jobs:
             - c-test-build
             - c-test-build-windows
             - c-sanitizer-test-build
+            - swift-test-build
         runs-on: ubuntu-latest
         steps:
             - name: Release build-tested artifacts to parallel test consumers
@@ -392,6 +497,35 @@ jobs:
             - name: Run sanitizer suite without building
               run: scripts/run-c-test-artifact.sh build/ci-artifacts/c "${{ matrix.preset }}"
 
+    swift-test:
+        name: Test - Swift / ${{ matrix.label }}
+        needs: build-tests-ready
+        runs-on: macos-26
+        timeout-minutes: 12
+        strategy:
+            fail-fast: false
+            matrix:
+                include:
+                    - suite: macos-correctness
+                      label: macOS · Correctness
+                    - suite: macos-conformance
+                      label: macOS · Conformance
+                    - suite: ios-correctness
+                      label: iOS · Correctness
+                    - suite: ios-conformance
+                      label: iOS · Conformance
+        steps:
+            - uses: actions/checkout@v7
+            - uses: maxim-lobanov/setup-xcode@v1
+              with:
+                  xcode-version: "26.6"
+            - uses: actions/download-artifact@v8
+              with:
+                  name: swift-test-${{ github.sha }}
+                  path: build/ci-artifacts/swift
+            - name: Run Swift suite without building
+              run: scripts/run-swift-test-artifact.sh build/ci-artifacts/swift "${{ matrix.suite }}"
+
     benchmark-c:
         name: Test - C / Linux · Benchmark
         needs: build-tests-ready
@@ -405,16 +539,35 @@ jobs:
             - name: Run C benchmark suite without building
               run: scripts/run-c-test-artifact.sh build/ci-artifacts/c benchmark
 
+    benchmark-swift:
+        name: Test - Swift / macOS · Benchmark
+        needs: build-tests-ready
+        runs-on: macos-26
+        steps:
+            - uses: actions/checkout@v7
+            - uses: maxim-lobanov/setup-xcode@v1
+              with:
+                  xcode-version: "26.6"
+            - uses: actions/download-artifact@v8
+              with:
+                  name: swift-test-${{ github.sha }}
+                  path: build/ci-artifacts/swift
+            - name: Run Swift benchmark suite without building
+              run: scripts/run-swift-test-artifact.sh build/ci-artifacts/swift macos-benchmark
+
     benchmarks-ready:
         name: Benchmarks - Ready
         if: ${{ always() }}
-        needs: [benchmark-c]
+        needs: [benchmark-c, benchmark-swift]
         runs-on: ubuntu-latest
         steps:
             - name: Require every platform benchmark
               env:
                   C: ${{ needs.benchmark-c.result }}
-              run: test "$C" = success
+                  SWIFT: ${{ needs.benchmark-swift.result }}
+              run: |
+                  test "$C" = success
+                  test "$SWIFT" = success
 
     tests-ready:
         name: Tests - Ready
@@ -423,6 +576,7 @@ jobs:
             - c-test
             - c-test-windows
             - c-sanitizer-test
+            - swift-test
         runs-on: ubuntu-latest
         steps:
             - name: Require every platform test
@@ -430,11 +584,13 @@ jobs:
                   C_TEST: ${{ needs.c-test.result }}
                   C_TEST_WINDOWS: ${{ needs.c-test-windows.result }}
                   C_SANITIZER_TEST: ${{ needs.c-sanitizer-test.result }}
+                  SWIFT_TEST: ${{ needs.swift-test.result }}
               run: |
                   for result in \
                       "$C_TEST" \
                       "$C_TEST_WINDOWS" \
-                      "$C_SANITIZER_TEST"
+                      "$C_SANITIZER_TEST" \
+                      "$SWIFT_TEST"
                   do
                       if [ "$result" != success ]; then
                           echo "A required test dependency concluded: $result" >&2
