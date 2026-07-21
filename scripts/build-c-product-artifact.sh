@@ -8,6 +8,11 @@ output=${3:?usage: build-c-product-artifact.sh VARIANT ON|OFF OUTPUT_DIRECTORY [
 configuration=${4:-Release}
 build_dir=build/cmake
 
+# Start from an empty tree: reconfiguring a reused build directory with
+# -DTEX_CORE_TESTS=OFF does not remove already-built test binaries, and the
+# archive below captures the whole tree.
+rm -rf "${root:?}/$build_dir"
+
 cmake -S "$root" -B "$root/$build_dir" \
     -DCMAKE_BUILD_TYPE=Release \
     -DTEX_CORE_TESTS=OFF \
