@@ -71,20 +71,61 @@ if grep -Eq '\.testTarget|TexCoreBenchmarks|Conformance|Plugins|Tools' \
     exit 1
 fi
 
+test -x scripts/build-kotlin-product-artifact.sh
+test -x scripts/build-kotlin-host-test-artifact.sh
+test -x scripts/run-kotlin-host-test-artifact.sh
+test -x scripts/build-kotlin-android-test-artifact.sh
+test -x scripts/run-kotlin-android-test-artifact.sh
+test -x scripts/stage-maven-publications.sh
+grep -Fq 'stageJvmBenchmarkArtifact' scripts/build-kotlin-host-test-artifact.sh
+grep -Fq -- '-PtexCore.android.abis=x86_64' scripts/build-kotlin-android-test-artifact.sh
+search 'sha256sum --check SHA256SUMS' scripts/run-kotlin-android-test-artifact.sh
+search 'source_sha' scripts/run-kotlin-android-test-artifact.sh
+
+# The emulator consumers execute one immutable APK; any build-system entry
+# point there voids the build-once/test-many contract, and the four
+# page-size x suite legs must stay independent so a wedged leg cannot mask
+# its siblings.
+android_test_job=$(sed -n '/^    kotlin-android-test:$/,/^    swift-test:$/p' "$ci")
+for forbidden in \
+    'gradle' \
+    'sdkmanager "platforms' \
+    'ndk;' \
+    'cmake' \
+    'publishKotlinToMavenLocal' \
+    'run-kotlin-android-emulator-tests.sh'; do
+    if grep -Fq "$forbidden" <<<"$android_test_job"; then
+        echo "Android test consumer contains build dependency: $forbidden" >&2
+        exit 1
+    fi
+done
+if [ "$(grep -c '^                      suite:' <<<"$android_test_job")" -ne 4 ]; then
+    echo "Android correctness/conformance and 4K/16K must be four independent consumers" >&2
+    exit 1
+fi
+
 for job in \
     health-check-repository \
     health-check-c \
+    health-check-kotlin \
     health-checks-ready \
     c-product-build \
     c-product-build-windows \
+    kotlin-product-build \
     package-audit \
     c-test-build \
     c-test-build-windows \
     c-sanitizer-test-build \
+    kotlin-test-build \
+    kotlin-consumers \
+    kotlin-android-test-build \
     c-test \
     c-test-windows \
     c-sanitizer-test \
+    kotlin-test \
+    kotlin-android-test \
     benchmark-c \
+    benchmark-kotlin \
     benchmarks-ready \
     builds-ready \
     build-tests-ready \
@@ -107,7 +148,10 @@ for consumer in \
     c-test \
     c-test-windows \
     c-sanitizer-test \
-    benchmark-c; do
+    kotlin-test \
+    kotlin-android-test \
+    benchmark-c \
+    benchmark-kotlin; do
     consumer_job=$(sed -n "/^    ${consumer}:$/,/^    [a-z].*:$/p" "$ci")
     if ! grep -Fq '        needs: build-tests-ready' <<<"$consumer_job"; then
         echo "test consumer bypasses the global build-test barrier: $consumer" >&2
@@ -117,7 +161,8 @@ done
 
 for producer in \
     c-product-build \
-    c-product-build-windows; do
+    c-product-build-windows \
+    kotlin-product-build; do
     producer_job=$(sed -n "/^    ${producer}:$/,/^    [a-z].*:$/p" "$ci")
     if ! grep -Fq '        needs: health-checks-ready' <<<"$producer_job"; then
         echo "build producer bypasses the global health-check barrier: $producer" >&2
@@ -129,7 +174,10 @@ for contract in \
     package-audit \
     c-test-build \
     c-test-build-windows \
-    c-sanitizer-test-build; do
+    c-sanitizer-test-build \
+    kotlin-test-build \
+    kotlin-consumers \
+    kotlin-android-test-build; do
     contract_job=$(sed -n "/^    ${contract}:$/,/^    [a-z].*:$/p" "$ci")
     if ! grep -Fq '        needs: builds-ready' <<<"$contract_job"; then
         echo "build test bypasses the global build barrier: $contract" >&2
