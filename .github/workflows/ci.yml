@@ -89,12 +89,37 @@ jobs:
             - name: Lint Swift
               run: scripts/lint-swift.sh
 
+    health-check-kotlin:
+        name: Health Check - Kotlin
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v7
+            - uses: actions/setup-node@v7
+              with:
+                  node-version: 26.5.0
+            - uses: pnpm/action-setup@v6
+              with:
+                  run_install: false
+                  version: 11.7.0
+            - uses: actions/setup-java@v5
+              with:
+                  cache: gradle
+                  distribution: temurin
+                  java-version: 26
+            - name: Install Kotlin health-check dependencies
+              run: pnpm install --frozen-lockfile
+            - name: Check Kotlin formatting and lint
+              run: pnpm format:kotlin:check
+            - name: Load Gradle model
+              run: pnpm check:gradle-model
+
     health-checks-ready:
         name: Health Checks - Ready
         needs:
             - health-check-repository
             - health-check-c
             - health-check-swift
+            - health-check-kotlin
         runs-on: ubuntu-latest
         steps:
             - name: Release checked source to build producers
@@ -163,6 +188,46 @@ jobs:
                   retention-days: 7
                   path: build/ci-artifacts/c-product
 
+    kotlin-product-build:
+        name: Build - Kotlin / ${{ matrix.label }}
+        needs: health-checks-ready
+        runs-on: ${{ matrix.os }}
+        strategy:
+            fail-fast: false
+            matrix:
+                include:
+                    - os: ubuntu-latest
+                      label: Linux · Release Publications
+                      mode: linux-release
+                      artifact-label: linux-release
+                    - os: macos-26
+                      label: macOS · Native Publications
+                      mode: macos-native
+                      artifact-label: macos-native
+        steps:
+            - uses: actions/checkout@v7
+            - uses: actions/setup-java@v5
+              with:
+                  cache: gradle
+                  distribution: temurin
+                  java-version: 26
+            - uses: android-actions/setup-android@v4
+              if: matrix.mode == 'linux-release'
+            - name: Install Android build dependencies
+              if: matrix.mode == 'linux-release'
+              run: sdkmanager "platforms;android-36" "cmake;3.22.1" "ndk;28.2.13676358"
+            - name: Build immutable Kotlin product artifact
+              run: |
+                  scripts/build-kotlin-product-artifact.sh \
+                      "${{ matrix.mode }}" \
+                      "build/ci-artifacts/kotlin-product-${{ matrix.artifact-label }}"
+            - uses: actions/upload-artifact@v7
+              with:
+                  name: kotlin-product-${{ matrix.artifact-label }}-${{ github.sha }}
+                  if-no-files-found: error
+                  retention-days: 7
+                  path: build/ci-artifacts/kotlin-product-${{ matrix.artifact-label }}
+
     swift-product-build:
         name: Build - Swift / Product
         needs: health-checks-ready
@@ -219,6 +284,7 @@ jobs:
         needs:
             - c-product-build
             - c-product-build-windows
+            - kotlin-product-build
             - swift-product-build
             - swift-deployment-contract
         runs-on: ubuntu-latest
@@ -355,6 +421,91 @@ jobs:
                   retention-days: 7
                   path: build/ci-artifacts/c
 
+    kotlin-test-build:
+        name: Build Test - Kotlin / ${{ matrix.label }}
+        needs: builds-ready
+        runs-on: ${{ matrix.os }}
+        strategy:
+            fail-fast: false
+            matrix:
+                include:
+                    - os: ubuntu-latest
+                      target: linuxX64
+                      target-id: linux-x64
+                      label: Linux x64 · Host Tests
+                    - os: macos-26
+                      target: macosArm64
+                      target-id: macos-arm64
+                      label: macOS arm64 · Host Tests
+        steps:
+            - uses: actions/checkout@v7
+            - uses: actions/setup-java@v5
+              with:
+                  cache: gradle
+                  distribution: temurin
+                  java-version: 26
+            - uses: android-actions/setup-android@v4
+            - name: Install Android build dependencies
+              if: matrix.os == 'ubuntu-latest'
+              run: sdkmanager "platforms;android-36" "cmake;3.22.1" "ndk;28.2.13676358"
+            - name: Build immutable Kotlin test products
+              run: scripts/build-kotlin-host-test-artifact.sh "${{ matrix.target }}"
+            - uses: actions/upload-artifact@v7
+              with:
+                  name: kotlin-host-${{ matrix.target-id }}-${{ github.sha }}
+                  if-no-files-found: error
+                  retention-days: 7
+                  path: build/ci-artifacts/kotlin-${{ matrix.target }}
+
+    kotlin-consumers:
+        name: Build Test - Kotlin / Consumers
+        needs: builds-ready
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v7
+            - uses: actions/setup-java@v5
+              with:
+                  cache: gradle
+                  distribution: temurin
+                  java-version: 26
+            - uses: actions/setup-node@v7
+              with:
+                  node-version: 26.5.0
+            - uses: pnpm/action-setup@v6
+              with:
+                  run_install: false
+                  version: 11.7.0
+            - uses: android-actions/setup-android@v4
+            - name: Install Android build dependencies
+              run: sdkmanager "platforms;android-36" "cmake;3.22.1" "ndk;28.2.13676358"
+            - name: Verify Kotlin publication consumers
+              run: pnpm check:kotlin-consumers
+
+    kotlin-android-test-build:
+        name: Build Test - Kotlin / Android x86_64 · Instrumentation APK
+        needs: builds-ready
+        runs-on: ubuntu-24.04
+        timeout-minutes: 15
+        steps:
+            - uses: actions/checkout@v7
+            - uses: actions/setup-java@v5
+              with:
+                  cache: gradle
+                  distribution: temurin
+                  java-version: 26
+            - uses: android-actions/setup-android@v4
+            - name: Install Android build dependencies
+              run: sdkmanager "platforms;android-36" "cmake;3.22.1" "ndk;28.2.13676358"
+            - name: Build immutable Android instrumentation artifact
+              run: scripts/build-kotlin-android-test-artifact.sh
+            - name: Upload Android instrumentation artifact
+              uses: actions/upload-artifact@v7
+              with:
+                  name: kotlin-android-x86_64-${{ github.sha }}
+                  if-no-files-found: error
+                  retention-days: 7
+                  path: build/ci-artifacts/kotlin-android-x86_64
+
     swift-test-build:
         name: Build Test - Swift / Test Products
         needs: builds-ready
@@ -390,6 +541,9 @@ jobs:
             - c-test-build
             - c-test-build-windows
             - c-sanitizer-test-build
+            - kotlin-test-build
+            - kotlin-consumers
+            - kotlin-android-test-build
             - swift-test-build
         runs-on: ubuntu-latest
         steps:
@@ -497,6 +651,194 @@ jobs:
             - name: Run sanitizer suite without building
               run: scripts/run-c-test-artifact.sh build/ci-artifacts/c "${{ matrix.preset }}"
 
+    kotlin-test:
+        name: Test - Kotlin / ${{ matrix.label }}
+        needs: build-tests-ready
+        runs-on: ${{ matrix.os }}
+        strategy:
+            fail-fast: false
+            matrix:
+                include:
+                    - os: ubuntu-latest
+                      artifact-target: linux-x64
+                      artifact-dir: linuxX64
+                      platform: linux-x64
+                      suite: correctness
+                      label: Linux x64 · Correctness
+                    - os: ubuntu-latest
+                      artifact-target: linux-x64
+                      artifact-dir: linuxX64
+                      platform: linux-x64
+                      suite: conformance
+                      label: Linux x64 · Conformance
+                    - os: macos-26
+                      artifact-target: macos-arm64
+                      artifact-dir: macosArm64
+                      platform: macos-arm64
+                      suite: correctness
+                      label: macOS arm64 · Correctness
+                    - os: macos-26
+                      artifact-target: macos-arm64
+                      artifact-dir: macosArm64
+                      platform: macos-arm64
+                      suite: conformance
+                      label: macOS arm64 · Conformance
+                    - os: ubuntu-latest
+                      artifact-target: linux-x64
+                      artifact-dir: linuxX64
+                      platform: jvm
+                      suite: correctness
+                      label: JVM · Correctness
+                    - os: ubuntu-latest
+                      artifact-target: linux-x64
+                      artifact-dir: linuxX64
+                      platform: jvm
+                      suite: conformance
+                      label: JVM · Conformance
+                    - os: ubuntu-latest
+                      artifact-target: linux-x64
+                      artifact-dir: linuxX64
+                      platform: android-host
+                      suite: correctness
+                      label: Android Host · Correctness
+                    - os: ubuntu-latest
+                      artifact-target: linux-x64
+                      artifact-dir: linuxX64
+                      platform: android-host
+                      suite: conformance
+                      label: Android Host · Conformance
+        steps:
+            - uses: actions/checkout@v7
+            - uses: actions/setup-java@v5
+              if: matrix.platform == 'jvm' || matrix.platform == 'android-host'
+              with:
+                  distribution: temurin
+                  java-version: 26
+            - uses: actions/download-artifact@v8
+              with:
+                  name: kotlin-host-${{ matrix.artifact-target }}-${{ github.sha }}
+                  path: build/ci-artifacts/kotlin-${{ matrix.artifact-dir }}
+            - name: Run Kotlin suite without building
+              run: |
+                  scripts/run-kotlin-host-test-artifact.sh \
+                      "build/ci-artifacts/kotlin-${{ matrix.artifact-dir }}" \
+                      "${{ matrix.platform }}" \
+                      "${{ matrix.suite }}"
+
+    kotlin-android-test:
+        # Each leaf receives the same immutable APK and owns a fresh emulator
+        # lifecycle per attempt. No Gradle, JVM, NDK, CMake, publication,
+        # managed device snapshot, or other test suite runs on these
+        # consumers. The emulator and system image are pinned by cache key:
+        # Google revises system-image packages in place under the same path,
+        # so an uncached sdkmanager install makes runs non-reproducible and
+        # the ~1.7 GB download itself has corrupted (digest-mismatch); bump
+        # the -r suffix deliberately to take a newer revision.
+        name: Test - Kotlin / Android · ${{ matrix.label }}
+        needs: build-tests-ready
+        runs-on: ubuntu-24.04
+        # Two full attempts must fit: each is bounded by three minutes of adb
+        # wait, six of boot, and six of instrumentation, so a first-attempt
+        # hang still leaves the fresh-AVD retry room to finish.
+        timeout-minutes: 30
+        strategy:
+            fail-fast: false
+            matrix:
+                include:
+                    - page-size: 4k
+                      page-size-label: 4 KB
+                      system-image: google_apis
+                      suite: correctness
+                      label: 4 KB · x86_64 · Correctness
+                    - page-size: 16k
+                      page-size-label: 16 KB
+                      system-image: google_apis_ps16k
+                      suite: correctness
+                      label: 16 KB · x86_64 · Correctness
+                    - page-size: 4k
+                      page-size-label: 4 KB
+                      system-image: google_apis
+                      suite: conformance
+                      label: 4 KB · x86_64 · Conformance
+                    - page-size: 16k
+                      page-size-label: 16 KB
+                      system-image: google_apis_ps16k
+                      suite: conformance
+                      label: 16 KB · x86_64 · Conformance
+        steps:
+            - uses: actions/checkout@v7
+            - uses: android-actions/setup-android@v4
+            - name: Restore the pinned emulator and system image
+              id: emulator-cache
+              uses: actions/cache/restore@v4
+              with:
+                  path: |
+                      ${{ env.ANDROID_HOME }}/emulator
+                      ${{ env.ANDROID_HOME }}/system-images/android-36/${{ matrix.system-image }}
+                  key: android-emulator-api36-${{ matrix.system-image }}-x86_64-r1
+            - name: Install one Android runtime image
+              if: steps.emulator-cache.outputs.cache-hit != 'true'
+              run: |
+                  sdkmanager \
+                      "emulator" \
+                      "system-images;android-36;${{ matrix.system-image }};x86_64"
+            # Saved before the tests run, not in a post step: the combined
+            # cache action only saves on job success, so a cold cache plus
+            # one flaky failure would re-download moving bytes on every
+            # rerun — exactly what the pin exists to prevent. Sibling legs
+            # sharing an image race to save once; the loser's "cache
+            # already exists" is harmless.
+            - name: Save the pinned emulator and system image
+              if: steps.emulator-cache.outputs.cache-hit != 'true'
+              uses: actions/cache/save@v4
+              with:
+                  path: |
+                      ${{ env.ANDROID_HOME }}/emulator
+                      ${{ env.ANDROID_HOME }}/system-images/android-36/${{ matrix.system-image }}
+                  key: android-emulator-api36-${{ matrix.system-image }}-x86_64-r1
+            - name: Enable KVM
+              run: |
+                  echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+                  sudo udevadm control --reload-rules
+                  sudo udevadm trigger --name-match=kvm
+            - name: Verify runner architecture and emulator acceleration
+              run: |
+                  test "${{ runner.arch }}" = "X64"
+                  test -c /dev/kvm
+                  test -r /dev/kvm
+                  test -w /dev/kvm
+                  "$ANDROID_HOME/emulator/emulator" -accel-check
+            - name: Download immutable Android instrumentation artifact
+              uses: actions/download-artifact@v8
+              with:
+                  name: kotlin-android-x86_64-${{ github.sha }}
+                  path: build/ci-artifacts/kotlin-android-x86_64
+            - name: Run Android ${{ matrix.suite }} without building
+              # One bounded retry with a fresh AVD absorbs transient
+              # emulator-stack crashes; a real regression still fails both
+              # attempts.
+              run: |
+                  for attempt in 1 2; do
+                      if scripts/run-kotlin-android-test-artifact.sh \
+                          build/ci-artifacts/kotlin-android-x86_64 \
+                          "${{ matrix.suite }}" \
+                          "${{ matrix.page-size }}"; then
+                          exit 0
+                      fi
+                      echo "::warning::Android ${{ matrix.label }} attempt ${attempt} failed"
+                  done
+                  exit 1
+            - name: Upload Android test failure evidence
+              # A job-timeout kill cancels the run step rather than failing
+              # it; the evidence must survive that path too.
+              if: failure() || cancelled()
+              uses: actions/upload-artifact@v7
+              with:
+                  name: android-${{ matrix.page-size }}-${{ matrix.suite }}-failure-${{ github.run_attempt }}
+                  if-no-files-found: warn
+                  retention-days: 14
+                  path: ${{ runner.temp }}/android-test-${{ matrix.page-size }}-${{ matrix.suite }}
+
     swift-test:
         name: Test - Swift / ${{ matrix.label }}
         needs: build-tests-ready
@@ -539,6 +881,25 @@ jobs:
             - name: Run C benchmark suite without building
               run: scripts/run-c-test-artifact.sh build/ci-artifacts/c benchmark
 
+    benchmark-kotlin:
+        name: Test - Kotlin / JVM · Benchmark
+        needs: build-tests-ready
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v7
+            - uses: actions/setup-java@v5
+              with:
+                  distribution: temurin
+                  java-version: 26
+            - uses: actions/download-artifact@v8
+              with:
+                  name: kotlin-host-linux-x64-${{ github.sha }}
+                  path: build/ci-artifacts/kotlin-linuxX64
+            - name: Run Kotlin benchmark suite without building
+              run: |
+                  scripts/run-kotlin-host-test-artifact.sh \
+                      build/ci-artifacts/kotlin-linuxX64 jvm benchmark
+
     benchmark-swift:
         name: Test - Swift / macOS · Benchmark
         needs: build-tests-ready
@@ -558,15 +919,17 @@ jobs:
     benchmarks-ready:
         name: Benchmarks - Ready
         if: ${{ always() }}
-        needs: [benchmark-c, benchmark-swift]
+        needs: [benchmark-c, benchmark-kotlin, benchmark-swift]
         runs-on: ubuntu-latest
         steps:
             - name: Require every platform benchmark
               env:
                   C: ${{ needs.benchmark-c.result }}
+                  KOTLIN: ${{ needs.benchmark-kotlin.result }}
                   SWIFT: ${{ needs.benchmark-swift.result }}
               run: |
                   test "$C" = success
+                  test "$KOTLIN" = success
                   test "$SWIFT" = success
 
     tests-ready:
@@ -576,6 +939,8 @@ jobs:
             - c-test
             - c-test-windows
             - c-sanitizer-test
+            - kotlin-test
+            - kotlin-android-test
             - swift-test
         runs-on: ubuntu-latest
         steps:
@@ -584,12 +949,16 @@ jobs:
                   C_TEST: ${{ needs.c-test.result }}
                   C_TEST_WINDOWS: ${{ needs.c-test-windows.result }}
                   C_SANITIZER_TEST: ${{ needs.c-sanitizer-test.result }}
+                  KOTLIN_TEST: ${{ needs.kotlin-test.result }}
+                  KOTLIN_ANDROID_TEST: ${{ needs.kotlin-android-test.result }}
                   SWIFT_TEST: ${{ needs.swift-test.result }}
               run: |
                   for result in \
                       "$C_TEST" \
                       "$C_TEST_WINDOWS" \
                       "$C_SANITIZER_TEST" \
+                      "$KOTLIN_TEST" \
+                      "$KOTLIN_ANDROID_TEST" \
                       "$SWIFT_TEST"
                   do
                       if [ "$result" != success ]; then
