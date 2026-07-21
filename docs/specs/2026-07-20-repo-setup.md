@@ -485,59 +485,59 @@ or release support.
 
 Tasks:
 
-- [ ] Root `package.json` (private, `packageManager: pnpm@11.7.0`, engines,
+- [x] Root `package.json` (private, `packageManager: pnpm@11.7.0`, engines,
       script skeleton that fails loudly for not-yet-landed lanes),
       `.node-version`, `pnpm-workspace.yaml`, committed `pnpm-lock.yaml`.
-- [ ] `prettier.config.mjs`, `.prettierignore`, `eslint.config.js`,
+- [x] `prettier.config.mjs`, `.prettierignore`, `eslint.config.js`,
       `.cmake-format.yaml`, `.swift-format`, `.swiftlint.yml`.
-- [ ] `scripts/init-environment.sh` with §9 semantics and component model.
-- [ ] `scripts/format-c.sh`, `scripts/format-cmake.sh`, `scripts/lint-c.sh`,
+- [x] `scripts/init-environment.sh` with §9 semantics and component model.
+- [x] `scripts/format-c.sh`, `scripts/format-cmake.sh`, `scripts/lint-c.sh`,
       `scripts/format-swift.sh`, `scripts/lint-swift.sh` (tool bootstrap into
       `.tools/`, checksum-verified downloads).
-- [ ] `scripts/audit-repository.sh` (tracked-tree cleanliness, `--physical`,
+- [x] `scripts/audit-repository.sh` (tracked-tree cleanliness, `--physical`,
       naming-family greps from §3).
-- [ ] `docs/toolchains.md` (§8 matrix) and
+- [x] `docs/toolchains.md` (§8 matrix) and
       `docs/development-environment.md` (§9 contract).
 
 Acceptance:
 
-- [ ] Clean macOS checkout: `init-environment --check core node` passes;
+- [x] Clean macOS checkout: `init-environment --check core node` passes;
       `--install dependencies tools` is idempotent (run twice, second is
       no-op).
-- [ ] `pnpm format:check` and `pnpm lint` pass (over docs/config surface).
-- [ ] No script reads credentials; `git clean -fdX` leaves a tree where
+- [x] `pnpm format:check` and `pnpm lint` pass (over docs/config surface).
+- [x] No script reads credentials; `git clean -fdX` leaves a tree where
       `audit:repository --physical` passes.
 
 ### Phase 2 — C core walking skeleton
 
 Tasks:
 
-- [ ] `packages/tex-core/` layout: `include/tex_core.h` (+ export headers),
+- [x] `packages/tex-core/` layout: `include/tex_core.h` (+ export headers),
       `core/` sources, `tests/`, `benchmarks/`, `cmake/` package-config
       templates; root `CMakeLists.txt`, `CMakePresets.json` (§6.1 presets),
       root `Makefile` wrapper.
-- [ ] Walking-skeleton engine: tokenizer + parser + layout for *ordinary
+- [x] Walking-skeleton engine: tokenizer + parser + layout for *ordinary
       atoms and explicit spacing only*, producing a real render tree
       (glyph/kern/hbox nodes with metrics from an initial embedded metrics
       table for a minimal glyph set).
-- [ ] `tex_core_document_compile` (with the `options.mode` input forms),
+- [x] `tex_core_document_compile` (with the `options.mode` input forms),
       `tex_core_render_tree_dump`, `tex_core_render_tree_free`, version API,
       structured error type with source ranges.
-- [ ] `tex-core` CLI (stdin/args → dump), correctness CTest suite including
+- [x] `tex-core` CLI (stdin/args → dump), correctness CTest suite including
       error paths and allocation-failure injection hooks, benchmark
       executable (trivial workload), libFuzzer harness target.
-- [ ] Metrics generator script (offline, provenance-recorded, output
+- [x] Metrics generator script (offline, provenance-recorded, output
       committed) for the initial table (D5, §5.4).
 
 Acceptance:
 
-- [ ] `make build && make test`, `ctest --preset
+- [x] `make build && make test`, `ctest --preset
       correctness|conformance|benchmark` all green (conformance may run a
       placeholder suite until Phase 3, but the preset and runner exist).
-- [ ] `asan`/`ubsan`/`tsan` presets green.
-- [ ] Dump output is byte-deterministic across repeated runs and across
+- [x] `asan`/`ubsan`/`tsan` presets green.
+- [x] Dump output is byte-deterministic across repeated runs and across
       Linux/macOS.
-- [ ] `pnpm format:c:check`, `lint:c` cover the new sources.
+- [x] `pnpm format:c:check`, `lint:c` cover the new sources.
 
 ### Phase 3 — Canonical render-tree spec, fixtures, C conformance
 
