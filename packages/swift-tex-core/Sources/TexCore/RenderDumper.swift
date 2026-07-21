@@ -48,8 +48,13 @@ struct RenderDumper: RenderVisitor {
     /// Knuth's `print_scaled` (TeX §103) over the recovered integer scaled
     /// value: published measures are exact multiples of 2^-16 pt, so the
     /// recovery is lossless and the digits match the engine's exactly.
+    /// The half-away-from-zero adjustment guards a stray ulp without
+    /// `FloatingPoint.rounded()`, whose libm symbols a consumer executable
+    /// would otherwise have to link (`Int64.init` truncates toward zero
+    /// and lowers to a plain conversion instruction).
     private func measure(_ points: Double) -> String {
-        var value = Int64((points * 65536).rounded())
+        let scaled = points * 65536
+        var value = Int64(scaled < 0 ? scaled - 0.5 : scaled + 0.5)
         var text = ""
         if value < 0 {
             text += "-"
