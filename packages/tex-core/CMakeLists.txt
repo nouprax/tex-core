@@ -28,7 +28,9 @@ if(NOT CMAKE_BUILD_TYPE)
 endif()
 
 if(MSVC)
-    add_compile_options(/W4)
+    # The allocation-injection seam uses C11 <stdatomic.h>; MSVC gates it
+    # behind this flag even at /std:c11.
+    add_compile_options(/W4 /experimental:c11atomics)
 else()
     add_compile_options(-Wall -Wextra)
 endif()
