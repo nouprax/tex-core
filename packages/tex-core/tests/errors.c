@@ -187,6 +187,22 @@ static const txc_error_case TXC_ERROR_CASES[] = {
      "unsupported paragraph break",
      1,
      5},
+    {"paragraph break after a control word",
+     "\\quad\n\nx",
+     8,
+     TEX_CORE_MODE_DOCUMENT,
+     TEX_CORE_STATUS_UNSUPPORTED,
+     "unsupported paragraph break",
+     5,
+     7},
+    {"paragraph break with spaces after a control word",
+     "\\quad \n \nx",
+     10,
+     TEX_CORE_MODE_DOCUMENT,
+     TEX_CORE_STATUS_UNSUPPORTED,
+     "unsupported paragraph break",
+     5,
+     9},
 };
 
 int main(void) {

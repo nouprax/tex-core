@@ -23,24 +23,33 @@ static tex_core_status txc_scan_invalid(txc_scanner *scanner, size_t invalid_len
     return txc_fail(error, TEX_CORE_STATUS_INVALID_UTF8, &range, "invalid UTF-8 sequence");
 }
 
-/* Collapses a whitespace run into one SPACE token, or PAR when the run
- * contains a blank line (two or more line ends, TeX's \par boundary).
- * Carriage returns pair with line feeds so CRLF sources scan like LF ones. */
-static void txc_scan_blank(txc_scanner *scanner, txc_token *token) {
-    size_t start = scanner->position;
-    size_t line_ends = 0;
-    while (scanner->position < scanner->length && txc_blank(scanner->source[scanner->position])) {
-        uint8_t byte = scanner->source[scanner->position];
+/* Measures the blank run starting at `position`: returns one past its end
+ * and counts line ends. Carriage returns pair with line feeds so CRLF
+ * sources scan like LF ones. */
+static size_t txc_blank_run(const txc_scanner *scanner, size_t position, size_t *line_ends) {
+    size_t count = 0;
+    while (position < scanner->length && txc_blank(scanner->source[position])) {
+        uint8_t byte = scanner->source[position];
         if (byte == '\n') {
-            line_ends += 1;
+            count += 1;
         } else if (byte == '\r') {
-            line_ends += 1;
-            if (scanner->position + 1 < scanner->length && scanner->source[scanner->position + 1] == '\n') {
-                scanner->position += 1;
+            count += 1;
+            if (position + 1 < scanner->length && scanner->source[position + 1] == '\n') {
+                position += 1;
             }
         }
-        scanner->position += 1;
+        position += 1;
     }
+    *line_ends = count;
+    return position;
+}
+
+/* Collapses a whitespace run into one SPACE token, or PAR when the run
+ * contains a blank line (two or more line ends, TeX's \par boundary). */
+static void txc_scan_blank(txc_scanner *scanner, txc_token *token) {
+    size_t start = scanner->position;
+    size_t line_ends;
+    scanner->position = txc_blank_run(scanner, start, &line_ends);
     token->kind = line_ends >= 2 ? TXC_TOKEN_PAR : TXC_TOKEN_SPACE;
     token->range.begin = start;
     token->range.end = scanner->position;
@@ -67,8 +76,14 @@ static tex_core_status txc_scan_control(txc_scanner *scanner, txc_token *token, 
         token->name_length = scanner->position - name_start;
         token->range.begin = start;
         token->range.end = scanner->position;
-        while (scanner->position < scanner->length && txc_blank(scanner->source[scanner->position])) {
-            scanner->position += 1;
+        /* TeX discards blanks after a control word (state S), and a single
+         * line end goes with them — but a blank line is still a paragraph
+         * break (state N), so when the run contains one, leave the whole
+         * run for the next scan to report as PAR. */
+        size_t line_ends;
+        size_t run_end = txc_blank_run(scanner, scanner->position, &line_ends);
+        if (line_ends < 2) {
+            scanner->position = run_end;
         }
         return TEX_CORE_STATUS_OK;
     }

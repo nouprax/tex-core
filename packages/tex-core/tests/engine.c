@@ -207,9 +207,19 @@ static void txc_test_whitespace(txc_test *test) {
     txc_check_size(test, tex_core_node_range(tex_core_node_child(root, 2)).begin, 3, "glyph after CRLF");
     tex_core_render_tree_free(tree);
 
-    /* Blanks after a control word belong to the control word. */
+    /* Blanks after a control word belong to the control word, including a
+     * single line end (TeX state S) — but only a single one; a blank line
+     * there still fails fast as a paragraph break (covered in errors.c). */
     tree = txc_compile(test, "a\\quad b", TEX_CORE_MODE_DOCUMENT, "a quad b");
     txc_check_size(test, tex_core_node_child_count(tex_core_render_tree_root(tree)), 3, "no space after control word");
+    tex_core_render_tree_free(tree);
+    tree = txc_compile(test, "a\\quad\nb", TEX_CORE_MODE_DOCUMENT, "a quad newline b");
+    txc_check_size(
+        test,
+        tex_core_node_child_count(tex_core_render_tree_root(tree)),
+        3,
+        "no space after control word newline"
+    );
     tex_core_render_tree_free(tree);
 }
 
