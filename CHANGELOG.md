@@ -6,6 +6,15 @@ not promised to remain compatible between releases.
 
 ## Unreleased
 
+- Stand up CI phase A (C-only): the fail-closed PR quality-gate DAG
+  (`Health Check → Build → Build Test → Test → Required gates`) over a
+  four-way C build matrix with sanitizer suites, immutable artifact handoff
+  between producer and consumer jobs, a CodeQL C/C++ manual-build scan with
+  `CodeQL gate`, the C package-content audit with pkg-config and CMake
+  `find_package` link consumers, CI-policy and test-topology self-audits,
+  and the checked-in GitHub control-plane recipes plus
+  `scripts/bootstrap-repository.sh` (evaluate enforcement first). The one
+  exported CMake target is now `tex-core::tex-core`.
 - Freeze render-tree schemaVersion 1: the canonical schema and dump
   contracts (`docs/specs/render-tree.md`, `docs/specs/render-tree-dump.md`),
   the shared conformance corpus `specs/render-tree/` (manifest + reviewed
