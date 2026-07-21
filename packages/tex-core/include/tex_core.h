@@ -119,8 +119,8 @@ typedef enum tex_core_family { TEX_CORE_FAMILY_MAIN = 0 } tex_core_family;
 
 /* Resolved geometry in points, relative to the parent's reference point on
  * the baseline. Kern nodes use `width` only; `italic` is the italic
- * correction of glyph nodes. (Scaled points are internal; the canonical
- * render-tree spec lands in Phase 3 and fixes the exact public field set.) */
+ * correction of glyph nodes. The canonical schema is
+ * docs/specs/render-tree.md; scaled points are internal. */
 typedef struct tex_core_frame {
     double x;
     double y;

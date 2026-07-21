@@ -23,3 +23,7 @@
 # Canonical fixtures and render-tree goldens are byte-exact UTF-8 text.
 packages/tex-core/tests/fixtures/** text eol=lf
 specs/render-tree/** text eol=lf
+
+# This input deliberately contains an invalid UTF-8 byte (corpus case
+# error-utf8); keep git from applying any text handling to it.
+specs/render-tree/error-utf8.tex -text

@@ -6,6 +6,14 @@ not promised to remain compatible between releases.
 
 ## Unreleased
 
+- Freeze render-tree schemaVersion 1: the canonical schema and dump
+  contracts (`docs/specs/render-tree.md`, `docs/specs/render-tree-dump.md`),
+  the shared conformance corpus `specs/render-tree/` (manifest + reviewed
+  `.tex`/`.tree` pairs covering every shipped construct and error path), a
+  manifest-driven byte-exact C conformance suite, the corpus audit
+  `check:contracts`, and the C naming conventions
+  (`docs/specs/c-naming.md`). The dump schema line moves from `render-tree
+  0` to `render-tree 1`.
 - Land the C core walking skeleton: `tex_core_document_compile` over the
   document/math-inline/math-display input forms, an immutable render tree
   (hbox/glyph/kern) with embedded KaTeX-derived Computer Modern metrics,
