@@ -613,10 +613,9 @@ lane.
 
 Acceptance:
 
-- [ ] All Swift lanes green locally and in CI; consumer builds from a staged
-      source archive with no workspace fallback (local lanes and
-      `check-swift-source-archive.sh` verified; CI rows land with this
-      phase's PR).
+- [x] All Swift lanes green locally and in CI; consumer builds from a staged
+      source archive with no workspace fallback (PR #7's first run: all 48
+      checks green including every Swift row and the Swift CodeQL lane).
 - [x] Swift dump of every shared fixture is byte-identical to the C golden
       (the conformance suite replays all 13 manifest cases, including the
       error records, through the public Swift API).
@@ -645,7 +644,10 @@ manual build with `--no-build-cache --rerun-tasks`.
 
 Acceptance:
 
-- [ ] All Kotlin lanes green on both hosts; emulator suites green in CI.
+- [ ] All Kotlin lanes green on both hosts; emulator suites green in CI
+      (macOS host fully green locally — JVM, Android host, macosArm64,
+      both managed devices; Linux host and CI rows land with the Kotlin CI
+      extension PR).
 - [ ] Template §14.15 stability probes pass: a warm sibling leg hits the
       image cache without downloading; a wedged instrumentation or teardown
       fails within its phase bound (not the job timeout) and still uploads
@@ -653,10 +655,16 @@ Acceptance:
       absorbed by the fresh-AVD retry while a real regression fails both
       attempts.
 - [ ] Kotlin dump of every shared fixture matches the C goldens on every
-      target.
+      target (verified locally on JVM, Android host, both API 36 managed
+      devices, and macosArm64; linuxX64 completes in CI).
 - [ ] `publishKotlinToMavenLocal` + all four staged consumers pass;
-      IDE clean-import contract (§6.3) verified once and recorded.
-- [ ] `--warning-mode=fail` cache-cold matrix pass recorded.
+      IDE clean-import contract (§6.3) verified once and recorded
+      (publish + all four staged consumers green locally; headless model
+      smoke green; the one-time interactive IDE import recording remains).
+- [x] `--warning-mode=fail` cache-cold matrix pass recorded
+      (`--warning-mode=fail --no-build-cache --rerun-tasks
+      allKotlinTests`: 98 tasks, all suites green including both managed
+      devices, 2026-07-21).
 
 ### Phase 7 — ES/WASM binding
 

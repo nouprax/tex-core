@@ -1,0 +1,6 @@
+headers = tex_core_kotlin_bridge.h
+headerFilter = tex_core_kotlin_bridge.h
+package = com.nouprax.tex.core.internal.nativebridge
+staticLibraries = libtex_core_kotlin.a libtex-core.a
+libraryPaths = @LIBRARY_PATH@
+noStringConversion = tex_core_kotlin_compile
