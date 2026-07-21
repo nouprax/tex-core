@@ -43,15 +43,6 @@ else()
     set_target_properties(libtex-core_static PROPERTIES OUTPUT_NAME "tex-core" VERSION ${PROJECT_VERSION})
 endif()
 
-generate_export_header(
-    libtex-core_static
-    BASE_NAME
-    TEX_CORE
-    EXPORT_MACRO_NAME
-    TEX_CORE_API
-    EXPORT_FILE_NAME
-    "${CMAKE_CURRENT_BINARY_DIR}/include/tex-core-export.h")
-
 set(TEX_CORE_TARGETS libtex-core_static)
 
 if(TEX_CORE_SHARED)
@@ -63,6 +54,25 @@ if(TEX_CORE_SHARED)
                    SOVERSION ${PROJECT_VERSION_MAJOR})
     list(APPEND TEX_CORE_TARGETS libtex-core)
 endif()
+
+# The export header must come from the shared target: generating it from a
+# static target makes CMake emit a no-op TEX_CORE_API, which under hidden
+# visibility would strip every public symbol from the shared library.
+# Static-only builds (the sanitizer presets) keep the no-op macros, which is
+# correct for archives.
+if(TEX_CORE_SHARED)
+    set(TEX_CORE_EXPORT_SOURCE_TARGET libtex-core)
+else()
+    set(TEX_CORE_EXPORT_SOURCE_TARGET libtex-core_static)
+endif()
+generate_export_header(
+    ${TEX_CORE_EXPORT_SOURCE_TARGET}
+    BASE_NAME
+    TEX_CORE
+    EXPORT_MACRO_NAME
+    TEX_CORE_API
+    EXPORT_FILE_NAME
+    "${CMAKE_CURRENT_BINARY_DIR}/include/tex-core-export.h")
 
 foreach(target IN LISTS TEX_CORE_TARGETS)
     set_target_properties(
