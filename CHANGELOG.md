@@ -6,6 +6,17 @@ not promised to remain compatible between releases.
 
 ## Unreleased
 
+- Extend CI to the Kotlin binding: health check, Linux/macOS publication
+  producers, host-test producers, JVM/Android-host/Native test consumers,
+  the build-once/test-many Android instrumentation APK producer with four
+  independent emulator consumers ({4 KB, 16 KB} pages × {correctness,
+  conformance}) under the template §14.15 stability contract (pinned
+  emulator/system-image cache with restore/save split, KVM and ABI
+  verification, bounded adb/boot/instrumentation phases, one fresh-AVD
+  retry, escalating teardown, evidence upload on failure or
+  cancellation), a JVM benchmark row, a Java/Kotlin CodeQL lane, and the
+  release publication staging/merge scripts; `audit:ci` now enforces the
+  Kotlin producer/consumer topology.
 - Land the Kotlin Multiplatform binding: `com.nouprax:kotlin-tex-core`
   (Android min API 21, JVM 17, `macosArm64`, `linuxX64`) with
   `Document.compile` over the three input modes, an immutable render-tree
