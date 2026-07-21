@@ -22,13 +22,11 @@ add_library(
     "${TEX_CORE_ROOT}/packages/kotlin-tex-core/src/native/tex_core_kotlin_bridge.c"
     "${TEX_CORE_ROOT}/packages/kotlin-tex-core/src/native/tex_core_kotlin_jni.c")
 
-target_include_directories(
-    tex_core_kotlin PRIVATE "${TEX_CORE_CORE_DIR}" "${TEX_CORE_ROOT}/packages/tex-core/include"
-                            "${TEX_CORE_ROOT}/packages/kotlin-tex-core/src/native")
+target_include_directories(tex_core_kotlin PRIVATE "${TEX_CORE_CORE_DIR}" "${TEX_CORE_ROOT}/packages/tex-core/include"
+                                                   "${TEX_CORE_ROOT}/packages/kotlin-tex-core/src/native")
 target_compile_definitions(tex_core_kotlin PRIVATE TEX_CORE_STATIC_DEFINE)
-target_link_options(
-    tex_core_kotlin PRIVATE
-    "-Wl,--version-script=${TEX_CORE_ROOT}/packages/kotlin-tex-core/src/native/tex_core_kotlin.map")
+target_link_options(tex_core_kotlin PRIVATE
+                    "-Wl,--version-script=${TEX_CORE_ROOT}/packages/kotlin-tex-core/src/native/tex_core_kotlin.map")
 target_compile_options(
     tex_core_kotlin
     PRIVATE $<$<OR:$<C_COMPILER_ID:Clang>,$<C_COMPILER_ID:GNU>>:-Wall>
