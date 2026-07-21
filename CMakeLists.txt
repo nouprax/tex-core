@@ -10,3 +10,9 @@ project(
 
 enable_testing()
 add_subdirectory(packages/tex-core)
+
+# Kotlin bridge targets, requested by the Gradle build only; the default C
+# graph never builds them.
+if(TEX_CORE_KOTLIN_JNI OR TEX_CORE_KOTLIN_NATIVE)
+    add_subdirectory(packages/kotlin-tex-core/src/native)
+endif()

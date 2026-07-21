@@ -6,6 +6,20 @@ not promised to remain compatible between releases.
 
 ## Unreleased
 
+- Land the Kotlin Multiplatform binding: `com.nouprax:kotlin-tex-core`
+  (Android min API 21, JVM 17, `macosArm64`, `linuxX64`) with
+  `Document.compile` over the three input modes, an immutable render-tree
+  value API with the exhaustive `RenderVisitor`, the structured
+  `CompileException`, and a canonical dumper byte-identical to the C dump.
+  One TXC1 wire bridge over the public C facade serves JNI (JVM desktop
+  payload and the `kotlin-tex-core-android-runtime` AAR with all four
+  ABIs) and Kotlin/Native cinterop alike; conformance replays the shared
+  corpus from build-generated case data on every target, including both
+  Gradle Managed Devices (API 36, 4 KB and 16 KB page sizes). Repo-owned
+  Gradle and Maven wrappers, dependency locking with verification
+  metadata, ktlint, headless Gradle model smoke, and four staged
+  consumers (KMP, JVM Gradle, Android, Maven) resolving from a local
+  staged repository only.
 - Land the Swift binding: the `TexCore` SwiftPM product (iOS 18+/macOS 15+)
   with `Document.compile` over the three input modes, an immutable
   `Sendable` render-tree value API with exhaustive typed visitors, the
