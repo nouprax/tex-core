@@ -24,6 +24,8 @@ importers:
         specifier: 8.63.0
         version: 8.63.0(eslint@10.0.1)(typescript@6.0.3)
 
+  packages/es-tex-core: {}
+
 packages:
 
   '@eslint-community/eslint-utils@4.9.1':

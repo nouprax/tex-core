@@ -89,6 +89,25 @@ jobs:
             - name: Lint Swift
               run: scripts/lint-swift.sh
 
+    health-check-es:
+        name: Health Check - ES
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v7
+            - uses: actions/setup-node@v7
+              with:
+                  node-version: 26.5.0
+            - uses: pnpm/action-setup@v6
+              with:
+                  run_install: false
+                  version: 11.7.0
+            - name: Install ES health-check dependencies
+              run: pnpm install --frozen-lockfile
+            - name: Check ES formatting
+              run: pnpm format:es:check
+            - name: Lint ES
+              run: pnpm lint:es
+
     health-check-kotlin:
         name: Health Check - Kotlin
         runs-on: ubuntu-latest
@@ -120,6 +139,7 @@ jobs:
             - health-check-c
             - health-check-swift
             - health-check-kotlin
+            - health-check-es
         runs-on: ubuntu-latest
         steps:
             - name: Release checked source to build producers
@@ -187,6 +207,33 @@ jobs:
                   if-no-files-found: error
                   retention-days: 7
                   path: build/ci-artifacts/c-product
+
+    es-product-build:
+        name: Build - ES / WASM Package
+        needs: health-checks-ready
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v7
+            - uses: actions/setup-node@v7
+              with:
+                  node-version: 26.5.0
+            - uses: pnpm/action-setup@v6
+              with:
+                  run_install: false
+                  version: 11.7.0
+            - uses: emscripten-core/setup-emsdk@v16
+              with:
+                  version: 4.0.23
+            - name: Install ES build dependencies
+              run: pnpm install --frozen-lockfile
+            - name: Build immutable ES product artifact
+              run: scripts/build-es-product-artifact.sh
+            - uses: actions/upload-artifact@v7
+              with:
+                  name: es-product-${{ github.sha }}
+                  if-no-files-found: error
+                  retention-days: 7
+                  path: build/ci-artifacts/es-product
 
     kotlin-product-build:
         name: Build - Kotlin / ${{ matrix.label }}
@@ -285,6 +332,7 @@ jobs:
             - c-product-build
             - c-product-build-windows
             - kotlin-product-build
+            - es-product-build
             - swift-product-build
             - swift-deployment-contract
         runs-on: ubuntu-latest
@@ -506,6 +554,37 @@ jobs:
                   retention-days: 7
                   path: build/ci-artifacts/kotlin-android-x86_64
 
+    es-test-build:
+        name: Build Test - ES / Test Bundle
+        needs: builds-ready
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v7
+            - uses: actions/setup-node@v7
+              with:
+                  node-version: 26.5.0
+            - uses: pnpm/action-setup@v6
+              with:
+                  run_install: false
+                  version: 11.7.0
+            - uses: emscripten-core/setup-emsdk@v16
+              with:
+                  version: 4.0.23
+            - name: Install JavaScript dependencies
+              run: pnpm install --frozen-lockfile
+            - uses: actions/download-artifact@v8
+              with:
+                  name: es-product-${{ github.sha }}
+                  path: build/ci-artifacts/es-product
+            - name: Build immutable ES test artifact
+              run: scripts/build-es-test-artifact.sh build/ci-artifacts/es build/ci-artifacts/es-product
+            - uses: actions/upload-artifact@v7
+              with:
+                  name: es-test-${{ github.sha }}
+                  if-no-files-found: error
+                  retention-days: 7
+                  path: build/ci-artifacts/es
+
     swift-test-build:
         name: Build Test - Swift / Test Products
         needs: builds-ready
@@ -544,6 +623,7 @@ jobs:
             - kotlin-test-build
             - kotlin-consumers
             - kotlin-android-test-build
+            - es-test-build
             - swift-test-build
         runs-on: ubuntu-latest
         steps:
@@ -839,6 +919,43 @@ jobs:
                   retention-days: 14
                   path: ${{ runner.temp }}/android-test-${{ matrix.page-size }}-${{ matrix.suite }}
 
+    es-test:
+        name: Test - ES / ${{ matrix.label }}
+        needs: build-tests-ready
+        runs-on: ubuntu-latest
+        strategy:
+            fail-fast: false
+            matrix:
+                include:
+                    - suite: node-correctness
+                      label: Node · Correctness
+                    - suite: browser-correctness
+                      label: Browser · Correctness
+                    - suite: node-conformance
+                      label: Node · Conformance
+        steps:
+            - uses: actions/checkout@v7
+            - uses: actions/setup-node@v7
+              with:
+                  node-version: 26.5.0
+            - uses: pnpm/action-setup@v6
+              with:
+                  run_install: false
+                  version: 11.7.0
+            - uses: browser-actions/setup-chrome@v2
+              id: setup-chrome
+              if: matrix.suite == 'browser-correctness'
+            - name: Install test-runner dependencies
+              run: pnpm install --frozen-lockfile
+            - uses: actions/download-artifact@v8
+              with:
+                  name: es-test-${{ github.sha }}
+                  path: build/ci-artifacts/es
+            - name: Run ES suite without building
+              run: scripts/run-es-test-artifact.sh build/ci-artifacts/es "${{ matrix.suite }}"
+              env:
+                  CHROME: ${{ steps.setup-chrome.outputs.chrome-path }}
+
     swift-test:
         name: Test - Swift / ${{ matrix.label }}
         needs: build-tests-ready
@@ -900,6 +1017,28 @@ jobs:
                   scripts/run-kotlin-host-test-artifact.sh \
                       build/ci-artifacts/kotlin-linuxX64 jvm benchmark
 
+    benchmark-es:
+        name: Test - ES / Node · Benchmark
+        needs: build-tests-ready
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v7
+            - uses: actions/setup-node@v7
+              with:
+                  node-version: 26.5.0
+            - uses: pnpm/action-setup@v6
+              with:
+                  run_install: false
+                  version: 11.7.0
+            - name: Install benchmark dependencies
+              run: pnpm install --frozen-lockfile
+            - uses: actions/download-artifact@v8
+              with:
+                  name: es-test-${{ github.sha }}
+                  path: build/ci-artifacts/es
+            - name: Run ES benchmark suite without building
+              run: scripts/run-es-test-artifact.sh build/ci-artifacts/es node-benchmark
+
     benchmark-swift:
         name: Test - Swift / macOS · Benchmark
         needs: build-tests-ready
@@ -919,17 +1058,19 @@ jobs:
     benchmarks-ready:
         name: Benchmarks - Ready
         if: ${{ always() }}
-        needs: [benchmark-c, benchmark-kotlin, benchmark-swift]
+        needs: [benchmark-c, benchmark-kotlin, benchmark-es, benchmark-swift]
         runs-on: ubuntu-latest
         steps:
             - name: Require every platform benchmark
               env:
                   C: ${{ needs.benchmark-c.result }}
                   KOTLIN: ${{ needs.benchmark-kotlin.result }}
+                  ES: ${{ needs.benchmark-es.result }}
                   SWIFT: ${{ needs.benchmark-swift.result }}
               run: |
                   test "$C" = success
                   test "$KOTLIN" = success
+                  test "$ES" = success
                   test "$SWIFT" = success
 
     tests-ready:
@@ -941,6 +1082,7 @@ jobs:
             - c-sanitizer-test
             - kotlin-test
             - kotlin-android-test
+            - es-test
             - swift-test
         runs-on: ubuntu-latest
         steps:
@@ -951,6 +1093,7 @@ jobs:
                   C_SANITIZER_TEST: ${{ needs.c-sanitizer-test.result }}
                   KOTLIN_TEST: ${{ needs.kotlin-test.result }}
                   KOTLIN_ANDROID_TEST: ${{ needs.kotlin-android-test.result }}
+                  ES_TEST: ${{ needs.es-test.result }}
                   SWIFT_TEST: ${{ needs.swift-test.result }}
               run: |
                   for result in \
@@ -959,6 +1102,7 @@ jobs:
                       "$C_SANITIZER_TEST" \
                       "$KOTLIN_TEST" \
                       "$KOTLIN_ANDROID_TEST" \
+                      "$ES_TEST" \
                       "$SWIFT_TEST"
                   do
                       if [ "$result" != success ]; then
