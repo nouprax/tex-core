@@ -118,7 +118,7 @@ private class WireReader(
                     ascent = ascent,
                     descent = descent,
                     src = src,
-                    children = List(childCount) { node() },
+                    children = immutableList(childCount) { node() },
                 )
             }
 
