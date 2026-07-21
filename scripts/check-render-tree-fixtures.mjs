@@ -1,0 +1,334 @@
+/* Audits the shared render-tree conformance corpus: manifest shape, file
+ * discovery, dump/error-record grammar, declared coverage, and completeness
+ * against the schema contract. Modeled on markdown-core's canonical-AST
+ * checker. Fails closed: every vocabulary here must exactly match the
+ * manifest, and every declared label must be demonstrated. */
+
+import { readFile, readdir } from "node:fs/promises";
+import path from "node:path";
+import process from "node:process";
+import { TextDecoder } from "node:util";
+
+const root = process.cwd();
+const contractPath = path.join(root, "docs/specs/render-tree.md");
+const dumpGrammarPath = path.join(root, "docs/specs/render-tree-dump.md");
+const specPath = path.join(root, "specs/render-tree");
+const manifestPath = path.join(specPath, "manifest.json");
+const decoder = new TextDecoder("utf-8", { fatal: true });
+
+const [contract, dumpGrammar, manifestText, entries] = await Promise.all([
+    readFile(contractPath, "utf8"),
+    readFile(dumpGrammarPath, "utf8"),
+    readFile(manifestPath, "utf8"),
+    readdir(specPath)
+]);
+const manifest = JSON.parse(manifestText);
+const failures = [];
+const difference = (left, right) => [...left].filter((value) => !right.has(value)).sort();
+const sameArray = (left, right) => left.length === right.length && left.every((value, index) => value === right[index]);
+const set = (values) => new Set(values);
+
+// The contract's node inventory is the field authority; the dump grammar's
+// field-order table must be the same inventory minus the structural
+// `children` edge. Parsing both keeps the two documents from drifting.
+const inventory = contract.match(/## Node inventory[\s\S]*?## Source ranges/)?.[0];
+if (inventory === undefined) throw new Error("Unable to locate the contract node inventory");
+const inventoryRows = [...inventory.matchAll(/^\| `([a-z]+)` \| ([^|]+) \|/gm)];
+const canonicalKinds = inventoryRows.map((match) => match[1]);
+const fieldsByKind = Object.fromEntries(
+    inventoryRows.map((match) => [match[1], [...match[2].matchAll(/`([A-Za-z]+):/g)].map((field) => field[1])])
+);
+const dumpFieldsByKind = Object.fromEntries(
+    canonicalKinds.map((kind) => [kind, fieldsByKind[kind].filter((field) => field !== "children")])
+);
+const canonicalFields = canonicalKinds.flatMap((kind) => fieldsByKind[kind].map((field) => `${kind}.${field}`));
+
+const orderTable = dumpGrammar.match(/## Field order by kind[\s\S]*$/)?.[0];
+if (orderTable === undefined) throw new Error("Unable to locate the dump field-order table");
+for (const [, kind, cell] of orderTable.matchAll(/^\| `([a-z]+)` \| ([^|]+) \|/gm)) {
+    const ordered = [...cell.matchAll(/`([A-Za-z]+)`/g)].map((match) => match[1]);
+    if (!sameArray(ordered, dumpFieldsByKind[kind] ?? [])) {
+        failures.push(`dump field order for ${kind} drifted from the contract inventory`);
+    }
+}
+
+const modes = ["document", "mathInline", "mathDisplay"];
+const measure = /^-?(0|[1-9]\d*)\.\d+pt$/;
+const rangeValue = /^(0|[1-9]\d*)\.\.(0|[1-9]\d*)$/;
+const valueChecks = {
+    x: measure,
+    y: measure,
+    width: measure,
+    ascent: measure,
+    descent: measure,
+    italic: measure,
+    size: measure,
+    cp: /^U\+[0-9A-F]{4,6}$/,
+    style: /^(upright|italic)$/,
+    family: /^main$/,
+    src: rangeValue
+};
+
+const glyphMeasure = (tree, field) =>
+    [...tree.matchAll(new RegExp(`^ +glyph .* ${field}=(-?[\\d.]+)pt `, "gm"))].map((match) => Number(match[1]));
+const kernLines = (tree) => [...tree.matchAll(/^ +kern /gm)].length;
+
+// Validators run over the whole case: `source` is the decoded input (null
+// for the invalid-UTF-8 case), `tree` the expected file text, `mode` and
+// `outcome` the manifest values. A declared state must validate; every
+// state must be demonstrated somewhere in the corpus.
+const stateValidators = {
+    "mode.document": ({ mode }) => mode === "document",
+    "mode.mathInline": ({ mode }) => mode === "mathInline",
+    "mode.mathDisplay": ({ mode }) => mode === "mathDisplay",
+    "outcome.tree": ({ outcome }) => outcome === "tree",
+    "outcome.error": ({ outcome }) => outcome === "error",
+    "children.none": ({ outcome, tree }) => outcome === "tree" && tree.split("\n").length === 3,
+    "children.populated": ({ tree }) => /^ {2}\S/m.test(tree),
+    "atom.upper": ({ tree }) => / cp=U\+00(4[1-9A-F]|5[0-9A]) /.test(tree),
+    "atom.lower": ({ tree }) => / cp=U\+00(6[1-9A-F]|7[0-9A]) /.test(tree),
+    "atom.digit": ({ tree }) => / cp=U\+003[0-9] /.test(tree),
+    "atom.period": ({ tree }) => / cp=U\+002E /.test(tree),
+    "atom.comma": ({ tree }) => / cp=U\+002C /.test(tree),
+    "glyph.style.upright": ({ tree }) => / style=upright /.test(tree),
+    "glyph.style.italic": ({ tree }) => / style=italic /.test(tree),
+    "glyph.italic.zero": ({ tree }) => glyphMeasure(tree, "italic").some((value) => value === 0),
+    "glyph.italic.positive": ({ tree }) => glyphMeasure(tree, "italic").some((value) => value > 0),
+    "glyph.descent.positive": ({ tree }) => glyphMeasure(tree, "descent").some((value) => value > 0),
+    "blank.word": ({ source, mode, outcome, tree }) =>
+        outcome === "tree" && mode === "document" && /[ \t\n]/.test(source ?? "") && kernLines(tree) > 0,
+    "blank.collapsed": ({ source, outcome }) => outcome === "tree" && /[ \t\n]{2,}/.test(source ?? ""),
+    "blank.ignoredInMath": ({ source, mode, outcome, tree }) =>
+        outcome === "tree" && mode !== "document" && /[ \t\n]/.test(source ?? "") && kernLines(tree) === 0,
+    "blank.discardedAfterControlWord": ({ source, outcome }) =>
+        outcome === "tree" && /\\[A-Za-z]+[ \t\n]/.test(source ?? ""),
+    "command.controlSpace": ({ source }) => /\\ /.test(source ?? ""),
+    "command.thin": ({ source }) => /\\,/.test(source ?? ""),
+    "command.medium": ({ source }) => /\\:/.test(source ?? ""),
+    "command.thick": ({ source }) => /\\;/.test(source ?? ""),
+    "command.negativeThin": ({ source }) => /\\!/.test(source ?? ""),
+    "command.quad": ({ source }) => /\\quad/.test(source ?? ""),
+    "command.qquad": ({ source }) => /\\qquad/.test(source ?? ""),
+    "measure.zero": ({ tree }) => /=0\.0pt/.test(tree),
+    "measure.negative": ({ tree }) => /=-/.test(tree),
+    "input.empty": ({ bytes }) => bytes !== undefined && bytes.length === 0,
+    "input.noFinalNewline": ({ bytes }) => bytes !== undefined && bytes.length > 0 && bytes.at(-1) !== 0x0a,
+    "error.unsupportedCharacter": ({ outcome, tree }) =>
+        outcome === "error" && / message=unsupported character U\+/.test(tree),
+    "error.unsupportedCommand": ({ outcome, tree }) =>
+        outcome === "error" && / message=unsupported command \\/.test(tree),
+    "error.paragraphBreak": ({ outcome, tree }) =>
+        outcome === "error" && / message=unsupported paragraph break\n/.test(tree),
+    "error.invalidUtf8": ({ outcome, tree }) => outcome === "error" && / status=invalid-utf8 /.test(tree),
+    "error.incompleteControl": ({ outcome, tree }) =>
+        outcome === "error" && / message=incomplete control sequence/.test(tree)
+};
+const orderValidators = {
+    "root.hbox": ({ outcome, tree }) => outcome === "tree" && /^render-tree 1\nhbox /.test(tree),
+    "children.sourceOrder": ({ outcome, tree }) => {
+        if (outcome !== "tree") return false;
+        const begins = [...tree.matchAll(/^ {2}\S.* src=(\d+)\.\./gm)].map((match) => Number(match[1]));
+        return begins.length >= 2 && begins.every((begin, index) => index === 0 || begins[index - 1] <= begin);
+    }
+};
+
+if (manifest.schemaVersion !== 1) failures.push("manifest schemaVersion must be 1");
+if (manifest.contract !== "docs/specs/render-tree.md" || manifest.dumpGrammar !== "docs/specs/render-tree-dump.md") {
+    failures.push("manifest contract paths drifted from the repository specifications");
+}
+if (
+    manifest.format?.encoding !== "UTF-8" ||
+    manifest.format?.lineEndings !== "LF" ||
+    manifest.format?.finalNewline !== true ||
+    manifest.format?.caseOrder !== "manifest"
+) {
+    failures.push("manifest must freeze UTF-8, LF, one final newline, and manifest case order");
+}
+if (!sameArray(manifest.coverageRequirements?.kinds ?? [], canonicalKinds)) {
+    failures.push("manifest kind inventory must exactly match the contract inventory order");
+}
+if (!sameArray(manifest.coverageRequirements?.states ?? [], Object.keys(stateValidators))) {
+    failures.push("manifest state vocabulary must exactly match the fail-closed audit vocabulary");
+}
+if (!sameArray(manifest.coverageRequirements?.orders ?? [], Object.keys(orderValidators))) {
+    failures.push("manifest order vocabulary must exactly match the fail-closed audit vocabulary");
+}
+if (!Array.isArray(manifest.cases) || manifest.cases.length === 0) {
+    failures.push("manifest cases must be a non-empty array");
+}
+
+const allowedEntries = new Set(["README.md", "manifest.json"]);
+const names = new Set();
+const allCoveredKinds = new Set();
+const allCoveredStates = new Set();
+const allCoveredOrders = new Set();
+const allObservedFields = new Set();
+
+for (const testCase of manifest.cases ?? []) {
+    const label = typeof testCase.name === "string" ? testCase.name : "<unnamed>";
+    if (!/^[a-z][a-z0-9-]*$/.test(label) || names.has(label)) {
+        failures.push(`invalid or duplicate case name: ${label}`);
+    }
+    names.add(label);
+    if (testCase.input !== `${label}.tex` || testCase.expected !== `${label}.tree`) {
+        failures.push(`${label} paths must be ${label}.tex and ${label}.tree`);
+    }
+    allowedEntries.add(testCase.input);
+    allowedEntries.add(testCase.expected);
+
+    const mode = testCase.compileOptions?.mode;
+    if (!sameArray(Object.keys(testCase.compileOptions ?? {}), ["mode"]) || !modes.includes(mode)) {
+        failures.push(`${label} compileOptions must freeze exactly one mode of ${modes.join("|")}`);
+    }
+    const outcome = testCase.outcome;
+    if (outcome !== "tree" && outcome !== "error") {
+        failures.push(`${label} outcome must be tree or error`);
+    }
+
+    const declaredStates = testCase.coverage?.states ?? [];
+    let bytes;
+    let tree;
+    try {
+        bytes = await readFile(path.join(specPath, testCase.input));
+    } catch (error) {
+        failures.push(`${testCase.input} is missing: ${error.message}`);
+    }
+    try {
+        const expectedBytes = await readFile(path.join(specPath, testCase.expected));
+        tree = decoder.decode(expectedBytes);
+    } catch (error) {
+        failures.push(`${testCase.expected} is missing or is not valid UTF-8: ${error.message}`);
+    }
+    if (bytes === undefined || tree === undefined) continue;
+
+    // Inputs are byte-exact compile input. The declared coverage names the
+    // documented exceptions: invalid UTF-8 stays undecoded, and only the
+    // empty/no-final-newline cases may omit the final LF.
+    let source = null;
+    if (declaredStates.includes("error.invalidUtf8")) {
+        let decodes = true;
+        try {
+            decoder.decode(bytes);
+        } catch {
+            decodes = false;
+        }
+        if (decodes) failures.push(`${testCase.input} covers error.invalidUtf8 but is valid UTF-8`);
+    } else {
+        try {
+            source = decoder.decode(bytes);
+        } catch (error) {
+            failures.push(`${testCase.input} is not valid UTF-8: ${error.message}`);
+            continue;
+        }
+        if (source.includes("\r")) failures.push(`${testCase.input} must not contain CR`);
+        const exemptFromFinalLF =
+            declaredStates.includes("input.empty") || declaredStates.includes("input.noFinalNewline");
+        if (!exemptFromFinalLF && !source.endsWith("\n")) {
+            failures.push(`${testCase.input} must end with a final newline`);
+        }
+    }
+    if (!tree.endsWith("\n") || tree.endsWith("\n\n") || tree.includes("\r")) {
+        failures.push(`${testCase.expected} must use LF and exactly one final newline`);
+    }
+
+    const lines = tree.slice(0, -1).split("\n");
+    const actualKinds = new Set();
+    if (outcome === "tree") {
+        if (lines[0] !== `render-tree ${manifest.schemaVersion}`) {
+            failures.push(`${testCase.expected}:1 schema line must be "render-tree ${manifest.schemaVersion}"`);
+        }
+        let previousDepth = -1;
+        for (const [index, line] of lines.slice(1).entries()) {
+            const match = line.match(/^((?: {2})*)([a-z]+)((?: [a-z]+=\S+)*)$/);
+            const depth = match === null ? -1 : match[1].length / 2;
+            if (match === null || (index === 0 ? depth !== 0 : depth < 1 || depth > previousDepth + 1)) {
+                failures.push(`${testCase.expected}:${index + 2} does not match the canonical line grammar`);
+                continue;
+            }
+            previousDepth = depth;
+            const kind = match[2];
+            actualKinds.add(kind);
+            for (const field of fieldsByKind[kind] ?? []) allObservedFields.add(`${kind}.${field}`);
+            const pairs = [...match[3].matchAll(/ ([a-z]+)=(\S+)/g)];
+            if (
+                !sameArray(
+                    pairs.map((pair) => pair[1]),
+                    dumpFieldsByKind[kind] ?? []
+                )
+            ) {
+                failures.push(`${testCase.expected}:${index + 2} fields drift from the ${kind} canonical order`);
+            }
+            for (const [, name, value] of pairs) {
+                if (valueChecks[name] !== undefined && !valueChecks[name].test(value)) {
+                    failures.push(`${testCase.expected}:${index + 2} has a malformed ${name} value: ${value}`);
+                }
+                if (name === "src") {
+                    const [begin, end] = value.split("..").map(Number);
+                    if (begin > end) failures.push(`${testCase.expected}:${index + 2} src begin exceeds end`);
+                }
+            }
+        }
+        const rootSrc = lines[1]?.match(/ src=(\d+)\.\.(\d+)$/);
+        if (rootSrc === null || rootSrc?.[1] !== "0" || Number(rootSrc?.[2]) !== bytes.length) {
+            failures.push(`${testCase.expected} root must span the whole input, src=0..${bytes.length}`);
+        }
+    } else {
+        if (lines[0] !== `render-error ${manifest.schemaVersion}`) {
+            failures.push(`${testCase.expected}:1 schema line must be "render-error ${manifest.schemaVersion}"`);
+        }
+        if (
+            lines.length !== 2 ||
+            !/^error status=(invalid-utf8|unsupported) src=((0|[1-9]\d*)\.\.(0|[1-9]\d*)|none) message=[ -~]+$/.test(
+                lines[1]
+            )
+        ) {
+            failures.push(`${testCase.expected} does not match the canonical error-record grammar`);
+        }
+    }
+
+    const declaredKinds = set(testCase.coverage?.kinds ?? []);
+    for (const [description, values] of [
+        ["missing declared kinds", difference(declaredKinds, actualKinds)],
+        ["undeclared kinds", difference(actualKinds, declaredKinds)]
+    ]) {
+        if (values.length > 0) failures.push(`${label} ${description}: ${values.join(", ")}`);
+    }
+    for (const kind of declaredKinds) allCoveredKinds.add(kind);
+
+    const subject = { bytes, source, tree, mode, outcome };
+    for (const state of declaredStates) {
+        allCoveredStates.add(state);
+        if (!(state in stateValidators)) failures.push(`${label} declares unknown state: ${state}`);
+        else if (!stateValidators[state](subject))
+            failures.push(`${label} does not demonstrate declared state: ${state}`);
+    }
+    for (const order of testCase.coverage?.orders ?? []) {
+        allCoveredOrders.add(order);
+        if (!(order in orderValidators)) failures.push(`${label} declares unknown order: ${order}`);
+        else if (!orderValidators[order](subject))
+            failures.push(`${label} does not demonstrate declared order: ${order}`);
+    }
+}
+
+for (const [description, actual, required] of [
+    ["node kind coverage", allCoveredKinds, set(canonicalKinds)],
+    ["behavior-bearing field coverage", allObservedFields, set(canonicalFields)],
+    ["state coverage", allCoveredStates, set(Object.keys(stateValidators))],
+    ["child-order coverage", allCoveredOrders, set(Object.keys(orderValidators))]
+]) {
+    const missing = difference(required, actual);
+    const unknown = difference(actual, required);
+    if (missing.length > 0) failures.push(`${description} is missing: ${missing.join(", ")}`);
+    if (unknown.length > 0) failures.push(`${description} is undeclared: ${unknown.join(", ")}`);
+}
+
+const unexpectedEntries = entries.filter((entry) => !allowedEntries.has(entry));
+const missingEntries = difference(allowedEntries, set(entries));
+if (unexpectedEntries.length > 0) failures.push(`unmanifested spec entries: ${unexpectedEntries.sort().join(", ")}`);
+if (missingEntries.length > 0) failures.push(`manifested spec entries missing on disk: ${missingEntries.join(", ")}`);
+
+if (failures.length > 0) throw new Error(failures.join("\n"));
+process.stdout.write(
+    `Render-tree manifest v${manifest.schemaVersion} covers ${canonicalKinds.length} node kinds, ` +
+        `${canonicalFields.length} fields, and ${manifest.cases.length} cases.\n`
+);

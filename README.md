@@ -78,6 +78,13 @@ Capability grows along a fixed major-version ladder:
 - [`docs/repository-setup-template.md`](docs/repository-setup-template.md) —
   the normative CI/release/control-plane contract, imported from
   markdown-core.
+- [`docs/specs/render-tree.md`](docs/specs/render-tree.md) — the canonical
+  render-tree schema contract (schemaVersion 1), with
+  [`docs/specs/render-tree-dump.md`](docs/specs/render-tree-dump.md) as its
+  deterministic textual form and [`specs/render-tree/`](specs/render-tree/)
+  as the executable cross-platform conformance corpus.
+- [`docs/specs/c-naming.md`](docs/specs/c-naming.md) — C naming
+  conventions for the engine and its test tree.
 
 ## License
 

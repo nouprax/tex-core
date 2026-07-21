@@ -543,24 +543,25 @@ Acceptance:
 
 Tasks:
 
-- [ ] `specs/render-tree/`: schema document (every node kind, field, type,
+- [x] `specs/render-tree/`: schema document (every node kind, field, type,
       unit, nullability, default, child ordering), canonical dump format
       spec, `manifest.json` (schemaVersion + fixture inventory), fixture
       pairs (`<name>.tex` + `<name>.tree`) covering every construct shipped
       so far — growing with each §13 milestone — plus empty/error/boundary
       cases (template §4.3 checklist).
-- [ ] `docs/specs/c-naming.md` and `docs/specs/render-tree-dump.md`
+- [x] `docs/specs/c-naming.md` and `docs/specs/render-tree-dump.md`
       (repo-facing spec docs mirroring markdown-core's spec set).
-- [ ] C conformance runner consumes the fixtures; goldens are byte-exact.
-- [ ] `scripts/check-render-tree-fixtures.mjs` (manifest ↔ files ↔ schema
+- [x] C conformance runner consumes the fixtures; goldens are byte-exact.
+- [x] `scripts/check-render-tree-fixtures.mjs` (manifest ↔ files ↔ schema
       consistency), wired into `check:contracts`.
-- [ ] `.gitattributes` entries pinning fixture text encoding (done at
-      bootstrap; verify paths).
+- [x] `.gitattributes` entries pinning fixture text encoding (done at
+      bootstrap; verified paths; the deliberately invalid-UTF-8 error input
+      is exempted from text handling).
 
 Acceptance:
 
-- [ ] `ctest --preset conformance` runs every manifest fixture and passes.
-- [ ] Deliberately corrupting one golden fails conformance; deliberately
+- [x] `ctest --preset conformance` runs every manifest fixture and passes.
+- [x] Deliberately corrupting one golden fails conformance; deliberately
       removing a fixture from the manifest fails `check:contracts`.
 - [ ] Spec review sign-off recorded in the PR (schema is now versioned; §5.5
       protocol active).
