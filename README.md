@@ -25,11 +25,21 @@ two projects remain independently consumable.
 
 ## Status
 
-**Pre-release, phase 0.** This repository currently contains the adopted setup
-plan and repository hygiene only; the engine, bindings, CI, and release
-pipeline land in the phases defined by
+**Pre-release, phase 2 of the setup plan.** The C engine exists as a walking
+skeleton: `tex_core_document_compile` compiles ordinary atoms and explicit
+spacing in all three input modes into a real render tree with embedded
+Computer Modern metrics, a byte-deterministic canonical dump, a `tex-core`
+CLI, and a correctness/conformance/benchmark/sanitizer CTest graph. The
+LaTeX surface, canonical render-tree spec, bindings, CI, and release
+pipeline land in the remaining phases of
 [`docs/specs/2026-07-20-repo-setup.md`](docs/specs/2026-07-20-repo-setup.md).
 Nothing is published yet and no platform support is claimed.
+
+Build and test the C core:
+
+```sh
+make build && make test    # or: cmake --preset default && ctest --preset correctness
+```
 
 ## Planned packages
 

@@ -1,0 +1,10 @@
+prefix=@CMAKE_INSTALL_PREFIX@
+exec_prefix=${prefix}
+libdir=${prefix}/@CMAKE_INSTALL_LIBDIR@
+includedir=${prefix}/@CMAKE_INSTALL_INCLUDEDIR@
+
+Name: tex-core
+Description: Self-contained LaTeX to platform-neutral render-tree compiler
+Version: @PROJECT_VERSION@
+Libs: -L${libdir} -ltex-core
+Cflags: -I${includedir}
