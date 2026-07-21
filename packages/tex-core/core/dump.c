@@ -97,7 +97,7 @@ static bool txc_dump_node(txc_buffer *buffer, const txc_node *node, unsigned dep
 
 tex_core_status txc_dump(const txc_node *root, char **dump, size_t *length) {
     txc_buffer buffer = {NULL, 0, 0};
-    if (!txc_buffer_text(&buffer, "render-tree 0\n") || !txc_dump_node(&buffer, root, 0)) {
+    if (!txc_buffer_text(&buffer, "render-tree 1\n") || !txc_dump_node(&buffer, root, 0)) {
         txc_free(buffer.data);
         return TEX_CORE_STATUS_ALLOCATION_FAILED;
     }

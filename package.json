@@ -20,10 +20,10 @@
         "benchmark:es-node": "scripts/pending.sh 'Phase 7 (ES binding)'",
         "build:c": "cmake --preset default && cmake --build --preset default --parallel",
         "build:swift": "scripts/pending.sh 'Phase 5 (Swift binding)'",
-        "check:contracts": "scripts/pending.sh 'Phase 3 (render-tree spec and fixtures)'",
+        "check:contracts": "node scripts/check-render-tree-fixtures.mjs",
         "check:gradle-model": "scripts/pending.sh 'Phase 6 (Kotlin binding)'",
         "check:kotlin-consumers": "scripts/pending.sh 'Phase 6 (Kotlin binding)'",
-        "conformance:c-host": "scripts/pending.sh 'Phase 3 (render-tree spec and fixtures)'",
+        "conformance:c-host": "cmake --preset default && cmake --build --preset default --parallel && ctest --preset conformance",
         "conformance:swift-macos": "scripts/pending.sh 'Phase 5 (Swift binding)'",
         "conformance:swift-ios-simulator": "scripts/pending.sh 'Phase 5 (Swift binding)'",
         "conformance:kotlin-jvm": "scripts/pending.sh 'Phase 6 (Kotlin binding)'",
@@ -61,7 +61,7 @@
         "test:kotlin-linux-x64": "scripts/pending.sh 'Phase 6 (Kotlin binding)'",
         "test:es-node": "scripts/pending.sh 'Phase 7 (ES binding)'",
         "test:es-browser": "scripts/pending.sh 'Phase 7 (ES binding)'",
-        "verify": "pnpm run format:check && pnpm run lint && pnpm run audit:repository"
+        "verify": "pnpm run format:check && pnpm run lint && pnpm run check:contracts && pnpm run audit:repository"
     },
     "devDependencies": {
         "@eslint/js": "10.0.1",
