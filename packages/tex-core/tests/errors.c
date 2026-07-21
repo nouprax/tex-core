@@ -1,0 +1,236 @@
+/* Error paths: every rejection is a structured error with an exact status,
+ * message, and source byte range — fail-fast, never a silent skip (plan
+ * decision D4, section 5.1). */
+
+#include <string.h>
+
+#include "harness.h"
+#include "tex_core.h"
+
+typedef struct txc_error_case {
+    const char *label;
+    const char *source;
+    size_t length;
+    tex_core_mode mode;
+    tex_core_status status;
+    const char *message;
+    size_t begin;
+    size_t end;
+} txc_error_case;
+
+static const txc_error_case TXC_ERROR_CASES[] = {
+    {"lone invalid byte",
+     "\xFF",
+     1,
+     TEX_CORE_MODE_DOCUMENT,
+     TEX_CORE_STATUS_INVALID_UTF8,
+     "invalid UTF-8 sequence",
+     0,
+     1},
+    {"truncated sequence at end",
+     "ab\xC3",
+     3,
+     TEX_CORE_MODE_DOCUMENT,
+     TEX_CORE_STATUS_INVALID_UTF8,
+     "invalid UTF-8 sequence",
+     2,
+     3},
+    {"overlong encoding",
+     "\xC0\x80",
+     2,
+     TEX_CORE_MODE_DOCUMENT,
+     TEX_CORE_STATUS_INVALID_UTF8,
+     "invalid UTF-8 sequence",
+     0,
+     2},
+    {"surrogate encoding",
+     "\xED\xA0\x80",
+     3,
+     TEX_CORE_MODE_DOCUMENT,
+     TEX_CORE_STATUS_INVALID_UTF8,
+     "invalid UTF-8 sequence",
+     0,
+     3},
+    {"codepoint past U+10FFFF",
+     "\xF5\x80\x80\x80",
+     4,
+     TEX_CORE_MODE_DOCUMENT,
+     TEX_CORE_STATUS_INVALID_UTF8,
+     "invalid UTF-8 sequence",
+     0,
+     4},
+    {"stray continuation byte",
+     "a\x80",
+     2,
+     TEX_CORE_MODE_DOCUMENT,
+     TEX_CORE_STATUS_INVALID_UTF8,
+     "invalid UTF-8 sequence",
+     1,
+     2},
+    {"invalid byte in a control symbol",
+     "\\\xFF",
+     2,
+     TEX_CORE_MODE_DOCUMENT,
+     TEX_CORE_STATUS_INVALID_UTF8,
+     "invalid UTF-8 sequence",
+     1,
+     2},
+
+    {"math shift", "$", 1, TEX_CORE_MODE_DOCUMENT, TEX_CORE_STATUS_UNSUPPORTED, "unsupported character U+0024", 0, 1},
+    {"begin group",
+     "{",
+     1,
+     TEX_CORE_MODE_MATH_INLINE,
+     TEX_CORE_STATUS_UNSUPPORTED,
+     "unsupported character U+007B",
+     0,
+     1},
+    {"end group", "}", 1, TEX_CORE_MODE_MATH_INLINE, TEX_CORE_STATUS_UNSUPPORTED, "unsupported character U+007D", 0, 1},
+    {"comment", "a%b", 3, TEX_CORE_MODE_DOCUMENT, TEX_CORE_STATUS_UNSUPPORTED, "unsupported character U+0025", 1, 2},
+    {"parameter", "#", 1, TEX_CORE_MODE_DOCUMENT, TEX_CORE_STATUS_UNSUPPORTED, "unsupported character U+0023", 0, 1},
+    {"superscript",
+     "x^2",
+     3,
+     TEX_CORE_MODE_MATH_INLINE,
+     TEX_CORE_STATUS_UNSUPPORTED,
+     "unsupported character U+005E",
+     1,
+     2},
+    {"subscript",
+     "x_2",
+     3,
+     TEX_CORE_MODE_MATH_INLINE,
+     TEX_CORE_STATUS_UNSUPPORTED,
+     "unsupported character U+005F",
+     1,
+     2},
+    {"alignment tab",
+     "&",
+     1,
+     TEX_CORE_MODE_DOCUMENT,
+     TEX_CORE_STATUS_UNSUPPORTED,
+     "unsupported character U+0026",
+     0,
+     1},
+    {"active tilde", "~", 1, TEX_CORE_MODE_DOCUMENT, TEX_CORE_STATUS_UNSUPPORTED, "unsupported character U+007E", 0, 1},
+    {"binary operator outside the skeleton",
+     "a+b",
+     3,
+     TEX_CORE_MODE_MATH_INLINE,
+     TEX_CORE_STATUS_UNSUPPORTED,
+     "unsupported character U+002B",
+     1,
+     2},
+    {"math punctuation outside the skeleton",
+     "a,b",
+     3,
+     TEX_CORE_MODE_MATH_INLINE,
+     TEX_CORE_STATUS_UNSUPPORTED,
+     "unsupported character U+002C",
+     1,
+     2},
+    {"letter outside the embedded metrics",
+     "\xC3\xA9",
+     2,
+     TEX_CORE_MODE_DOCUMENT,
+     TEX_CORE_STATUS_UNSUPPORTED,
+     "unsupported character U+00E9",
+     0,
+     2},
+
+    {"unknown control word",
+     "\\frac",
+     5,
+     TEX_CORE_MODE_MATH_INLINE,
+     TEX_CORE_STATUS_UNSUPPORTED,
+     "unsupported command \\frac",
+     0,
+     5},
+    {"unknown control word in document mode",
+     "a \\usepackage",
+     13,
+     TEX_CORE_MODE_DOCUMENT,
+     TEX_CORE_STATUS_UNSUPPORTED,
+     "unsupported command \\usepackage",
+     2,
+     13},
+    {"unknown control symbol",
+     "\\@",
+     2,
+     TEX_CORE_MODE_DOCUMENT,
+     TEX_CORE_STATUS_UNSUPPORTED,
+     "unsupported command \\@",
+     0,
+     2},
+    {"incomplete control sequence",
+     "ab\\",
+     3,
+     TEX_CORE_MODE_DOCUMENT,
+     TEX_CORE_STATUS_UNSUPPORTED,
+     "incomplete control sequence at end of input",
+     2,
+     3},
+
+    {"paragraph break",
+     "a\n\nb",
+     4,
+     TEX_CORE_MODE_DOCUMENT,
+     TEX_CORE_STATUS_UNSUPPORTED,
+     "unsupported paragraph break",
+     1,
+     3},
+    {"paragraph break with blank-line whitespace",
+     "a\n \t\nb",
+     6,
+     TEX_CORE_MODE_DOCUMENT,
+     TEX_CORE_STATUS_UNSUPPORTED,
+     "unsupported paragraph break",
+     1,
+     5},
+    {"paragraph break after a control word",
+     "\\quad\n\nx",
+     8,
+     TEX_CORE_MODE_DOCUMENT,
+     TEX_CORE_STATUS_UNSUPPORTED,
+     "unsupported paragraph break",
+     5,
+     7},
+    {"paragraph break with spaces after a control word",
+     "\\quad \n \nx",
+     10,
+     TEX_CORE_MODE_DOCUMENT,
+     TEX_CORE_STATUS_UNSUPPORTED,
+     "unsupported paragraph break",
+     5,
+     9},
+};
+
+int main(void) {
+    txc_test test = {0, 0};
+    for (size_t index = 0; index < sizeof(TXC_ERROR_CASES) / sizeof(TXC_ERROR_CASES[0]); index++) {
+        const txc_error_case *expected = &TXC_ERROR_CASES[index];
+        tex_core_options options;
+        tex_core_options_init(&options);
+        options.mode = expected->mode;
+        tex_core_render_tree *tree = NULL;
+        tex_core_error error;
+        tex_core_status status =
+            tex_core_document_compile((const uint8_t *)expected->source, expected->length, &options, &tree, &error);
+
+        txc_check(
+            &test,
+            status == expected->status,
+            "%s: status %d, expected %d",
+            expected->label,
+            (int)status,
+            (int)expected->status
+        );
+        txc_check(&test, tree == NULL, "%s: tree stays NULL", expected->label);
+        txc_check(&test, error.status == status, "%s: error mirrors the status", expected->label);
+        txc_check_text(&test, error.message, expected->message, expected->label);
+        txc_check(&test, error.has_range, "%s: error carries a range", expected->label);
+        txc_check_size(&test, error.range.begin, expected->begin, expected->label);
+        txc_check_size(&test, error.range.end, expected->end, expected->label);
+    }
+    return txc_test_finish(&test, "errors");
+}

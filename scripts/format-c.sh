@@ -19,11 +19,12 @@ if [ ! -d packages/tex-core ]; then
     exit 0
 fi
 
+# Generated headers (tex-core-export.h, tex-core-version.h) are configured
+# into the build tree, never the source tree, so no exclusions are needed;
+# the committed generated metrics table is metrics.inc, which the patterns
+# below do not match.
 file_list=$(find packages/tex-core -type f \
     \( -name '*.c' -o -name '*.h' -o -name '*.cpp' \) \
-    ! -path 'packages/tex-core/core/include/tex-core-export.h' \
-    ! -path 'packages/tex-core/core/include/tex-core-version.h' \
-    ! -path 'packages/tex-core/core/include/config.h' \
     -print)
 if [ -z "$file_list" ]; then
     echo "note: no C sources yet; format:c is a no-op until Phase 2 lands them"

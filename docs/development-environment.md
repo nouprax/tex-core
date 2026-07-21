@@ -51,6 +51,36 @@ in `scripts/init-environment.sh`, and the repo-owned Gradle/Maven wrappers
 (Phase 6); Emscripten 4.0.23 via the pinned emsdk (Phase 7). This document
 gains the corresponding sections when those phases land.
 
+## Building and testing the C core (Phase 2 onward)
+
+The root `Makefile` is a thin wrapper over the single CMake/CTest graph —
+never a second runner:
+
+```sh
+make build          # cmake --preset default + build
+make test           # ctest --preset correctness
+make conformance    # ctest --preset conformance
+make bench          # ctest --preset benchmark (serial, informational)
+make asan-test      # AddressSanitizer preset build + correctness
+make ubsan-test     # UndefinedBehaviorSanitizer preset build + correctness
+make tsan-test      # ThreadSanitizer preset build + correctness
+make libFuzzer      # explicit non-default fuzz smoke campaign
+```
+
+The equivalent pnpm lanes are `build:c`, `test:c-host`, and
+`benchmark:c-host`. Build trees live under `build/` (`cmake`, `asan`,
+`ubsan`, `tsan`, `fuzz`, and the `lint-c` tree used by `pnpm lint:c`).
+
+`make libFuzzer` needs a clang whose runtime ships libFuzzer. Apple's Xcode
+clang does not; point `FUZZ_CC` at an LLVM install
+(`make libFuzzer FUZZ_CC=/opt/homebrew/opt/llvm/bin/clang`).
+
+The embedded font-metrics table
+(`packages/tex-core/core/metrics.inc`) is generated offline by
+`node scripts/generate-metrics.mjs` from the vendored provenance-recorded
+snapshot in `scripts/metrics/` and committed; generation never runs during
+build or test.
+
 ## Repository-managed tools
 
 `--install tools` installs ignored, reproducible copies under `.tools/`:
