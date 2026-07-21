@@ -1,5 +1,3 @@
-include(GenerateExportHeader)
-
 set(TEX_CORE_HEADERS
     dump.h
     error.h
@@ -11,7 +9,9 @@ set(TEX_CORE_HEADERS
     token.h
     tree.h
     utf8.h
-    "${TEX_CORE_INCLUDE_DIR}/tex_core.h")
+    "${TEX_CORE_INCLUDE_DIR}/tex_core.h"
+    "${TEX_CORE_INCLUDE_DIR}/tex-core-export.h"
+    "${TEX_CORE_INCLUDE_DIR}/tex-core-version.h")
 set(TEX_CORE_SOURCES
     dump.c
     error.c
@@ -24,9 +24,6 @@ set(TEX_CORE_SOURCES
     token.c
     utf8.c
     ${TEX_CORE_HEADERS})
-
-configure_file("${CMAKE_CURRENT_SOURCE_DIR}/tex-core-version.h.in"
-               "${CMAKE_CURRENT_BINARY_DIR}/include/tex-core-version.h")
 
 set(CMAKE_C_VISIBILITY_PRESET hidden)
 set(CMAKE_VISIBILITY_INLINES_HIDDEN 1)
@@ -45,34 +42,21 @@ endif()
 
 set(TEX_CORE_TARGETS libtex-core_static)
 
+# The export and version headers are committed files in the public include
+# directory (SwiftPM and the other bindings compile the same headers with no
+# generation step). The shared library alone defines TEX_CORE_EXPORTS, which
+# under hidden visibility marks exactly the reviewed public API as visible;
+# archives use the no-op macro through TEX_CORE_STATIC_DEFINE.
 if(TEX_CORE_SHARED)
     add_library(libtex-core SHARED ${TEX_CORE_SOURCES})
     set_target_properties(
         libtex-core
         PROPERTIES OUTPUT_NAME "tex-core"
                    VERSION ${PROJECT_VERSION}
-                   SOVERSION ${PROJECT_VERSION_MAJOR})
+                   SOVERSION ${PROJECT_VERSION_MAJOR}
+                   DEFINE_SYMBOL TEX_CORE_EXPORTS)
     list(APPEND TEX_CORE_TARGETS libtex-core)
 endif()
-
-# The export header must come from the shared target: generating it from a
-# static target makes CMake emit a no-op TEX_CORE_API, which under hidden
-# visibility would strip every public symbol from the shared library.
-# Static-only builds (the sanitizer presets) keep the no-op macros, which is
-# correct for archives.
-if(TEX_CORE_SHARED)
-    set(TEX_CORE_EXPORT_SOURCE_TARGET libtex-core)
-else()
-    set(TEX_CORE_EXPORT_SOURCE_TARGET libtex-core_static)
-endif()
-generate_export_header(
-    ${TEX_CORE_EXPORT_SOURCE_TARGET}
-    BASE_NAME
-    TEX_CORE
-    EXPORT_MACRO_NAME
-    TEX_CORE_API
-    EXPORT_FILE_NAME
-    "${CMAKE_CURRENT_BINARY_DIR}/include/tex-core-export.h")
 
 foreach(target IN LISTS TEX_CORE_TARGETS)
     set_target_properties(
@@ -82,8 +66,7 @@ foreach(target IN LISTS TEX_CORE_TARGETS)
                    C_EXTENSIONS OFF)
     target_include_directories(
         ${target}
-        PUBLIC "$<BUILD_INTERFACE:${TEX_CORE_INCLUDE_DIR}>" "$<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/include>"
-               "$<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>"
+        PUBLIC "$<BUILD_INTERFACE:${TEX_CORE_INCLUDE_DIR}>" "$<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>"
         PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
 endforeach()
 
@@ -97,8 +80,8 @@ target_link_libraries(tex-core PRIVATE libtex-core_static)
 
 configure_file("${CMAKE_CURRENT_SOURCE_DIR}/tex-core.pc.in" "${CMAKE_CURRENT_BINARY_DIR}/tex-core.pc" @ONLY)
 
-install(FILES "${TEX_CORE_INCLUDE_DIR}/tex_core.h" "${CMAKE_CURRENT_BINARY_DIR}/include/tex-core-export.h"
-              "${CMAKE_CURRENT_BINARY_DIR}/include/tex-core-version.h" DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}")
+install(FILES "${TEX_CORE_INCLUDE_DIR}/tex_core.h" "${TEX_CORE_INCLUDE_DIR}/tex-core-export.h"
+              "${TEX_CORE_INCLUDE_DIR}/tex-core-version.h" DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}")
 install(FILES "${CMAKE_CURRENT_BINARY_DIR}/tex-core.pc" DESTINATION "${CMAKE_INSTALL_LIBDIR}/pkgconfig")
 install(TARGETS tex-core RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}")
 

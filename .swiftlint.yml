@@ -36,6 +36,13 @@ opt_in_rules:
 
 reporter: xcode
 
+identifier_name:
+    # x and y are render-tree schema field names (docs/specs/render-tree.md);
+    # bindings must not respell schema names.
+    excluded:
+        - x
+        - y
+
 file_length:
     warning: 400
     error: 600
