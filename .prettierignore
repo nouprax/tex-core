@@ -1,0 +1,26 @@
+# Language-specific formatters
+**/*.c
+**/*.cc
+**/*.cmake
+**/*.cpp
+**/*.h
+**/*.hpp
+**/*.kt
+**/*.kts
+**/*.swift
+**/*.xsl
+CMakeLists.txt
+Makefile
+
+# Documentation and byte-exact fixtures/goldens
+**/*.md
+packages/tex-core/tests/fixtures/
+specs/render-tree/
+
+# Generated, copied, and package-manager content
+node_modules/
+dist/
+build/
+.build/
+.gradle/
+pnpm-lock.yaml
