@@ -32,6 +32,25 @@ if [ "$clean" = true ]; then
     fi
 fi
 
+# The SwiftPM manifest name is fixed by the naming family (plan §3): the
+# package identity comes from the repository URL, the manifest name from the
+# Swift package directory.
+for manifest in Package.swift packages/swift-tex-core/Package.release.swift; do
+    if ! grep -Fq 'name: "swift-tex-core"' "$manifest"; then
+        fail "$manifest must declare the manifest name swift-tex-core"
+    fi
+done
+
+# The committed version header must match the canonical VERSION file; the
+# header is hand-maintained because SwiftPM (and later bindings) compile it
+# without a generation step.
+version=$(cat VERSION)
+header_version=$(sed -n 's/^#define TEX_CORE_VERSION_STRING "\(.*\)"$/\1/p' \
+    packages/tex-core/include/tex-core-version.h)
+if [ "$version" != "$header_version" ]; then
+    fail "tex-core-version.h ($header_version) drifted from VERSION ($version)"
+fi
+
 tracked_secret_paths=$(git ls-files | awk '
     /(^|\/)\.env($|\.)/ && $0 !~ /\.env\.example$/ { print }
     /\.(jks|keystore|p12|pem)$/ { print }
