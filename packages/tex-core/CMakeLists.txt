@@ -29,8 +29,11 @@ endif()
 
 if(MSVC)
     # The allocation-injection seam uses C11 <stdatomic.h>; MSVC gates it
-    # behind this flag even at /std:c11.
+    # behind this flag even at /std:c11. _CRT_SECURE_NO_WARNINGS keeps the
+    # portable standard-C calls (fopen) from tripping the MSVC-only C4996
+    # deprecation under warnings-as-errors (markdown-core does the same).
     add_compile_options(/W4 /experimental:c11atomics)
+    add_compile_definitions(_CRT_SECURE_NO_WARNINGS)
 else()
     add_compile_options(-Wall -Wextra)
 endif()
