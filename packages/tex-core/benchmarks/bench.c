@@ -13,9 +13,11 @@ static const char TXC_BENCH_PHRASE[] = "The quick brown fox \\quad jumps over th
 #define TXC_BENCH_TARGET_BYTES 65536
 #define TXC_BENCH_ITERATIONS 64
 
+/* Standard C11 wall clock: POSIX monotonic clocks do not exist on MSVC,
+ * and these informational numbers do not warrant a per-platform timer. */
 static double txc_now(void) {
     struct timespec now;
-    clock_gettime(CLOCK_MONOTONIC, &now);
+    timespec_get(&now, TIME_UTC);
     return (double)now.tv_sec + (double)now.tv_nsec / 1e9;
 }
 

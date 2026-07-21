@@ -38,11 +38,21 @@ void *txc_realloc(void *block, size_t size) {
 
 void txc_free(void *block) { free(block); }
 
+/* Max-aligned storage unit for arena blocks. A local union instead of
+ * max_align_t: MSVC's C mode does not declare max_align_t, and the union's
+ * alignment (covering the widest scalar kinds) matches it on the supported
+ * toolchains. */
+typedef union txc_arena_align {
+    long long integer;
+    long double floating;
+    void *pointer;
+} txc_arena_align;
+
 struct txc_arena_chunk {
     txc_arena_chunk *next;
     size_t used;
     size_t capacity;
-    max_align_t storage[];
+    txc_arena_align storage[];
 };
 
 #define TXC_ARENA_CHUNK_CAPACITY 4096u
@@ -50,7 +60,7 @@ struct txc_arena_chunk {
 void txc_arena_init(txc_arena *arena) { arena->head = NULL; }
 
 void *txc_arena_alloc(txc_arena *arena, size_t size) {
-    size_t alignment = sizeof(max_align_t);
+    size_t alignment = sizeof(txc_arena_align);
     size_t rounded = (size + alignment - 1) / alignment * alignment;
     if (rounded < size) {
         return NULL;

@@ -102,16 +102,23 @@ install(FILES "${TEX_CORE_INCLUDE_DIR}/tex_core.h" "${CMAKE_CURRENT_BINARY_DIR}/
 install(FILES "${CMAKE_CURRENT_BINARY_DIR}/tex-core.pc" DESTINATION "${CMAKE_INSTALL_LIBDIR}/pkgconfig")
 install(TARGETS tex-core RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}")
 
-set(TEX_CORE_INSTALL_TARGETS "")
-if(TEX_CORE_STATIC)
-    list(APPEND TEX_CORE_INSTALL_TARGETS libtex-core_static)
-endif()
+# Exactly one target is exported as tex-core::tex-core — the shared library
+# when it exists, otherwise the public static archive. Exporting both would
+# leak the internal libtex-core/libtex-core_static target names into every
+# consumer; with both libraries enabled the static archive still installs,
+# just without an export entry (consumers reach it through pkg-config
+# --static).
 if(TEX_CORE_SHARED)
-    list(APPEND TEX_CORE_INSTALL_TARGETS libtex-core)
+    set(TEX_CORE_EXPORT_TARGET libtex-core)
+elseif(TEX_CORE_STATIC)
+    set(TEX_CORE_EXPORT_TARGET libtex-core_static)
+else()
+    set(TEX_CORE_EXPORT_TARGET "")
 endif()
-if(TEX_CORE_INSTALL_TARGETS)
+if(TEX_CORE_EXPORT_TARGET)
+    set_target_properties(${TEX_CORE_EXPORT_TARGET} PROPERTIES EXPORT_NAME tex-core)
     install(
-        TARGETS ${TEX_CORE_INSTALL_TARGETS}
+        TARGETS ${TEX_CORE_EXPORT_TARGET}
         EXPORT tex-core-targets
         ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}"
         LIBRARY DESTINATION "${CMAKE_INSTALL_LIBDIR}"
@@ -120,4 +127,7 @@ if(TEX_CORE_INSTALL_TARGETS)
         EXPORT tex-core-targets
         NAMESPACE tex-core::
         DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/tex-core")
+endif()
+if(TEX_CORE_STATIC AND TEX_CORE_SHARED)
+    install(TARGETS libtex-core_static ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}")
 endif()

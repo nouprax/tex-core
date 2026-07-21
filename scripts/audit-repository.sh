@@ -81,6 +81,13 @@ done
 
 git ls-files | while IFS= read -r path; do
     [ -f "$path" ] && [ -s "$path" ] || continue
+    # Render-tree fixture inputs are byte-exact contract data; boundary
+    # coverage includes sources that deliberately end without a newline.
+    # The .tree goldens stay under the check: the canonical dump is
+    # newline-terminated.
+    case "$path" in
+        specs/render-tree/*.tex) continue ;;
+    esac
     if LC_ALL=C grep -Iq -- . "$path"; then
         last_byte=$(tail -c 1 "$path" | od -An -t u1 | tr -d ' ')
         [ "$last_byte" = "10" ] || fail "text file lacks a final newline: $path"
