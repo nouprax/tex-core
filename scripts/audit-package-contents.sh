@@ -177,12 +177,47 @@ if ! [ -s "$temp_dir/c-static-archives.txt" ]; then
     echo "Installed C static archives were not found for the global-state audit" >&2
     exit 1
 fi
+# Classification prefers the SysV section column: ELF const data that
+# contains relocations (string-pointer tables like the spacing-command
+# inventory) is emitted into .data.rel.ro, which the loader write-protects
+# right after relocation — immutable by contract and therefore allowed.
+# Mach-O nm leaves the SysV section column empty, but its class letters
+# already separate const data from writable data, so the letters decide
+# there; the plain-format letter scan remains as the fallback.
 while IFS= read -r archive; do
-    writable_symbols=$("$nm_tool" "$archive" 2>/dev/null \
-        | awk '$2 ~ /^[dDbBC]$/ { print $NF }' \
-        | sed 's/^_//' \
-        | grep -v -E '^(txc_allocation_countdown|ltmp[0-9]+)$' \
-        | sort -u || true)
+    sysv_output=$("$nm_tool" --format=sysv "$archive" 2>/dev/null || true)
+    case "$sysv_output" in
+    *'|'*)
+        writable_symbols=$(printf '%s\n' "$sysv_output" | awk -F'|' '
+            NF >= 6 {
+                name = $1
+                gsub(/^[ \t]+|[ \t]+$/, "", name)
+                class = $3
+                gsub(/^[ \t]+|[ \t]+$/, "", class)
+                section = (NF >= 7) ? $7 : ""
+                gsub(/^[ \t]+|[ \t]+$/, "", section)
+                if (name == "")
+                    next
+                if (section != "") {
+                    if (section ~ /^\.data\.rel\.ro/)
+                        next
+                    if (section ~ /^(\.data|\.bss|\.tdata|\.tbss)/ || section ~ /COM/)
+                        print name
+                } else if (class ~ /^[dDbBC]$/) {
+                    print name
+                }
+            }' | sed 's/^_//' \
+            | grep -v -E '^(txc_allocation_countdown|ltmp[0-9]+)$' \
+            | sort -u || true)
+        ;;
+    *)
+        writable_symbols=$("$nm_tool" "$archive" 2>/dev/null \
+            | awk '$2 ~ /^[dDbBC]$/ { print $NF }' \
+            | sed 's/^_//' \
+            | grep -v -E '^(txc_allocation_countdown|ltmp[0-9]+)$' \
+            | sort -u || true)
+        ;;
+    esac
     if [ -n "$writable_symbols" ]; then
         echo "Writable global state found in $archive:" >&2
         echo "$writable_symbols" >&2
