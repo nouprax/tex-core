@@ -1,11 +1,10 @@
 #!/bin/sh
-# Test coverage and topology audit (phase-A skeleton).
+# Test coverage and topology audit.
 #
-# Verifies externally meaningful coverage boundaries for the C engine: the
-# shared render-tree conformance contract is consumed, test plumbing never
-# fetches mutable inputs at runtime, and the CTest selections discover the
-# workloads they claim to run. Platform bindings extend this audit as they
-# land; Phase 8 completes it.
+# Verifies externally meaningful coverage boundaries: every binding consumes
+# the shared render-tree conformance contract, test plumbing never fetches
+# mutable inputs at runtime, the CTest selections discover the workloads
+# they claim to run, and each platform's suite discovery is non-empty.
 set -eu
 
 failures=0
@@ -17,14 +16,20 @@ note() {
     echo "ok: $1"
 }
 
-# 1. The C test graph consumes the shared conformance contract.
+# 1. Every platform consumes the shared conformance contract; a runner- or
+# platform-owned fixture copy is a drift channel.
 if [ ! -f specs/render-tree/manifest.json ]; then
     fail "root shared render-tree manifest is missing"
 fi
-if ! grep -q 'specs/render-tree' packages/tex-core/tests/CMakeLists.txt; then
-    fail "C conformance targets do not consume the shared render-tree spec"
+if ! grep -q 'specs/render-tree' packages/tex-core/tests/CMakeLists.txt \
+    || ! grep -q 'plugins: \[.plugin(name: "GenerateRenderTreeResources")\]' Package.swift \
+    || ! grep -q 'specs/render-tree' packages/swift-tex-core/Plugins/GenerateRenderTreeResources/plugin.swift \
+    || ! grep -q 'GenerateRenderTreeFixtures' packages/kotlin-tex-core/build.gradle.kts \
+    || ! grep -q 'bundle:conformance-fixtures' packages/es-tex-core/package.json \
+    || ! grep -q 'specs/render-tree' packages/es-tex-core/scripts/bundle-conformance-fixtures.mjs; then
+    fail "one or more conformance targets do not consume the shared render-tree spec"
 else
-    note "C conformance suite consumes the shared render-tree spec"
+    note "C, SwiftPM plugin, Gradle task, and ES bundler consume the shared spec"
 fi
 
 # 2. No runtime network dependency in build/test/bench plumbing.
@@ -34,9 +39,12 @@ if grep -n 'git clone' Makefile package.json CMakePresets.json \
 else
     note "no runtime clone in build/test plumbing"
 fi
-if grep -n -E 'curl|wget' Makefile CMakePresets.json \
+if grep -n -E 'curl|wget|fetch\(' Makefile CMakePresets.json \
     packages/tex-core/tests/CMakeLists.txt \
-    packages/tex-core/benchmarks/CMakeLists.txt 2>/dev/null; then
+    packages/tex-core/benchmarks/CMakeLists.txt \
+    packages/es-tex-core/scripts/build.mjs \
+    packages/es-tex-core/scripts/bundle-conformance-fixtures.mjs \
+    packages/swift-tex-core/Plugins/GenerateRenderTreeResources/plugin.swift 2>/dev/null; then
     fail "network fetch in build/test plumbing"
 else
     note "no network fetch in build/test plumbing"
@@ -96,6 +104,27 @@ if echo "$benchmark_list" | grep -v '^benchmark-' | grep -q .; then
     fail "benchmark selection includes non-benchmark tests"
 else
     note "benchmark selection contains only benchmark workloads"
+fi
+
+# 4. Platform suite discovery must be non-empty when the toolchain is
+# present; CI additionally executes each on its platform row.
+if command -v swift >/dev/null 2>&1; then
+    if [ "$(CLANG_MODULE_CACHE_PATH="$BUILD_DIR/swift-module-cache" \
+        swift test --disable-sandbox list 2>/dev/null | wc -l)" -lt 1 ]; then
+        fail "swift test discovers no Swift Testing suites"
+    else
+        note "swift test discovers Swift Testing suites"
+    fi
+fi
+if [ "$(node packages/es-tex-core/scripts/run-tests.mjs --list | wc -l)" -lt 1 ]; then
+    fail "the ES runner discovers no correctness suites"
+else
+    note "the ES runner discovers correctness suites"
+fi
+if ! grep -q 'includeTestsMatching("\*ConformanceTest\*")' packages/kotlin-tex-core/build.gradle.kts; then
+    fail "the Kotlin conformance test runs lost their filter"
+else
+    note "Kotlin conformance test runs keep their dedicated filter"
 fi
 
 if [ "$failures" -gt 0 ]; then

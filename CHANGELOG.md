@@ -6,6 +6,18 @@ not promised to remain compatible between releases.
 
 ## Unreleased
 
+- Complete CI phase B: the package-content audit now covers the npm
+  tarball, the SwiftPM manifest shape, the Kotlin publications, the
+  installed C export set, and the no-process-global-state contract over
+  the static archives; new public-surface and Maven-publication audits
+  pin every binding's reviewed API and publication metadata; the test
+  topology audit spans all four platforms; benchmark rows upload
+  informational PR metrics with a fork-safe comment workflow; and
+  release discipline lands (`docs/releases/`, `release:check-version`
+  inside `verify` and Health Check).
+
+## 0.1.0 - 2026-07-21
+
 - Land the ES/WASM binding: `@nouprax/es-tex-core`, an ESM-only package
   (Node ≥ 20 and modern browsers) compiling the C engine to standalone
   WASM through the pinned Emscripten toolchain, with `Document.compile`

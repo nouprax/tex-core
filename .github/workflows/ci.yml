@@ -40,11 +40,13 @@ jobs:
               run: scripts/init-environment.sh --check node dependencies
             - name: Check cross-platform contracts
               run: pnpm check:contracts
-            - name: Audit repository, CI policy, and test topology
+            - name: Audit repository, CI policy, test topology, and surface
               run: |
                   pnpm audit:repository:clean
                   pnpm audit:ci
                   pnpm audit:tests
+                  pnpm audit:surface
+                  pnpm release:check-version
 
     health-check-c:
         name: Health Check - C
@@ -353,12 +355,22 @@ jobs:
               with:
                   run_install: false
                   version: 11.7.0
+            - uses: actions/setup-java@v5
+              with:
+                  cache: gradle
+                  distribution: temurin
+                  java-version: 26
+            - uses: android-actions/setup-android@v4
+            - uses: emscripten-core/setup-emsdk@v16
+              with:
+                  version: 4.0.23
             - name: Install package-audit dependencies
               run: |
                   sudo apt-get update
                   sudo apt-get install --yes pkg-config
+                  sdkmanager "platforms;android-36" "cmake;3.22.1" "ndk;28.2.13676358"
                   pnpm install --frozen-lockfile
-            - name: Audit installed package contents and link consumers
+            - name: Audit installed and published package contents
               run: pnpm audit:packages
 
     c-test-build:
@@ -1013,9 +1025,33 @@ jobs:
                   name: kotlin-host-linux-x64-${{ github.sha }}
                   path: build/ci-artifacts/kotlin-linuxX64
             - name: Run Kotlin benchmark suite without building
+              # The explicit bash shell adds -o pipefail; the default run
+              # shell would let tee's zero status mask a benchmark failure.
+              shell: bash
               run: |
+                  mkdir -p build/pr-metrics-logs
                   scripts/run-kotlin-host-test-artifact.sh \
-                      build/ci-artifacts/kotlin-linuxX64 jvm benchmark
+                      build/ci-artifacts/kotlin-linuxX64 jvm benchmark \
+                      2>&1 | tee build/pr-metrics-logs/kotlin.log
+            - uses: actions/setup-node@v7
+              if: ${{ always() }}
+              with:
+                  node-version: 26.5.0
+            - name: Collect informational Kotlin metrics
+              if: ${{ always() }}
+              continue-on-error: true
+              env:
+                  SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+              run: node scripts/collect-pr-metrics.mjs --platform linux --logs build/pr-metrics-logs --output build/pr-metrics/kotlin-jvm.json
+            - name: Upload informational Kotlin metrics
+              if: ${{ always() }}
+              continue-on-error: true
+              uses: actions/upload-artifact@v7
+              with:
+                  name: pr-metrics-kotlin-jvm
+                  path: build/pr-metrics/kotlin-jvm.json
+                  if-no-files-found: warn
+                  retention-days: 14
 
     benchmark-es:
         name: Test - ES / Node · Benchmark
@@ -1037,7 +1073,28 @@ jobs:
                   name: es-test-${{ github.sha }}
                   path: build/ci-artifacts/es
             - name: Run ES benchmark suite without building
-              run: scripts/run-es-test-artifact.sh build/ci-artifacts/es node-benchmark
+              # The explicit bash shell adds -o pipefail; the default run
+              # shell would let tee's zero status mask a benchmark failure.
+              shell: bash
+              run: |
+                  mkdir -p build/pr-metrics-logs
+                  scripts/run-es-test-artifact.sh build/ci-artifacts/es node-benchmark \
+                      2>&1 | tee build/pr-metrics-logs/es.log
+            - name: Collect informational ES metrics
+              if: ${{ always() }}
+              continue-on-error: true
+              env:
+                  SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+              run: node scripts/collect-pr-metrics.mjs --platform linux --logs build/pr-metrics-logs --output build/pr-metrics/es-node.json
+            - name: Upload informational ES metrics
+              if: ${{ always() }}
+              continue-on-error: true
+              uses: actions/upload-artifact@v7
+              with:
+                  name: pr-metrics-es-node
+                  path: build/pr-metrics/es-node.json
+                  if-no-files-found: warn
+                  retention-days: 14
 
     benchmark-swift:
         name: Test - Swift / macOS · Benchmark
@@ -1053,7 +1110,32 @@ jobs:
                   name: swift-test-${{ github.sha }}
                   path: build/ci-artifacts/swift
             - name: Run Swift benchmark suite without building
-              run: scripts/run-swift-test-artifact.sh build/ci-artifacts/swift macos-benchmark
+              # The explicit bash shell adds -o pipefail; the default run
+              # shell would let tee's zero status mask a benchmark failure.
+              shell: bash
+              run: |
+                  mkdir -p build/pr-metrics-logs
+                  scripts/run-swift-test-artifact.sh build/ci-artifacts/swift macos-benchmark \
+                      2>&1 | tee build/pr-metrics-logs/swift.log
+            - uses: actions/setup-node@v7
+              if: ${{ always() }}
+              with:
+                  node-version: 26.5.0
+            - name: Collect informational Swift metrics
+              if: ${{ always() }}
+              continue-on-error: true
+              env:
+                  SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+              run: node scripts/collect-pr-metrics.mjs --platform macos --logs build/pr-metrics-logs --output build/pr-metrics/swift-macos.json
+            - name: Upload informational Swift metrics
+              if: ${{ always() }}
+              continue-on-error: true
+              uses: actions/upload-artifact@v7
+              with:
+                  name: pr-metrics-swift-macos
+                  path: build/pr-metrics/swift-macos.json
+                  if-no-files-found: warn
+                  retention-days: 14
 
     benchmarks-ready:
         name: Benchmarks - Ready
