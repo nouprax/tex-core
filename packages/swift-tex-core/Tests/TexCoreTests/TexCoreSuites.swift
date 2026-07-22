@@ -88,10 +88,10 @@ import TexCore
 
     @Test("mode changes the accepted surface")
     func modeSensitivity() throws {
-        _ = try Document.compile("a,b", options: CompileOptions(mode: .document))
+        _ = try Document.compile("a+b", options: CompileOptions(mode: .mathInline))
         do {
-            _ = try Document.compile("a,b", options: CompileOptions(mode: .mathInline))
-            Issue.record("math-mode comma unexpectedly compiled")
+            _ = try Document.compile("a+b", options: CompileOptions(mode: .document))
+            Issue.record("document-mode math character unexpectedly compiled")
         } catch let error as CompileError {
             #expect(error.status == .unsupported)
         } catch {

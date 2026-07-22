@@ -9,7 +9,11 @@
         "caseOrder": "manifest"
     },
     "coverageRequirements": {
-        "kinds": ["hbox", "glyph", "kern"],
+        "kinds": [
+            "hbox",
+            "glyph",
+            "kern"
+        ],
         "states": [
             "mode.document",
             "mode.mathInline",
@@ -23,6 +27,12 @@
             "atom.digit",
             "atom.period",
             "atom.comma",
+            "atom.bin",
+            "atom.rel",
+            "atom.open",
+            "atom.close",
+            "atom.punct",
+            "atom.remapped",
             "glyph.style.upright",
             "glyph.style.italic",
             "glyph.italic.zero",
@@ -39,6 +49,30 @@
             "command.negativeThin",
             "command.quad",
             "command.qquad",
+            "command.symbol.greekLower",
+            "command.symbol.greekUpper",
+            "command.symbol.ordinary",
+            "command.symbol.bin",
+            "command.symbol.rel",
+            "command.symbol.arrow",
+            "command.symbol.delimiter",
+            "command.symbol.alias",
+            "space.interAtom.none",
+            "space.interAtom.thin",
+            "space.interAtom.medium",
+            "space.interAtom.thick",
+            "space.interAtom.acrossExplicit",
+            "kern.boundaryRange",
+            "bin.kept",
+            "bin.demoted.leading",
+            "bin.demoted.trailing",
+            "bin.demoted.afterBin",
+            "bin.demoted.afterRel",
+            "bin.demoted.afterOpen",
+            "bin.demoted.afterPunct",
+            "bin.demoted.beforeRel",
+            "bin.demoted.beforeClose",
+            "bin.demoted.beforePunct",
             "measure.zero",
             "measure.negative",
             "input.empty",
@@ -49,29 +83,50 @@
             "error.invalidUtf8",
             "error.incompleteControl"
         ],
-        "orders": ["root.hbox", "children.sourceOrder"]
+        "orders": [
+            "root.hbox",
+            "children.sourceOrder"
+        ]
     },
     "cases": [
         {
             "name": "empty",
             "input": "empty.tex",
             "expected": "empty.tree",
-            "compileOptions": { "mode": "document" },
+            "compileOptions": {
+                "mode": "document"
+            },
             "outcome": "tree",
             "coverage": {
-                "kinds": ["hbox"],
-                "states": ["mode.document", "outcome.tree", "children.none", "measure.zero", "input.empty"],
-                "orders": ["root.hbox"]
+                "kinds": [
+                    "hbox"
+                ],
+                "states": [
+                    "mode.document",
+                    "outcome.tree",
+                    "children.none",
+                    "measure.zero",
+                    "input.empty"
+                ],
+                "orders": [
+                    "root.hbox"
+                ]
             }
         },
         {
             "name": "text",
             "input": "text.tex",
             "expected": "text.tree",
-            "compileOptions": { "mode": "document" },
+            "compileOptions": {
+                "mode": "document"
+            },
             "outcome": "tree",
             "coverage": {
-                "kinds": ["hbox", "glyph", "kern"],
+                "kinds": [
+                    "hbox",
+                    "glyph",
+                    "kern"
+                ],
                 "states": [
                     "mode.document",
                     "outcome.tree",
@@ -88,17 +143,25 @@
                     "blank.word",
                     "measure.zero"
                 ],
-                "orders": ["root.hbox", "children.sourceOrder"]
+                "orders": [
+                    "root.hbox",
+                    "children.sourceOrder"
+                ]
             }
         },
         {
             "name": "math-letters",
             "input": "math-letters.tex",
             "expected": "math-letters.tree",
-            "compileOptions": { "mode": "mathInline" },
+            "compileOptions": {
+                "mode": "mathInline"
+            },
             "outcome": "tree",
             "coverage": {
-                "kinds": ["hbox", "glyph"],
+                "kinds": [
+                    "hbox",
+                    "glyph"
+                ],
                 "states": [
                     "mode.mathInline",
                     "outcome.tree",
@@ -114,17 +177,26 @@
                     "blank.ignoredInMath",
                     "measure.zero"
                 ],
-                "orders": ["root.hbox", "children.sourceOrder"]
+                "orders": [
+                    "root.hbox",
+                    "children.sourceOrder"
+                ]
             }
         },
         {
             "name": "math-spacing",
             "input": "math-spacing.tex",
             "expected": "math-spacing.tree",
-            "compileOptions": { "mode": "mathDisplay" },
+            "compileOptions": {
+                "mode": "mathDisplay"
+            },
             "outcome": "tree",
             "coverage": {
-                "kinds": ["hbox", "glyph", "kern"],
+                "kinds": [
+                    "hbox",
+                    "glyph",
+                    "kern"
+                ],
                 "states": [
                     "mode.mathDisplay",
                     "outcome.tree",
@@ -145,17 +217,26 @@
                     "measure.zero",
                     "measure.negative"
                 ],
-                "orders": ["root.hbox", "children.sourceOrder"]
+                "orders": [
+                    "root.hbox",
+                    "children.sourceOrder"
+                ]
             }
         },
         {
             "name": "document-spacing",
             "input": "document-spacing.tex",
             "expected": "document-spacing.tree",
-            "compileOptions": { "mode": "document" },
+            "compileOptions": {
+                "mode": "document"
+            },
             "outcome": "tree",
             "coverage": {
-                "kinds": ["hbox", "glyph", "kern"],
+                "kinds": [
+                    "hbox",
+                    "glyph",
+                    "kern"
+                ],
                 "states": [
                     "mode.document",
                     "outcome.tree",
@@ -170,17 +251,26 @@
                     "command.quad",
                     "measure.zero"
                 ],
-                "orders": ["root.hbox", "children.sourceOrder"]
+                "orders": [
+                    "root.hbox",
+                    "children.sourceOrder"
+                ]
             }
         },
         {
             "name": "whitespace",
             "input": "whitespace.tex",
             "expected": "whitespace.tree",
-            "compileOptions": { "mode": "document" },
+            "compileOptions": {
+                "mode": "document"
+            },
             "outcome": "tree",
             "coverage": {
-                "kinds": ["hbox", "glyph", "kern"],
+                "kinds": [
+                    "hbox",
+                    "glyph",
+                    "kern"
+                ],
                 "states": [
                     "mode.document",
                     "outcome.tree",
@@ -192,18 +282,27 @@
                     "blank.collapsed",
                     "measure.zero"
                 ],
-                "orders": ["root.hbox", "children.sourceOrder"]
+                "orders": [
+                    "root.hbox",
+                    "children.sourceOrder"
+                ]
             }
         },
         {
             "name": "error-reserved",
             "input": "error-reserved.tex",
             "expected": "error-reserved.tree",
-            "compileOptions": { "mode": "document" },
+            "compileOptions": {
+                "mode": "document"
+            },
             "outcome": "error",
             "coverage": {
                 "kinds": [],
-                "states": ["mode.document", "outcome.error", "error.unsupportedCharacter"],
+                "states": [
+                    "mode.document",
+                    "outcome.error",
+                    "error.unsupportedCharacter"
+                ],
                 "orders": []
             }
         },
@@ -211,23 +310,17 @@
             "name": "error-unicode",
             "input": "error-unicode.tex",
             "expected": "error-unicode.tree",
-            "compileOptions": { "mode": "mathInline" },
+            "compileOptions": {
+                "mode": "mathInline"
+            },
             "outcome": "error",
             "coverage": {
                 "kinds": [],
-                "states": ["mode.mathInline", "outcome.error", "error.unsupportedCharacter"],
-                "orders": []
-            }
-        },
-        {
-            "name": "error-math-comma",
-            "input": "error-math-comma.tex",
-            "expected": "error-math-comma.tree",
-            "compileOptions": { "mode": "mathInline" },
-            "outcome": "error",
-            "coverage": {
-                "kinds": [],
-                "states": ["mode.mathInline", "outcome.error", "error.unsupportedCharacter"],
+                "states": [
+                    "mode.mathInline",
+                    "outcome.error",
+                    "error.unsupportedCharacter"
+                ],
                 "orders": []
             }
         },
@@ -235,11 +328,17 @@
             "name": "error-command",
             "input": "error-command.tex",
             "expected": "error-command.tree",
-            "compileOptions": { "mode": "document" },
+            "compileOptions": {
+                "mode": "document"
+            },
             "outcome": "error",
             "coverage": {
                 "kinds": [],
-                "states": ["mode.document", "outcome.error", "error.unsupportedCommand"],
+                "states": [
+                    "mode.document",
+                    "outcome.error",
+                    "error.unsupportedCommand"
+                ],
                 "orders": []
             }
         },
@@ -247,11 +346,17 @@
             "name": "error-par",
             "input": "error-par.tex",
             "expected": "error-par.tree",
-            "compileOptions": { "mode": "document" },
+            "compileOptions": {
+                "mode": "document"
+            },
             "outcome": "error",
             "coverage": {
                 "kinds": [],
-                "states": ["mode.document", "outcome.error", "error.paragraphBreak"],
+                "states": [
+                    "mode.document",
+                    "outcome.error",
+                    "error.paragraphBreak"
+                ],
                 "orders": []
             }
         },
@@ -259,11 +364,17 @@
             "name": "error-utf8",
             "input": "error-utf8.tex",
             "expected": "error-utf8.tree",
-            "compileOptions": { "mode": "document" },
+            "compileOptions": {
+                "mode": "document"
+            },
             "outcome": "error",
             "coverage": {
                 "kinds": [],
-                "states": ["mode.document", "outcome.error", "error.invalidUtf8"],
+                "states": [
+                    "mode.document",
+                    "outcome.error",
+                    "error.invalidUtf8"
+                ],
                 "orders": []
             }
         },
@@ -271,11 +382,334 @@
             "name": "error-incomplete",
             "input": "error-incomplete.tex",
             "expected": "error-incomplete.tree",
-            "compileOptions": { "mode": "mathDisplay" },
+            "compileOptions": {
+                "mode": "mathDisplay"
+            },
             "outcome": "error",
             "coverage": {
                 "kinds": [],
-                "states": ["mode.mathDisplay", "outcome.error", "error.incompleteControl", "input.noFinalNewline"],
+                "states": [
+                    "mode.mathDisplay",
+                    "outcome.error",
+                    "error.incompleteControl",
+                    "input.noFinalNewline"
+                ],
+                "orders": []
+            }
+        },
+        {
+            "name": "math-ascii-classes",
+            "input": "math-ascii-classes.tex",
+            "expected": "math-ascii-classes.tree",
+            "compileOptions": {
+                "mode": "mathInline"
+            },
+            "outcome": "tree",
+            "coverage": {
+                "kinds": [
+                    "hbox",
+                    "glyph",
+                    "kern"
+                ],
+                "states": [
+                    "mode.mathInline",
+                    "outcome.tree",
+                    "children.populated",
+                    "atom.lower",
+                    "atom.digit",
+                    "atom.bin",
+                    "atom.rel",
+                    "atom.open",
+                    "atom.close",
+                    "atom.punct",
+                    "atom.remapped",
+                    "glyph.style.upright",
+                    "glyph.style.italic",
+                    "glyph.italic.zero",
+                    "glyph.italic.positive",
+                    "glyph.descent.positive",
+                    "space.interAtom.none",
+                    "space.interAtom.thin",
+                    "space.interAtom.medium",
+                    "space.interAtom.thick",
+                    "kern.boundaryRange",
+                    "bin.kept",
+                    "measure.zero",
+                    "measure.negative"
+                ],
+                "orders": [
+                    "root.hbox",
+                    "children.sourceOrder"
+                ]
+            }
+        },
+        {
+            "name": "math-bin-context",
+            "input": "math-bin-context.tex",
+            "expected": "math-bin-context.tree",
+            "compileOptions": {
+                "mode": "mathDisplay"
+            },
+            "outcome": "tree",
+            "coverage": {
+                "kinds": [
+                    "hbox",
+                    "glyph",
+                    "kern"
+                ],
+                "states": [
+                    "mode.mathDisplay",
+                    "outcome.tree",
+                    "children.populated",
+                    "atom.lower",
+                    "atom.bin",
+                    "atom.rel",
+                    "atom.open",
+                    "atom.close",
+                    "atom.punct",
+                    "atom.remapped",
+                    "glyph.style.upright",
+                    "glyph.style.italic",
+                    "glyph.italic.zero",
+                    "glyph.italic.positive",
+                    "glyph.descent.positive",
+                    "space.interAtom.none",
+                    "space.interAtom.thin",
+                    "space.interAtom.medium",
+                    "space.interAtom.thick",
+                    "kern.boundaryRange",
+                    "bin.kept",
+                    "bin.demoted.leading",
+                    "bin.demoted.trailing",
+                    "bin.demoted.afterBin",
+                    "bin.demoted.afterRel",
+                    "bin.demoted.afterOpen",
+                    "bin.demoted.afterPunct",
+                    "bin.demoted.beforeRel",
+                    "bin.demoted.beforeClose",
+                    "bin.demoted.beforePunct",
+                    "measure.zero",
+                    "measure.negative"
+                ],
+                "orders": [
+                    "root.hbox",
+                    "children.sourceOrder"
+                ]
+            }
+        },
+        {
+            "name": "math-greek",
+            "input": "math-greek.tex",
+            "expected": "math-greek.tree",
+            "compileOptions": {
+                "mode": "mathInline"
+            },
+            "outcome": "tree",
+            "coverage": {
+                "kinds": [
+                    "hbox",
+                    "glyph"
+                ],
+                "states": [
+                    "mode.mathInline",
+                    "outcome.tree",
+                    "children.populated",
+                    "glyph.style.upright",
+                    "glyph.style.italic",
+                    "glyph.italic.zero",
+                    "glyph.italic.positive",
+                    "glyph.descent.positive",
+                    "blank.ignoredInMath",
+                    "command.symbol.greekLower",
+                    "command.symbol.greekUpper",
+                    "space.interAtom.none",
+                    "measure.zero"
+                ],
+                "orders": [
+                    "root.hbox",
+                    "children.sourceOrder"
+                ]
+            }
+        },
+        {
+            "name": "math-symbol-operators",
+            "input": "math-symbol-operators.tex",
+            "expected": "math-symbol-operators.tree",
+            "compileOptions": {
+                "mode": "mathDisplay"
+            },
+            "outcome": "tree",
+            "coverage": {
+                "kinds": [
+                    "hbox",
+                    "glyph",
+                    "kern"
+                ],
+                "states": [
+                    "mode.mathDisplay",
+                    "outcome.tree",
+                    "children.populated",
+                    "atom.upper",
+                    "atom.lower",
+                    "glyph.style.upright",
+                    "glyph.style.italic",
+                    "glyph.italic.zero",
+                    "glyph.italic.positive",
+                    "glyph.descent.positive",
+                    "blank.discardedAfterControlWord",
+                    "command.symbol.bin",
+                    "command.symbol.rel",
+                    "command.symbol.arrow",
+                    "command.symbol.alias",
+                    "space.interAtom.medium",
+                    "space.interAtom.thick",
+                    "kern.boundaryRange",
+                    "bin.kept",
+                    "measure.zero"
+                ],
+                "orders": [
+                    "root.hbox",
+                    "children.sourceOrder"
+                ]
+            }
+        },
+        {
+            "name": "math-symbol-ordinaries",
+            "input": "math-symbol-ordinaries.tex",
+            "expected": "math-symbol-ordinaries.tree",
+            "compileOptions": {
+                "mode": "mathInline"
+            },
+            "outcome": "tree",
+            "coverage": {
+                "kinds": [
+                    "hbox",
+                    "glyph"
+                ],
+                "states": [
+                    "mode.mathInline",
+                    "outcome.tree",
+                    "children.populated",
+                    "glyph.style.upright",
+                    "glyph.italic.zero",
+                    "glyph.italic.positive",
+                    "glyph.descent.positive",
+                    "blank.ignoredInMath",
+                    "command.symbol.ordinary",
+                    "space.interAtom.none",
+                    "measure.zero"
+                ],
+                "orders": [
+                    "root.hbox",
+                    "children.sourceOrder"
+                ]
+            }
+        },
+        {
+            "name": "math-symbol-delimiters",
+            "input": "math-symbol-delimiters.tex",
+            "expected": "math-symbol-delimiters.tree",
+            "compileOptions": {
+                "mode": "mathInline"
+            },
+            "outcome": "tree",
+            "coverage": {
+                "kinds": [
+                    "hbox",
+                    "glyph"
+                ],
+                "states": [
+                    "mode.mathInline",
+                    "outcome.tree",
+                    "children.populated",
+                    "atom.lower",
+                    "glyph.style.upright",
+                    "glyph.style.italic",
+                    "glyph.italic.zero",
+                    "glyph.italic.positive",
+                    "glyph.descent.positive",
+                    "blank.ignoredInMath",
+                    "command.symbol.delimiter",
+                    "space.interAtom.none",
+                    "measure.zero"
+                ],
+                "orders": [
+                    "root.hbox",
+                    "children.sourceOrder"
+                ]
+            }
+        },
+        {
+            "name": "math-spacing-mixed",
+            "input": "math-spacing-mixed.tex",
+            "expected": "math-spacing-mixed.tree",
+            "compileOptions": {
+                "mode": "mathInline"
+            },
+            "outcome": "tree",
+            "coverage": {
+                "kinds": [
+                    "hbox",
+                    "glyph",
+                    "kern"
+                ],
+                "states": [
+                    "mode.mathInline",
+                    "outcome.tree",
+                    "children.populated",
+                    "atom.lower",
+                    "atom.bin",
+                    "atom.rel",
+                    "glyph.style.upright",
+                    "glyph.style.italic",
+                    "glyph.italic.zero",
+                    "command.thin",
+                    "command.thick",
+                    "space.interAtom.medium",
+                    "space.interAtom.acrossExplicit",
+                    "kern.boundaryRange",
+                    "bin.kept",
+                    "measure.zero"
+                ],
+                "orders": [
+                    "root.hbox",
+                    "children.sourceOrder"
+                ]
+            }
+        },
+        {
+            "name": "error-document-plus",
+            "input": "error-document-plus.tex",
+            "expected": "error-document-plus.tree",
+            "compileOptions": {
+                "mode": "document"
+            },
+            "outcome": "error",
+            "coverage": {
+                "kinds": [],
+                "states": [
+                    "mode.document",
+                    "outcome.error",
+                    "error.unsupportedCharacter"
+                ],
+                "orders": []
+            }
+        },
+        {
+            "name": "error-document-symbol",
+            "input": "error-document-symbol.tex",
+            "expected": "error-document-symbol.tree",
+            "compileOptions": {
+                "mode": "document"
+            },
+            "outcome": "error",
+            "coverage": {
+                "kinds": [],
+                "states": [
+                    "mode.document",
+                    "outcome.error",
+                    "error.unsupportedCommand"
+                ],
                 "orders": []
             }
         }

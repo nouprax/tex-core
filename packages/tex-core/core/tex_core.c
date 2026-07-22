@@ -56,7 +56,7 @@ tex_core_status tex_core_document_compile(
     txc_list list;
     tex_core_status status = txc_parse(&compiled->arena, source, length, options->mode, &list, error);
     if (status == TEX_CORE_STATUS_OK) {
-        status = txc_layout(&compiled->arena, &list, length, &compiled->root, error);
+        status = txc_layout(&compiled->arena, &list, options->mode, length, &compiled->root, error);
     }
     if (status != TEX_CORE_STATUS_OK) {
         tex_core_render_tree_free(compiled);

@@ -1,0 +1,2 @@
+render-error 1
+error status=unsupported src=0..6 message=unsupported command \alpha

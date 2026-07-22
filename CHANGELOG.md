@@ -6,6 +6,24 @@ not promised to remain compatible between releases.
 
 ## Unreleased
 
+- Begin milestone M1 (math core): math-mode atoms now carry TeX's classes
+  (Ord, Bin, Rel, Open, Close, Punct), layout resolves contextual Bin
+  atoms to Ord exactly as TeX's first mlist pass and inserts the
+  TeXbook chapter-18 inter-atom spacing as kern nodes whose source range
+  is the gap between the spaced atoms. The math surface grows the ASCII
+  math characters (`+ - * / = < > ( ) [ ] , ; : ! ? |`, with `-`, `*`,
+  and `|` remapped to their plain TeX glyphs) and about 170 symbol
+  commands: the Greek alphabet, binary operators, relations, arrows,
+  letter-like and miscellaneous ordinaries, delimiter atoms, and their
+  plain TeX aliases. The embedded metrics tables grow to cover the new
+  glyphs (181 additional KaTeX Computer Modern rows), the shared corpus
+  gains nine reviewed cases (atom classes, Bin contexts, Greek, symbol
+  commands, mixed explicit/inter-atom spacing, and document-mode
+  rejection records) while the now-supported math-comma error case
+  retires, and all four bindings replay the grown corpus byte-exactly
+  with no binding code changes. Document mode is unchanged: math
+  characters and symbol commands there stay structured errors until the
+  M3 text surface.
 - Land release engineering: the secret-free release dry run (PR-triggered,
   disposable signing key, full artifact graph re-verified by staged
   consumers and the signed Maven audit) and the tag-driven formal release

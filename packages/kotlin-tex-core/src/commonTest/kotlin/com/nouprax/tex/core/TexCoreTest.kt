@@ -79,10 +79,10 @@ class TexCoreTest {
 
     @Test
     fun modeChangesTheAcceptedSurface() {
-        Document.compile("a,b")
+        Document.compile("a+b", CompileOptions(CompileMode.MATH_INLINE))
         val failure =
             assertFailsWith<CompileException> {
-                Document.compile("a,b", CompileOptions(CompileMode.MATH_INLINE))
+                Document.compile("a+b")
             }
         assertEquals(CompileStatus.UNSUPPORTED, failure.status)
     }

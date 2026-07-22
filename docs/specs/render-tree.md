@@ -57,7 +57,7 @@ in the source-range section.
 | --- | --- | --- |
 | `hbox` | `width: measure`, `ascent: measure`, `descent: measure`, `src: range`, `children: [node]` | horizontal box; the compile root; `width` is the advance of its content, `ascent`/`descent` the maxima over children; the root box spans the whole input |
 | `glyph` | `x: measure`, `y: measure`, `cp: codepoint`, `style: style`, `family: family`, `size: measure`, `width: measure`, `ascent: measure`, `descent: measure`, `italic: measure`, `src: range` | leaf; one glyph named by Unicode codepoint + style + family + size, never a private glyph ID; `italic` is the italic correction, included in the advance of a math Ord glyph |
-| `kern` | `x: measure`, `width: measure`, `src: range` | leaf; fixed horizontal advance; `width` may be negative; the skeleton resolves interword and explicit spacing to kerns (glue arrives with stretch/shrink later, as a schema change) |
+| `kern` | `x: measure`, `width: measure`, `src: range` | leaf; fixed horizontal advance; `width` may be negative; the engine resolves interword spacing, explicit spacing commands, and math inter-atom spacing to kerns (glue arrives with stretch/shrink later, as a schema change) |
 
 Field types:
 
@@ -67,6 +67,19 @@ Field types:
 - `style` — `upright | italic`. Bold and the remaining faces arrive with
   the 1.0.0 milestones as schema changes.
 - `family` — `main`. Additional families arrive as schema changes.
+
+Math inter-atom spacing: in the math modes every atom carries one of TeX's
+classes (Ord, Op, Bin, Rel, Open, Close, Punct, Inner — TeXbook chapter
+17), contextual Bin atoms resolve to Ord exactly as in TeX's first mlist
+pass, and the chapter-18 pair table inserts a thin (3/18 em), medium
+(4/18 em), or thick (5/18 em) kern directly before the right atom of a
+spaced pair — after any explicit spacing between the two, which never
+suppresses the inserted space. The class itself is not a tree field: it is
+layout input, visible through the inserted kerns. An inter-atom kern's
+`src` is the source gap between the two atoms it separates,
+`[left.src.end, right.src.begin)` — empty when the atoms are adjacent, and
+covering the blanks or explicit-spacing bytes between them otherwise.
+Document mode has no atom classes and never receives inter-atom kerns.
 
 ## Source ranges
 
