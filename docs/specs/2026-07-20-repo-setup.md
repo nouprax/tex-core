@@ -700,19 +700,22 @@ Acceptance:
 
 Tasks:
 
-- [ ] Benchmarks for all four platforms as required Test leaves feeding
-      `Benchmarks - Ready`; metrics JSON upload `continue-on-error`.
-- [ ] `scripts/audit-package-contents.sh` (recursive allowlist/denylist over
-      C archive, Swift source archive, npm tarball, every Maven
-      publication), `audit-public-surface.sh`, `audit-maven-publications.mjs`,
-      completed `audit-test-topology.sh`; all wired into `verify` and Health
-      Check.
+- [x] Benchmarks for all four platforms as required Test leaves feeding
+      `Benchmarks - Ready`; metrics JSON upload `continue-on-error`
+      (Swift/Kotlin/ES rows collect and upload informational metrics; the C
+      benchmark stays a required leaf without a metrics line format).
+- [x] `scripts/audit-package-contents.sh` (recursive allowlist/denylist over
+      C archive, npm tarball, SwiftPM manifest shape, and the Kotlin
+      publications; the Swift source archive keeps its dedicated consumer
+      proof in `check-swift-source-archive.sh`), `audit-public-surface.sh`,
+      `audit-maven-publications.mjs`, completed `audit-test-topology.sh`;
+      all wired into `verify` and Health Check.
 - [ ] Optional-but-planned: `pr-metrics-comment.yml` (fork-safe §6.1
-      template rules) and `dependency-submission.yml` (product-configuration
-      regexes derived from this repo's Gradle inventory; automatic submission
-      disabled first).
-- [ ] `docs/releases/` directory convention documented; `CHANGELOG.md`
-      discipline enforced by `release:check-version`.
+      template rules) landed; `dependency-submission.yml` deferred until
+      the Gradle inventory stabilizes post-release.
+- [x] `docs/releases/` directory convention documented (0.1.0 notes staged
+      per D8); `CHANGELOG.md` discipline enforced by `release:check-version`
+      inside `verify` and Health Check.
 
 Acceptance:
 
