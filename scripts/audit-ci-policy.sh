@@ -15,6 +15,8 @@ cd "$root"
 
 ci=.github/workflows/ci.yml
 codeql=.github/workflows/codeql.yml
+release=.github/workflows/release.yml
+release_dry_run=.github/workflows/release-dry-run.yml
 ruleset=.github/rulesets/main.json
 release_ruleset=.github/rulesets/release-tags.json
 release_environment=.github/environments/release.json
@@ -33,6 +35,8 @@ fi
 for required in \
     "$ci" \
     "$codeql" \
+    "$release" \
+    "$release_dry_run" \
     "$ruleset" \
     "$release_ruleset" \
     "$release_environment" \
@@ -225,6 +229,95 @@ grep -Fq 'BENCHMARKS_READY: ${{ needs.benchmarks-ready.result }}' <<<"$required_
 
 benchmarks_ready_job=$(sed -n '/^    benchmarks-ready:$/,/^    tests-ready:$/p' "$ci")
 grep -Fq '        if: ${{ always() }}' <<<"$benchmarks_ready_job"
+
+# Formal release workflow: tag-triggered only, tag-local quality gates,
+# environment-gated publishes, ordered publication, curated notes, OIDC npm.
+search '^    push:$' "$release"
+search '^        tags:$' "$release"
+search '^    workflow_dispatch:$' "$release"
+if search '^    pull_request:$' "$release"; then
+    echo "formal release workflow may not accept pull requests" >&2
+    exit 1
+fi
+search '^    contents: read$' "$release"
+search '^        environment: release$' "$release"
+search '^    quality:$' "$release"
+search '^        name: Quality Gate - Release$' "$release"
+search '^        uses: \./\.github/workflows/ci\.yml$' "$release"
+if search 'GITHUB_SHA|check-runs|merge-base|CodeQL gate|Required gates|Development branch gates' "$release"; then
+    echo "formal release must run tag-local quality gates instead of querying historical checks" >&2
+    exit 1
+fi
+if [ "$(grep -c '^        needs: quality$' "$release")" -ne 5 ]; then
+    echo "every initial release artifact job must wait for tag-local quality gates" >&2
+    exit 1
+fi
+for release_name in \
+    'Health Check - Release / Tag and Versions' \
+    'Build Release - C / ${{ matrix.label }}' \
+    'Build Release - Swift / Product Source' \
+    'Build Release - ES / npm Package' \
+    'Build Release - Kotlin / Linux Publications' \
+    'Build Release - Kotlin / macOS Publications' \
+    'Assemble Release - Maven Central' \
+    'Release Artifacts - Ready' \
+    'Publish Release - Maven Central / Stage' \
+    'Publish Release - ES / npm' \
+    'Publish Release - Maven Central / Commit' \
+    'Publish Release - GitHub'; do
+    grep -Fq "        name: $release_name" "$release"
+done
+release_ready_job=$(sed -n '/^    release-artifacts-ready:$/,/^    maven-stage:$/p' "$release")
+grep -Fq "if: \${{ github.event_name == 'push' && always() }}" <<<"$release_ready_job"
+for dependency in c-artifacts swift-source npm-package maven-assemble; do
+    grep -Fq "$dependency" <<<"$release_ready_job"
+done
+maven_stage_job=$(sed -n '/^    maven-stage:$/,/^    npm-publish:$/p' "$release")
+grep -Fq '        needs: release-artifacts-ready' <<<"$maven_stage_job"
+grep -Fq 'central-portal.sh upload build/tex-core-maven-central.zip' <<<"$maven_stage_job"
+if search 'central-portal\.sh upload' <(sed -n '/^    maven-assemble:$/,/^    release-artifacts-ready:$/p' "$release"); then
+    echo "Maven assembly phase may not publish externally" >&2
+    exit 1
+fi
+search '^            id-token: write$' "$release"
+search '^            attestations: write$' "$release"
+search 'actions/attest-build-provenance@' "$release"
+search 'npm publish \./release-npm/\*\.tgz --access public' "$release"
+search '^    resume-publish:$' "$release"
+search "if: github.event_name == 'workflow_dispatch'" "$release"
+search 'gh run download "\$SOURCE_RUN_ID" --name release-npm-package' "$release"
+grep -Fq 'test -s "docs/releases/$(cat VERSION).md"' "$release"
+grep -Fq -- '--notes-file "docs/releases/$(cat VERSION).md"' "$release"
+if search -- '--generate-notes' "$release"; then
+    echo "formal release workflow must use curated release notes" >&2
+    exit 1
+fi
+search 'publishingType=USER_MANAGED' scripts/central-portal.sh
+for secret in \
+    MAVEN_CENTRAL_USERNAME \
+    MAVEN_CENTRAL_PASSWORD \
+    MAVEN_SIGNING_KEY \
+    MAVEN_SIGNING_PASSWORD; do
+    search "secrets\.$secret" "$release"
+done
+if search 'NODE_AUTH_TOKEN|NPM_TOKEN|secrets\.NPM' "$release"; then
+    echo "npm release job must use OIDC rather than a registry token" >&2
+    exit 1
+fi
+
+# Release dry run: PR-triggered, secret-free, disposable signing key, full
+# aggregate audit.
+search '^    pull_request:$' "$release_dry_run"
+search '^    workflow_dispatch:$' "$release_dry_run"
+search '^    contents: read$' "$release_dry_run"
+search '^        name: Release Dry Run - Ready$' "$release_dry_run"
+search 'sign-maven-publications\.sh build/release-maven-central --ephemeral' "$release_dry_run"
+search 'audit-maven-publications\.mjs' "$release_dry_run"
+search 'build/release-maven-central --full --signed' "$release_dry_run"
+if search 'secrets\.|environment: release|contents: write|id-token: write' "$release_dry_run"; then
+    echo "release dry run may not read secrets or request publish permissions" >&2
+    exit 1
+fi
 
 for workflow in "$ci" "$codeql"; do
     if ! search '^    merge_group:$' "$workflow"; then
