@@ -25,15 +25,19 @@ two projects remain independently consumable.
 
 ## Status
 
-**Pre-release, phase 2 of the setup plan.** The C engine exists as a walking
-skeleton: `tex_core_document_compile` compiles ordinary atoms and explicit
-spacing in all three input modes into a real render tree with embedded
-Computer Modern metrics, a byte-deterministic canonical dump, a `tex-core`
-CLI, and a correctness/conformance/benchmark/sanitizer CTest graph. The
-LaTeX surface, canonical render-tree spec, bindings, CI, and release
-pipeline land in the remaining phases of
-[`docs/specs/2026-07-20-repo-setup.md`](docs/specs/2026-07-20-repo-setup.md).
-Nothing is published yet and no platform support is claimed.
+**Pre-release; infrastructure phases 1–9 of the setup plan are complete and
+the engine is climbing milestone M1 (math core).** The C engine, its
+render-tree contract (schemaVersion 1), the Swift, Kotlin Multiplatform,
+and ES/WASM bindings, the fail-closed CI quality gates, and the release
+workflows are all in place. `Document.compile` covers ordinary text atoms
+with explicit spacing in document mode and, in the math modes, classed
+math atoms — the ASCII math characters plus the M1 symbol-command set
+(Greek letters, binary operators, relations, arrows, letter-like and
+delimiter symbols) — laid out with TeX's inter-atom spacing over embedded
+Computer Modern metrics, with byte-identical canonical dumps on every
+platform. The rest of the M1–M4 surface (scripts, fractions, radicals, big
+operators, text galley, domain notations) and the registry setup of phase
+10 land before `1.0.0`. Nothing is published yet.
 
 Build and test the C core:
 

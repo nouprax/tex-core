@@ -90,6 +90,18 @@ const stateValidators = {
     "atom.digit": ({ tree }) => / cp=U\+003[0-9] /.test(tree),
     "atom.period": ({ tree }) => / cp=U\+002E /.test(tree),
     "atom.comma": ({ tree }) => / cp=U\+002C /.test(tree),
+    "atom.bin": ({ mode, source, tree }) =>
+        mode !== "document" && /[+*-]/.test(source ?? "") && / cp=U\+(002B|2212|2217) /.test(tree),
+    "atom.rel": ({ mode, source, tree }) =>
+        mode !== "document" && /[=<>:]/.test(source ?? "") && / cp=U\+003[ACDE] /.test(tree),
+    "atom.open": ({ mode, source, tree }) =>
+        mode !== "document" && /[([]/.test(source ?? "") && / cp=U\+00(28|5B) /.test(tree),
+    "atom.close": ({ mode, source, tree }) =>
+        mode !== "document" && /[)\]!?]/.test(source ?? "") && / cp=U\+00(29|5D|21|3F) /.test(tree),
+    "atom.punct": ({ mode, source, tree }) =>
+        mode !== "document" && /[,;]/.test(source ?? "") && / cp=U\+00(2C|3B) /.test(tree),
+    "atom.remapped": ({ mode, source, tree }) =>
+        mode !== "document" && /[-*|]/.test(source ?? "") && / cp=U\+2(212|217|223) /.test(tree),
     "glyph.style.upright": ({ tree }) => / style=upright /.test(tree),
     "glyph.style.italic": ({ tree }) => / style=italic /.test(tree),
     "glyph.italic.zero": ({ tree }) => glyphMeasure(tree, "italic").some((value) => value === 0),
@@ -109,6 +121,49 @@ const stateValidators = {
     "command.negativeThin": ({ source }) => /\\!/.test(source ?? ""),
     "command.quad": ({ source }) => /\\quad/.test(source ?? ""),
     "command.qquad": ({ source }) => /\\qquad/.test(source ?? ""),
+    "command.symbol.greekLower": ({ tree }) => / cp=U\+03(B[1-9A-F]|C[0-9]|D[156]|F[15]) style=italic /.test(tree),
+    "command.symbol.greekUpper": ({ tree }) => / cp=U\+03(9[348BE]|A[035689]) style=upright /.test(tree),
+    "command.symbol.ordinary": ({ source }) =>
+        /\\(infty|partial|ell|wp|Re|Im|aleph|forall|exists|neg|lnot|emptyset|nabla|surd|top|bot|angle|triangle|prime|flat|natural|sharp|clubsuit|diamondsuit|heartsuit|spadesuit|backslash)/.test(
+            source ?? ""
+        ),
+    "command.symbol.bin": ({ source }) =>
+        /\\(pm|mp|times|div|cdot|ast|star|circ|bullet|cap|cup|sqcap|sqcup|uplus|vee|lor|wedge|land|setminus|wr|diamond|oplus|ominus|otimes|oslash|odot|dagger|ddagger|amalg)/.test(
+            source ?? ""
+        ),
+    "command.symbol.rel": ({ source }) =>
+        /\\(leq?|geq?|equiv|prec|succ|ll|gg|subset|supset|subseteq|supseteq|in|ni|owns|vdash|dashv|smile|frown|mid|parallel|perp|models|asymp|sim|simeq|approx|cong|doteq|propto|bowtie)/.test(
+            source ?? ""
+        ),
+    "command.symbol.arrow": ({ source }) =>
+        /\\(to\b|gets|mapsto|leftarrow|rightarrow|Leftarrow|Rightarrow|leftrightarrow|Longrightarrow|uparrow|downarrow|nearrow|searrow|swarrow|nwarrow|harpoon)/.test(
+            source ?? ""
+        ),
+    "command.symbol.delimiter": ({ source }) =>
+        /\\(lbrace|rbrace|langle|rangle|lfloor|rfloor|lceil|rceil|[{}|])/.test(source ?? ""),
+    "command.symbol.alias": ({ source }) => /\\(le|ge|to|gets|lnot|land|lor|owns)\b/.test(source ?? ""),
+    "space.interAtom.none": ({ mode, outcome, tree }) =>
+        mode !== "document" && outcome === "tree" && /^ {2}glyph .*\n {2}glyph /m.test(tree),
+    "space.interAtom.thin": ({ mode, source, tree }) =>
+        mode !== "document" && !/\\,/.test(source ?? "") && / width=1\.66672pt /.test(tree),
+    "space.interAtom.medium": ({ mode, source, tree }) =>
+        mode !== "document" && !/\\:/.test(source ?? "") && / width=2\.22229pt /.test(tree),
+    "space.interAtom.thick": ({ mode, source, tree }) =>
+        mode !== "document" && !/\\;/.test(source ?? "") && / width=2\.77771pt /.test(tree),
+    "space.interAtom.acrossExplicit": ({ mode, tree }) => mode !== "document" && /^ {2}kern .*\n {2}kern /m.test(tree),
+    "kern.boundaryRange": ({ tree }) =>
+        [...tree.matchAll(/^ {2}kern .* src=(\d+)\.\.(\d+)$/gm)].some((match) => match[1] === match[2]),
+    "bin.kept": ({ mode, source, tree }) =>
+        mode !== "document" && /[+*]|\\pm|\\times|\\cdot/.test(source ?? "") && / width=2\.22229pt /.test(tree),
+    "bin.demoted.leading": ({ mode, source }) => mode !== "document" && /^[+*-]/.test(source ?? ""),
+    "bin.demoted.trailing": ({ mode, source }) => mode !== "document" && /[+*-]\n?$/.test(source ?? ""),
+    "bin.demoted.afterBin": ({ mode, source }) => mode !== "document" && /[+*-][+*-]/.test(source ?? ""),
+    "bin.demoted.afterRel": ({ mode, source }) => mode !== "document" && /[=<>:][+*-]/.test(source ?? ""),
+    "bin.demoted.afterOpen": ({ mode, source }) => mode !== "document" && /[([][+*-]/.test(source ?? ""),
+    "bin.demoted.afterPunct": ({ mode, source }) => mode !== "document" && /[,;] ?[+*-]/.test(source ?? ""),
+    "bin.demoted.beforeRel": ({ mode, source }) => mode !== "document" && /[+*-][=<>:]/.test(source ?? ""),
+    "bin.demoted.beforeClose": ({ mode, source }) => mode !== "document" && /[+*-][)\]]/.test(source ?? ""),
+    "bin.demoted.beforePunct": ({ mode, source }) => mode !== "document" && /[+*-][,;]/.test(source ?? ""),
     "measure.zero": ({ tree }) => /=0\.0pt/.test(tree),
     "measure.negative": ({ tree }) => /=-/.test(tree),
     "input.empty": ({ bytes }) => bytes !== undefined && bytes.length === 0,

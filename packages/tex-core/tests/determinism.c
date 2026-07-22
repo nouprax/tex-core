@@ -17,6 +17,17 @@ static const char *const TXC_SAMPLES[] = {
     "words  with\truns\nand lines",
 };
 
+/* Math-only samples: classed atoms, symbol commands, and inter-atom
+ * spacing are math-mode surface, so these compile in the two math modes
+ * only. */
+static const char *const TXC_MATH_SAMPLES[] = {
+    "-a+(-b)=-c*-d, -e*(f-)<g-=h-, k-",
+    "\\alpha\\pm\\beta\\le\\gamma\\to\\delta",
+    "(x, y; z)!?",
+    "a\\,+b\\;=c",
+    "\\lbrace\\langle x|y\\rangle\\rbrace\\{z\\}",
+};
+
 static char *txc_dump_once(txc_test *test, const char *source, tex_core_mode mode) {
     tex_core_options options;
     tex_core_options_init(&options);
@@ -47,6 +58,22 @@ int main(void) {
     for (size_t sample = 0; sample < sizeof(TXC_SAMPLES) / sizeof(TXC_SAMPLES[0]); sample++) {
         const char *source = TXC_SAMPLES[sample];
         for (size_t mode = 0; mode < sizeof(modes) / sizeof(modes[0]); mode++) {
+            char *first = txc_dump_once(&test, source, modes[mode]);
+            char *second = txc_dump_once(&test, source, modes[mode]);
+            txc_check(
+                &test,
+                first != NULL && second != NULL && strcmp(first, second) == 0,
+                "repeated dumps differ for \"%s\" in mode %d",
+                source,
+                (int)modes[mode]
+            );
+            tex_core_dump_free(first);
+            tex_core_dump_free(second);
+        }
+    }
+    for (size_t sample = 0; sample < sizeof(TXC_MATH_SAMPLES) / sizeof(TXC_MATH_SAMPLES[0]); sample++) {
+        const char *source = TXC_MATH_SAMPLES[sample];
+        for (size_t mode = 1; mode < sizeof(modes) / sizeof(modes[0]); mode++) {
             char *first = txc_dump_once(&test, source, modes[mode]);
             char *second = txc_dump_once(&test, source, modes[mode]);
             txc_check(

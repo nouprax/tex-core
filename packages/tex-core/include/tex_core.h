@@ -19,11 +19,14 @@
  * range — never partial output. The error struct is caller-allocated plain
  * data so that allocation-failure reports themselves allocate nothing.
  *
- * The walking-skeleton surface compiles ordinary atoms (ASCII letters,
- * digits, period — plus comma in document mode) and explicit spacing
- * commands. The full self-contained LaTeX surface arrives with the 1.0.0
- * milestones; every extension of the surface is a reviewed public-behavior
- * change.
+ * The supported surface (milestone M1 in progress): document mode compiles
+ * ordinary text atoms (ASCII letters, digits, period, comma) and explicit
+ * spacing commands; the math modes add the classed math characters
+ * (+ - * / = < > ( ) [ ] , ; : ! ? |) and the M1 symbol commands (Greek
+ * letters, binary operators, relations, arrows, letter-like and delimiter
+ * symbols), laid out with TeX's inter-atom spacing. The full self-contained
+ * LaTeX surface arrives with the 1.0.0 milestones; every extension of the
+ * surface is a reviewed public-behavior change.
  */
 
 #ifndef TEX_CORE_H
