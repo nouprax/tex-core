@@ -6,6 +6,20 @@ not promised to remain compatible between releases.
 
 ## Unreleased
 
+- Land the ES/WASM binding: `@nouprax/es-tex-core`, an ESM-only package
+  (Node ≥ 20 and modern browsers) compiling the C engine to standalone
+  WASM through the pinned Emscripten toolchain, with `Document.compile`
+  over the three input modes, a frozen discriminated-union render-tree
+  value API with the exhaustive visitor, structured `CompileError`
+  values, and a canonical dumper byte-identical to the C dump; the WASM
+  transport reuses the shared TXC1 bridge over the public C facade.
+  Conformance replays the shared corpus in Node; correctness runs on Node
+  and headless Chrome; the packaging suite proves the packed tarball
+  installs into a clean project, blocks deep imports through the
+  `exports` map, and resolves the WASM asset through its export. CI grows
+  ES health-check, WASM-package producer, test-bundle producer,
+  Node/browser/conformance consumers, a Node benchmark row, and a
+  JavaScript/TypeScript CodeQL lane.
 - Extend CI to the Kotlin binding: health check, Linux/macOS publication
   producers, host-test producers, JVM/Android-host/Native test consumers,
   the build-once/test-many Android instrumentation APK producer with four

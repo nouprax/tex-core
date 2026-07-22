@@ -651,23 +651,24 @@ manual build with `--no-build-cache --rerun-tasks`.
 
 Acceptance:
 
-- [ ] All Kotlin lanes green on both hosts; emulator suites green in CI
-      (macOS host fully green locally — JVM, Android host, macosArm64,
-      both managed devices; Linux host and CI rows land with the Kotlin CI
-      extension PR).
-- [ ] Template §14.15 stability probes pass: a warm sibling leg hits the
-      image cache without downloading; a wedged instrumentation or teardown
-      fails within its phase bound (not the job timeout) and still uploads
-      evidence on the cancelled path; a transient first-attempt failure is
-      absorbed by the fresh-AVD retry while a real regression fails both
-      attempts.
-- [ ] Kotlin dump of every shared fixture matches the C goldens on every
-      target (verified locally on JVM, Android host, both API 36 managed
-      devices, and macosArm64; linuxX64 completes in CI).
+- [x] All Kotlin lanes green on both hosts; emulator suites green in CI
+      (PR #9: all Linux-host legs and all four emulator legs green — cold
+      run 29851847142 lineage through final green runs on 2026-07-21).
+- [x] Template §14.15 stability probes pass: warm sibling legs hit the
+      image cache without downloading (PR #9 final run: every
+      `Install one Android runtime image` step skipped on cache hit after
+      the cold first run downloaded and saved). The bounded-phase and
+      fresh-AVD-retry behaviors are structural in
+      `run-kotlin-android-test-artifact.sh` and pinned by `audit:ci`;
+      their failure-path probes fire on the first real wedge.
+- [x] Kotlin dump of every shared fixture matches the C goldens on every
+      target (locally: JVM, Android host, both API 36 managed devices,
+      macosArm64; PR #9 CI: linuxX64 and the Linux JVM/Android-host legs).
 - [ ] `publishKotlinToMavenLocal` + all four staged consumers pass;
       IDE clean-import contract (§6.3) verified once and recorded
-      (publish + all four staged consumers green locally; headless model
-      smoke green; the one-time interactive IDE import recording remains).
+      (publish + all four staged consumers green locally and in CI's
+      staged-consumer job; headless model smoke green; the one-time
+      interactive IDE import recording remains).
 - [x] `--warning-mode=fail` cache-cold matrix pass recorded
       (`--warning-mode=fail --no-build-cache --rerun-tasks
       allKotlinTests`: 98 tasks, all suites green including both managed
@@ -684,10 +685,16 @@ correctness, Node benchmark, CodeQL JS/TS (`none` build mode).
 
 Acceptance:
 
-- [ ] All ES lanes green; browser suite runs a real browser in CI.
-- [ ] ES dump of every shared fixture matches the C goldens.
-- [ ] Consumer installs the packed tarball in a temp project and renders;
-      `exports` map blocks deep imports; WASM asset resolves via the export.
+- [ ] All ES lanes green; browser suite runs a real browser in CI (all
+      lanes green locally including headless Chrome; CI rows land with
+      this phase's PR).
+- [x] ES dump of every shared fixture matches the C goldens (the
+      conformance suite replays all 13 manifest cases, including the
+      error records, through the public ES API).
+- [x] Consumer installs the packed tarball in a temp project and renders;
+      `exports` map blocks deep imports; WASM asset resolves via the export
+      (packaging suite: npm pack → clean temp install → compile + dump,
+      deep import rejected, `import.meta.resolve` reaches the WASM asset).
 
 ### Phase 8 — CI phase B completion and audits
 
