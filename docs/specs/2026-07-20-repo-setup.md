@@ -726,28 +726,38 @@ Acceptance:
 
 Tasks:
 
-- [ ] `scripts/check-release-version.mjs` (§4 drift matrix),
+- [x] `scripts/check-release-version.mjs` (§4 drift matrix),
       `scripts/stage-maven-publications.sh`,
       `scripts/merge-maven-publications.mjs`, `scripts/central-portal.sh`,
-      `scripts/release-dry-run.sh`, checksum/signing helpers.
-- [ ] `.github/workflows/release-dry-run.yml` per §11 (secret-free, disposable
+      `scripts/release-dry-run.sh`, checksum/signing helpers
+      (`create-release-checksums.sh`, `sign-maven-publications.sh`
+      ephemeral/release modes, `stage-c-release.sh`, `stage-npm-release.sh`,
+      `wait-central-deployment.sh`).
+- [x] `.github/workflows/release-dry-run.yml` per §11 (secret-free, disposable
       key, full artifact graph, `Release Dry Run - Ready`).
-- [ ] `.github/workflows/release.yml` per §11 (validate → reusable CI →
+- [x] `.github/workflows/release.yml` per §11 (validate → reusable CI →
       Build Release → Assemble → barrier → ordered publish → attestations →
       GitHub Release; `Resume Release` recovery job).
-- [ ] `docs/releasing.md` for this repo (§11.1 table, rotation/leak runbooks,
-      publication order, verification commands).
-- [ ] Extend `audit-ci-policy.sh` with the release rules of template §13.
+- [x] `docs/releasing.md` for this repo (§11.1 table, rotation/leak runbooks,
+      publication order, verification commands; npm 0.1.0 bootstrap per D8).
+- [x] Extend `audit-ci-policy.sh` with the release rules of template §13.
 
 Acceptance:
 
 - [ ] Dry run green on a PR; downloaded artifacts independently re-audited
       (signatures verify against the disposable key; checksums match;
-      product-only contents).
-- [ ] Dry run provably reads no secrets (empty-env assertion job).
-- [ ] Release workflow rejects a non-`v$(VERSION)` tag and a tag off `main`
-      in rehearsal (evaluate-mode push of a scratch tag on a fork/test repo,
-      or dispatch-free static assertion via audit script).
+      product-only contents) — the host-mode dry run
+      (`scripts/release-dry-run.sh`: C archive, Swift source archive, npm
+      tarball, signed Maven repository re-verified by all four staged
+      consumers and the signed audit) is green locally; the full
+      Linux+macOS aggregate runs on this phase's PR.
+- [ ] Dry run provably reads no secrets (empty-env assertion job in the
+      validate row; completes with this phase's PR run).
+- [x] Release workflow rejects a non-`v$(VERSION)` tag and a tag off `main`
+      via the dispatch-free static assertions: `audit:ci` pins the
+      tag-only trigger surface and `check-release-version.mjs --tag`
+      rejects any tag that is not exactly `v$(VERSION)`; the protected-tag
+      ruleset restricts creation to the release reviewer.
 
 ### Phase 10 — Control plane active and registry setup
 

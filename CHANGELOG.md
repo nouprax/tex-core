@@ -6,6 +6,14 @@ not promised to remain compatible between releases.
 
 ## Unreleased
 
+- Land release engineering: the secret-free release dry run (PR-triggered,
+  disposable signing key, full artifact graph re-verified by staged
+  consumers and the signed Maven audit) and the tag-driven formal release
+  workflow (tag-local quality gates through the reusable CI, ordered
+  Maven-stage → npm OIDC → Maven-commit → GitHub Release publication with
+  build-provenance attestations, and a Resume Release recovery job), plus
+  the release staging scripts, `docs/releasing.md`, and the template §13
+  release rules in `audit:ci`.
 - Complete CI phase B: the package-content audit now covers the npm
   tarball, the SwiftPM manifest shape, the Kotlin publications, the
   installed C export set, and the no-process-global-state contract over

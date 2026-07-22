@@ -50,7 +50,7 @@
         "lint:kotlin": "scripts/gradle.sh ktlintCheck",
         "lint:swift": "scripts/lint-swift.sh",
         "release:check-version": "node scripts/check-release-version.mjs",
-        "release:dry-run": "scripts/pending.sh 'Phase 9 (release engineering)'",
+        "release:dry-run": "scripts/release-dry-run.sh",
         "test:c-host": "cmake --preset default && cmake --build --preset default --parallel && ctest --preset correctness",
         "test:swift-macos": "CLANG_MODULE_CACHE_PATH=build/swift-module-cache swift test --disable-sandbox --filter '^TexCoreTests\\.' && CLANG_MODULE_CACHE_PATH=build/swift-module-cache swift test --disable-sandbox --package-path packages/swift-tex-core/Tests/Consumer",
         "test:swift-ios-simulator": "CLANG_MODULE_CACHE_PATH=build/swift-module-cache xcodebuild test -scheme swift-tex-core-Package -destination 'platform=iOS Simulator,name=iPhone 17 Pro,OS=latest' -derivedDataPath build/xcode-tests -only-testing:TexCoreTests",
