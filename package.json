@@ -17,7 +17,7 @@
         "benchmark:c-host": "cmake --preset default && cmake --build --preset default --parallel && ctest --preset benchmark",
         "benchmark:swift-macos": "CLANG_MODULE_CACHE_PATH=build/swift-module-cache swift run --disable-sandbox -c release TexCoreBenchmarks",
         "benchmark:kotlin-jvm": "scripts/gradle.sh :packages:kotlin-tex-core:kotlinBenchmark",
-        "benchmark:es-node": "scripts/pending.sh 'Phase 7 (ES binding)'",
+        "benchmark:es-node": "pnpm --filter @nouprax/es-tex-core benchmark",
         "build:c": "cmake --preset default && cmake --build --preset default --parallel",
         "build:swift": "swift build",
         "check:contracts": "node scripts/check-render-tree-fixtures.mjs",
@@ -31,7 +31,7 @@
         "conformance:kotlin-android-emulator": "scripts/gradle.sh :packages:kotlin-tex-core:texCoreApi36Page4kAndroidDeviceTest :packages:kotlin-tex-core:texCoreApi36Page16kAndroidDeviceTest",
         "conformance:kotlin-macos-arm64": "scripts/gradle.sh :packages:kotlin-tex-core:macosArm64ConformanceTest",
         "conformance:kotlin-linux-x64": "scripts/gradle.sh :packages:kotlin-tex-core:linuxX64ConformanceTest",
-        "conformance:es-node": "scripts/pending.sh 'Phase 7 (ES binding)'",
+        "conformance:es-node": "pnpm --filter @nouprax/es-tex-core conformance",
         "format": "pnpm run format:c && pnpm run format:cmake && pnpm run format:swift && pnpm run format:kotlin && pnpm run format:es",
         "format:check": "pnpm run format:c:check && pnpm run format:cmake:check && pnpm run format:swift:check && pnpm run format:kotlin:check && pnpm run format:es:check",
         "format:c": "scripts/format-c.sh",
@@ -59,10 +59,11 @@
         "test:kotlin-android-emulator": "scripts/gradle.sh :packages:kotlin-tex-core:texCoreApi36Page4kAndroidDeviceTest :packages:kotlin-tex-core:texCoreApi36Page16kAndroidDeviceTest",
         "test:kotlin-macos-arm64": "scripts/gradle.sh :packages:kotlin-tex-core:macosArm64Test",
         "test:kotlin-linux-x64": "scripts/gradle.sh :packages:kotlin-tex-core:linuxX64Test",
-        "test:es-node": "scripts/pending.sh 'Phase 7 (ES binding)'",
-        "test:es-browser": "scripts/pending.sh 'Phase 7 (ES binding)'",
+        "test:es-node": "pnpm --filter @nouprax/es-tex-core test",
+        "test:es-browser": "pnpm --filter @nouprax/es-tex-core test:browser",
         "verify": "pnpm run format:check && pnpm run lint && pnpm run check:contracts && pnpm run check:gradle-model && pnpm run audit:repository && pnpm run audit:ci",
-        "clean:kotlin-android-emulator": "scripts/gradle.sh :packages:kotlin-tex-core:cleanManagedDevices"
+        "clean:kotlin-android-emulator": "scripts/gradle.sh :packages:kotlin-tex-core:cleanManagedDevices",
+        "build:es": "pnpm --filter @nouprax/es-tex-core build"
     },
     "devDependencies": {
         "@eslint/js": "10.0.1",

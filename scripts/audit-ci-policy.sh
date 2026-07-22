@@ -104,14 +104,23 @@ if [ "$(grep -c '^                      suite:' <<<"$android_test_job")" -ne 4 ]
     exit 1
 fi
 
+test -x scripts/build-es-product-artifact.sh
+test -x scripts/build-es-test-artifact.sh
+test -x scripts/run-es-test-artifact.sh
+grep -Fq 'kind=es-product-dist' scripts/build-es-product-artifact.sh
+search 'sha256sum --check SHA256SUMS' scripts/run-es-test-artifact.sh
+search 'source_sha' scripts/run-es-test-artifact.sh
+
 for job in \
     health-check-repository \
     health-check-c \
     health-check-kotlin \
+    health-check-es \
     health-checks-ready \
     c-product-build \
     c-product-build-windows \
     kotlin-product-build \
+    es-product-build \
     package-audit \
     c-test-build \
     c-test-build-windows \
@@ -119,13 +128,16 @@ for job in \
     kotlin-test-build \
     kotlin-consumers \
     kotlin-android-test-build \
+    es-test-build \
     c-test \
     c-test-windows \
     c-sanitizer-test \
     kotlin-test \
     kotlin-android-test \
+    es-test \
     benchmark-c \
     benchmark-kotlin \
+    benchmark-es \
     benchmarks-ready \
     builds-ready \
     build-tests-ready \
@@ -150,8 +162,10 @@ for consumer in \
     c-sanitizer-test \
     kotlin-test \
     kotlin-android-test \
+    es-test \
     benchmark-c \
-    benchmark-kotlin; do
+    benchmark-kotlin \
+    benchmark-es; do
     consumer_job=$(sed -n "/^    ${consumer}:$/,/^    [a-z].*:$/p" "$ci")
     if ! grep -Fq '        needs: build-tests-ready' <<<"$consumer_job"; then
         echo "test consumer bypasses the global build-test barrier: $consumer" >&2
@@ -162,7 +176,8 @@ done
 for producer in \
     c-product-build \
     c-product-build-windows \
-    kotlin-product-build; do
+    kotlin-product-build \
+    es-product-build; do
     producer_job=$(sed -n "/^    ${producer}:$/,/^    [a-z].*:$/p" "$ci")
     if ! grep -Fq '        needs: health-checks-ready' <<<"$producer_job"; then
         echo "build producer bypasses the global health-check barrier: $producer" >&2
@@ -177,7 +192,8 @@ for contract in \
     c-sanitizer-test-build \
     kotlin-test-build \
     kotlin-consumers \
-    kotlin-android-test-build; do
+    kotlin-android-test-build \
+    es-test-build; do
     contract_job=$(sed -n "/^    ${contract}:$/,/^    [a-z].*:$/p" "$ci")
     if ! grep -Fq '        needs: builds-ready' <<<"$contract_job"; then
         echo "build test bypasses the global build barrier: $contract" >&2

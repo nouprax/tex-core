@@ -29,6 +29,10 @@ jobs:
                       label: Java and Kotlin
                       build-mode: manual
                       os: ubuntu-latest
+                    - language: javascript-typescript
+                      label: JavaScript and TypeScript
+                      build-mode: none
+                      os: ubuntu-latest
                     - language: swift
                       label: Swift
                       build-mode: manual
