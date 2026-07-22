@@ -59,8 +59,8 @@ test("errors: invalid bytes throw the encoding error, never replace", () => {
 });
 
 test("errors: mode changes the accepted surface", () => {
-    Document.compile("a,b");
-    assert.throws(() => Document.compile("a,b", { mode: "mathInline" }), CompileError);
+    Document.compile("a+b", { mode: "mathInline" });
+    assert.throws(() => Document.compile("a+b"), CompileError);
 });
 
 test("errors: an unknown mode fails loudly instead of coercing to document", () => {
