@@ -154,12 +154,8 @@ jobs:
 
                       const marker = "<!-- tex-core-pr-metrics -->";
                       const allowedPlatforms = new Set(["linux", "macos"]);
-                      const allowedRuntimes = new Set(["c", "swift", "kotlin", "es"]);
-                      const allowedWorkloads = new Set([
-                          "representative_large",
-                          "large_document",
-                          "deep_nesting",
-                      ]);
+                      const allowedRuntimes = new Set(["swift", "kotlin-jvm", "es-node"]);
+                      const allowedWorkloads = new Set(["large_document", "math_spacing"]);
                       const allowedSizes = new Set([
                           "c-shared-library",
                           "kotlin-jvm-jar",
