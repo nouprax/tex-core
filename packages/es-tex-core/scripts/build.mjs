@@ -1,5 +1,5 @@
 import { mkdir, rm } from "node:fs/promises";
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
@@ -25,8 +25,13 @@ const bridges = [
 ];
 
 // The repo-managed emsdk (docs/toolchains.md pin) wins over any PATH emcc so
-// builds are reproducible across machines and CI.
-const pinnedEmcc = path.join(root, ".tools/emsdk/upstream/emscripten/emcc");
+// builds are reproducible across machines and CI. init-environment.sh owns
+// the version and installs under .tools/emsdk/<version>/.
+const emscriptenVersion = readFileSync(path.join(root, "scripts/init-environment.sh"), "utf8").match(
+    /^EMSCRIPTEN_VERSION=(\S+)$/m
+)?.[1];
+if (!emscriptenVersion) throw new Error("init-environment.sh no longer declares EMSCRIPTEN_VERSION");
+const pinnedEmcc = path.join(root, `.tools/emsdk/${emscriptenVersion}/upstream/emscripten/emcc`);
 const emcc = process.env.EMCC ?? (existsSync(pinnedEmcc) ? pinnedEmcc : "emcc");
 
 await rm(dist, { recursive: true, force: true });

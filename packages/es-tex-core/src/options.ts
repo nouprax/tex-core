@@ -8,12 +8,17 @@ export interface CompileOptions {
 }
 
 export function nativeMode(options: CompileOptions | undefined): number {
-    switch (options?.mode ?? "document") {
+    const mode = options?.mode ?? "document";
+    switch (mode) {
         case "document":
             return 0;
         case "mathInline":
             return 1;
         case "mathDisplay":
             return 2;
+        default:
+            // Unreachable for TypeScript callers; a plain-JavaScript typo
+            // must fail loudly instead of coercing to document mode.
+            throw new Error(`unknown compile mode: ${String(mode)}`);
     }
 }

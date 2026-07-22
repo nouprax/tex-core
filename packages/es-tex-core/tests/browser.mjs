@@ -70,8 +70,14 @@ const server = createServer(async (request, response) => {
         response.setHeader("content-type", name.endsWith(".wasm") ? "application/wasm" : "text/javascript");
         response.end(await readFile(resolved));
     } catch (error) {
+        // Diagnostics belong in the test process log, not in the response:
+        // even on this loopback-only test server, echoing exception text as
+        // the (default text/html) body trips stack-exposure and
+        // HTML-reinterpretation scanning for good reason.
+        console.error(error);
         response.statusCode = 500;
-        response.end(String(error));
+        response.setHeader("content-type", "text/plain; charset=utf-8");
+        response.end("internal test-server error");
     }
 });
 await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));

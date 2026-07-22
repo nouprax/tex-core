@@ -63,6 +63,10 @@ test("errors: mode changes the accepted surface", () => {
     assert.throws(() => Document.compile("a,b", { mode: "mathInline" }), CompileError);
 });
 
+test("errors: an unknown mode fails loudly instead of coercing to document", () => {
+    assert.throws(() => Document.compile("a,b", { mode: "mathinline" }), /unknown compile mode: mathinline/);
+});
+
 test("visitor: dispatch is exhaustive over the schema kinds", () => {
     const tree = Document.compile("a b");
     const counts = { hbox: 0, glyph: 0, kern: 0 };
