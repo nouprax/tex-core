@@ -586,18 +586,25 @@ Tasks:
 - [x] `.github/rulesets/{main,release-tags}.json`,
       `.github/environments/{release,release-tag-policy}.json` recipes;
       `scripts/bootstrap-repository.sh` copied from template §10.2.
-- [ ] Run bootstrap with `RULESET_ENFORCEMENT=evaluate`
+- [x] Run bootstrap with `RULESET_ENFORCEMENT=evaluate`
       (`GH_REPO=nouprax/tex-core`, `RELEASE_REVIEWER=DongyuZhao`).
 
 Acceptance (template §12.2 subset):
 
-- [ ] Test PR produces `Required gates` only from the PR run; push to its
-      branch produces no push CI; merge produces `Development branch gates`.
-- [ ] Killing/cancelling any leaf turns the stable gate red (fail-closed
-      probe).
-- [ ] `CodeQL gate` green only after the C analysis succeeds; tracer sees a
-      real compile.
-- [ ] `pnpm audit:ci` passes locally and in Health Check.
+- [x] Test PR produces `Required gates` only from the PR run; push to its
+      branch produces no push CI; merge produces `Development branch gates`
+      (PR #4: all branch runs were `pull_request` events carrying
+      `Required gates`; merge push run 29834728115 carried
+      `Development branch gates` only).
+- [x] Killing/cancelling any leaf turns the stable gate red (fail-closed
+      probe): PR #4 run 29829235921 (leaf failure → barriers red →
+      `Required gates` failure) and probe PR #5 run 29835186006
+      (mid-flight cancel → `Required gates` failure).
+- [x] `CodeQL gate` green only after the C analysis succeeds; tracer sees a
+      real compile (run 29834728171: `--begin-tracing --build-mode=manual`,
+      product built inside the tracer; manual-mode finalize fails on an
+      empty database, so a green analysis proves traced compilation).
+- [x] `pnpm audit:ci` passes locally and in Health Check.
 
 ### Phase 5 — Swift binding
 
