@@ -80,20 +80,27 @@ matching private key and passphrase. The encrypted offline private-key and
 revocation-certificate backup was confirmed on 2026-07-14.
 
 The npm package is public `@nouprax/es-tex-core`. Its initial `0.1.0`
-bootstrap publish is an interactive CLI session by the release operator
-(decision D8): publish once with 2FA, then configure the trusted publisher
-so every later release publishes through GitHub Actions OIDC only:
+bootstrap publish (decision D8) was executed on 2026-07-27. The
+interactive CLI session D8 presumed was impossible — corporate endpoint
+filtering blocks npm registry traffic from the operator's machine and the
+npm account uses passkey-only 2FA (npm requires an OTP for every token
+publish regardless of account settings, and the web-auth ceremony needs a
+browser) — so the publish ran as a one-off branch-local GitHub Actions
+workflow authenticated by a short-lived granular token carrying the
+per-token 2FA bypass. The token, its repository secret, and the bootstrap
+branches were deleted immediately after the run. The trusted publisher is
+configured so every release publishes through GitHub Actions OIDC only:
 
 - repository: `nouprax/tex-core`
 - workflow: `.github/workflows/release.yml`
 - environment: `release`
 - allowed action: `npm publish`
 
-Revoke the bootstrap CLI session/token immediately after configuration and
-verify `npm whoami` returns `ENEEDAUTH`. Package publishing access must
-require 2FA and disallow traditional tokens; no npm write token belongs in
-GitHub. The first coordinated release must run one OIDC publication and
-verify the provenance badge on the npm package page.
+Package publishing access requires 2FA and disallows traditional tokens;
+no npm write token belongs in GitHub, and no npm CLI session or
+credential outlived the bootstrap. The first coordinated release must run
+one OIDC publication and verify the provenance badge on the npm package
+page.
 
 ## Release preparation
 
