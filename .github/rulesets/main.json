@@ -2,7 +2,7 @@
     "name": "main quality gates",
     "target": "branch",
     "source_type": "Repository",
-    "enforcement": "evaluate",
+    "enforcement": "active",
     "conditions": {
         "ref_name": {
             "exclude": [],
