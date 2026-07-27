@@ -364,9 +364,7 @@ node --input-type=module - "$ruleset" <<'NODE'
 import fs from "node:fs";
 
 const ruleset = JSON.parse(fs.readFileSync(process.argv[2], "utf8"));
-// Rulesets run in evaluate mode until the Phase 10 activation flips this
-// audit (and the recipes) to require "active".
-if (!["evaluate", "active"].includes(ruleset.enforcement)) {
+if (ruleset.enforcement !== "active") {
     throw new Error(`main ruleset enforcement changed: ${ruleset.enforcement}`);
 }
 const required = ruleset.rules.find((rule) => rule.type === "required_status_checks");
@@ -397,8 +395,7 @@ const deploymentPolicy = JSON.parse(fs.readFileSync(process.argv[4], "utf8"));
 if (releaseRuleset.target !== "tag") {
     throw new Error("release tag ruleset must target tags");
 }
-// Evaluate until Phase 10 activation, matching the main ruleset recipe.
-if (!["evaluate", "active"].includes(releaseRuleset.enforcement)) {
+if (releaseRuleset.enforcement !== "active") {
     throw new Error(`release tag ruleset enforcement changed: ${releaseRuleset.enforcement}`);
 }
 if (releaseRuleset.conditions?.ref_name?.include?.join(",") !== "refs/tags/v*.*.*") {

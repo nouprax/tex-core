@@ -1,7 +1,7 @@
 {
     "name": "release tag protection",
     "target": "tag",
-    "enforcement": "evaluate",
+    "enforcement": "active",
     "conditions": {
         "ref_name": {
             "exclude": [],
