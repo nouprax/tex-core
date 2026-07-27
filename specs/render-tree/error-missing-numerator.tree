@@ -1,0 +1,2 @@
+render-error 3
+error status=unsupported src=0..5 message=missing numerator argument

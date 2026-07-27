@@ -1,5 +1,5 @@
 {
-    "schemaVersion": 2,
+    "schemaVersion": 3,
     "contract": "docs/specs/render-tree.md",
     "dumpGrammar": "docs/specs/render-tree-dump.md",
     "format": {
@@ -12,7 +12,8 @@
         "kinds": [
             "hbox",
             "glyph",
-            "kern"
+            "kern",
+            "rule"
         ],
         "states": [
             "mode.document",
@@ -101,7 +102,23 @@
             "error.unsupportedCommand",
             "error.paragraphBreak",
             "error.invalidUtf8",
-            "error.incompleteControl"
+            "error.incompleteControl",
+            "fraction.frac",
+            "fraction.dfrac",
+            "fraction.tfrac",
+            "fraction.charArgument",
+            "fraction.groupArgument",
+            "fraction.numeratorWider",
+            "fraction.denominatorWider",
+            "fraction.nested",
+            "fraction.inScript",
+            "fraction.scripted",
+            "fraction.display",
+            "fraction.text",
+            "fraction.script",
+            "kern.nullDelimiter",
+            "error.missingNumerator",
+            "error.missingDenominator"
         ],
         "orders": [
             "root.hbox",
@@ -1105,6 +1122,375 @@
                     "mode.document",
                     "outcome.error",
                     "error.unsupportedCharacter"
+                ],
+                "orders": []
+            }
+        },
+        {
+            "name": "math-frac",
+            "input": "math-frac.tex",
+            "expected": "math-frac.tree",
+            "compileOptions": {
+                "mode": "mathInline"
+            },
+            "outcome": "tree",
+            "coverage": {
+                "kinds": [
+                    "hbox",
+                    "glyph",
+                    "kern",
+                    "rule"
+                ],
+                "states": [
+                    "mode.mathInline",
+                    "outcome.tree",
+                    "children.populated",
+                    "atom.lower",
+                    "atom.digit",
+                    "atom.bin",
+                    "atom.rel",
+                    "glyph.style.upright",
+                    "glyph.style.italic",
+                    "glyph.italic.zero",
+                    "glyph.descent.positive",
+                    "bin.kept",
+                    "space.interAtom.medium",
+                    "space.interAtom.thick",
+                    "kern.boundaryRange",
+                    "fraction.frac",
+                    "fraction.groupArgument",
+                    "fraction.numeratorWider",
+                    "fraction.text",
+                    "kern.nullDelimiter",
+                    "size.script",
+                    "measure.zero",
+                    "measure.negative"
+                ],
+                "orders": [
+                    "root.hbox",
+                    "children.sourceOrder"
+                ]
+            }
+        },
+        {
+            "name": "math-frac-display",
+            "input": "math-frac-display.tex",
+            "expected": "math-frac-display.tree",
+            "compileOptions": {
+                "mode": "mathDisplay"
+            },
+            "outcome": "tree",
+            "coverage": {
+                "kinds": [
+                    "hbox",
+                    "glyph",
+                    "kern",
+                    "rule"
+                ],
+                "states": [
+                    "mode.mathDisplay",
+                    "outcome.tree",
+                    "children.populated",
+                    "atom.lower",
+                    "atom.digit",
+                    "atom.bin",
+                    "glyph.style.upright",
+                    "glyph.style.italic",
+                    "glyph.italic.zero",
+                    "glyph.descent.positive",
+                    "bin.kept",
+                    "space.interAtom.medium",
+                    "fraction.frac",
+                    "fraction.groupArgument",
+                    "fraction.denominatorWider",
+                    "fraction.display",
+                    "kern.nullDelimiter",
+                    "measure.zero",
+                    "measure.negative"
+                ],
+                "orders": [
+                    "root.hbox"
+                ]
+            }
+        },
+        {
+            "name": "math-frac-args",
+            "input": "math-frac-args.tex",
+            "expected": "math-frac-args.tree",
+            "compileOptions": {
+                "mode": "mathInline"
+            },
+            "outcome": "tree",
+            "coverage": {
+                "kinds": [
+                    "hbox",
+                    "glyph",
+                    "kern",
+                    "rule"
+                ],
+                "states": [
+                    "mode.mathInline",
+                    "outcome.tree",
+                    "children.populated",
+                    "atom.digit",
+                    "atom.bin",
+                    "glyph.style.upright",
+                    "glyph.style.italic",
+                    "glyph.italic.zero",
+                    "glyph.italic.positive",
+                    "glyph.descent.positive",
+                    "command.symbol.greekLower",
+                    "bin.kept",
+                    "space.interAtom.medium",
+                    "kern.boundaryRange",
+                    "fraction.frac",
+                    "fraction.charArgument",
+                    "fraction.numeratorWider",
+                    "fraction.text",
+                    "kern.nullDelimiter",
+                    "size.script",
+                    "measure.zero",
+                    "measure.negative"
+                ],
+                "orders": [
+                    "root.hbox",
+                    "children.sourceOrder"
+                ]
+            }
+        },
+        {
+            "name": "math-dfrac",
+            "input": "math-dfrac.tex",
+            "expected": "math-dfrac.tree",
+            "compileOptions": {
+                "mode": "mathInline"
+            },
+            "outcome": "tree",
+            "coverage": {
+                "kinds": [
+                    "hbox",
+                    "glyph",
+                    "kern",
+                    "rule"
+                ],
+                "states": [
+                    "mode.mathInline",
+                    "outcome.tree",
+                    "children.populated",
+                    "atom.digit",
+                    "glyph.style.upright",
+                    "glyph.italic.zero",
+                    "fraction.dfrac",
+                    "fraction.groupArgument",
+                    "fraction.display",
+                    "kern.nullDelimiter",
+                    "measure.zero",
+                    "measure.negative"
+                ],
+                "orders": [
+                    "root.hbox"
+                ]
+            }
+        },
+        {
+            "name": "math-tfrac",
+            "input": "math-tfrac.tex",
+            "expected": "math-tfrac.tree",
+            "compileOptions": {
+                "mode": "mathDisplay"
+            },
+            "outcome": "tree",
+            "coverage": {
+                "kinds": [
+                    "hbox",
+                    "glyph",
+                    "kern",
+                    "rule"
+                ],
+                "states": [
+                    "mode.mathDisplay",
+                    "outcome.tree",
+                    "children.populated",
+                    "atom.digit",
+                    "glyph.style.upright",
+                    "glyph.italic.zero",
+                    "fraction.tfrac",
+                    "fraction.groupArgument",
+                    "fraction.text",
+                    "size.script",
+                    "kern.nullDelimiter",
+                    "measure.zero",
+                    "measure.negative"
+                ],
+                "orders": [
+                    "root.hbox"
+                ]
+            }
+        },
+        {
+            "name": "math-frac-script",
+            "input": "math-frac-script.tex",
+            "expected": "math-frac-script.tree",
+            "compileOptions": {
+                "mode": "mathInline"
+            },
+            "outcome": "tree",
+            "coverage": {
+                "kinds": [
+                    "hbox",
+                    "glyph",
+                    "kern",
+                    "rule"
+                ],
+                "states": [
+                    "mode.mathInline",
+                    "outcome.tree",
+                    "children.populated",
+                    "atom.lower",
+                    "glyph.style.upright",
+                    "glyph.style.italic",
+                    "glyph.italic.zero",
+                    "script.sup",
+                    "fraction.frac",
+                    "fraction.groupArgument",
+                    "fraction.inScript",
+                    "fraction.script",
+                    "size.scriptscript",
+                    "kern.nullDelimiter",
+                    "measure.zero",
+                    "measure.negative"
+                ],
+                "orders": [
+                    "root.hbox",
+                    "children.sourceOrder"
+                ]
+            }
+        },
+        {
+            "name": "math-frac-scripted",
+            "input": "math-frac-scripted.tex",
+            "expected": "math-frac-scripted.tree",
+            "compileOptions": {
+                "mode": "mathInline"
+            },
+            "outcome": "tree",
+            "coverage": {
+                "kinds": [
+                    "hbox",
+                    "glyph",
+                    "kern",
+                    "rule"
+                ],
+                "states": [
+                    "mode.mathInline",
+                    "outcome.tree",
+                    "children.populated",
+                    "atom.digit",
+                    "glyph.style.upright",
+                    "glyph.italic.zero",
+                    "script.sup",
+                    "fraction.frac",
+                    "fraction.groupArgument",
+                    "fraction.scripted",
+                    "fraction.text",
+                    "size.script",
+                    "kern.nullDelimiter",
+                    "measure.zero",
+                    "measure.negative"
+                ],
+                "orders": [
+                    "root.hbox",
+                    "children.sourceOrder"
+                ]
+            }
+        },
+        {
+            "name": "math-frac-nested",
+            "input": "math-frac-nested.tex",
+            "expected": "math-frac-nested.tree",
+            "compileOptions": {
+                "mode": "mathInline"
+            },
+            "outcome": "tree",
+            "coverage": {
+                "kinds": [
+                    "hbox",
+                    "glyph",
+                    "kern",
+                    "rule"
+                ],
+                "states": [
+                    "mode.mathInline",
+                    "outcome.tree",
+                    "children.populated",
+                    "atom.digit",
+                    "glyph.style.upright",
+                    "glyph.italic.zero",
+                    "fraction.frac",
+                    "fraction.groupArgument",
+                    "fraction.nested",
+                    "fraction.script",
+                    "size.script",
+                    "size.scriptscript",
+                    "kern.nullDelimiter",
+                    "measure.zero",
+                    "measure.negative"
+                ],
+                "orders": [
+                    "root.hbox"
+                ]
+            }
+        },
+        {
+            "name": "error-missing-numerator",
+            "input": "error-missing-numerator.tex",
+            "expected": "error-missing-numerator.tree",
+            "compileOptions": {
+                "mode": "mathInline"
+            },
+            "outcome": "error",
+            "coverage": {
+                "kinds": [],
+                "states": [
+                    "mode.mathInline",
+                    "outcome.error",
+                    "error.missingNumerator"
+                ],
+                "orders": []
+            }
+        },
+        {
+            "name": "error-missing-denominator",
+            "input": "error-missing-denominator.tex",
+            "expected": "error-missing-denominator.tree",
+            "compileOptions": {
+                "mode": "mathInline"
+            },
+            "outcome": "error",
+            "coverage": {
+                "kinds": [],
+                "states": [
+                    "mode.mathInline",
+                    "outcome.error",
+                    "error.missingDenominator"
+                ],
+                "orders": []
+            }
+        },
+        {
+            "name": "error-frac-argument",
+            "input": "error-frac-argument.tex",
+            "expected": "error-frac-argument.tree",
+            "compileOptions": {
+                "mode": "mathInline"
+            },
+            "outcome": "error",
+            "coverage": {
+                "kinds": [],
+                "states": [
+                    "mode.mathInline",
+                    "outcome.error",
+                    "error.missingDenominator"
                 ],
                 "orders": []
             }

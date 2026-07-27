@@ -8,7 +8,7 @@
  *   status == OK:
  *     u32 node_count                    preorder walk
  *     per node:
- *       u32 kind                        1 hbox, 2 glyph, 3 kern
+ *       u32 kind                        1 hbox, 2 glyph, 3 kern, 4 rule
  *       f64 x, y, width, ascent, descent, italic
  *       u32 codepoint; u32 style        zero outside glyphs
  *       f64 size                        zero outside glyphs

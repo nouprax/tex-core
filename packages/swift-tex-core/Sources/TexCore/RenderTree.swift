@@ -123,6 +123,35 @@ public struct Glyph: Sendable, Hashable {
     }
 }
 
+/// A leaf rule: a solid rectangle. Its reference point sits at its left
+/// edge on the parent's baseline shifted by `y`; the ink extends `ascent`
+/// up, `descent` down, and `width` right. Today produced only as the
+/// fraction bar.
+public struct Rule: Sendable, Hashable {
+    /// Horizontal offset of the reference point from the parent's, in points.
+    public let x: Double
+    /// Vertical offset from the parent baseline, positive upward, in points.
+    public let y: Double
+    /// The ink width in points.
+    public let width: Double
+    /// Ink extent above the reference point in points.
+    public let ascent: Double
+    /// Ink extent below the reference point in points.
+    public let descent: Double
+    /// The source bytes this rule was compiled from.
+    public let src: SourceRange
+
+    /// Creates a rule value.
+    public init(x: Double, y: Double, width: Double, ascent: Double, descent: Double, src: SourceRange) {
+        self.x = x
+        self.y = y
+        self.width = width
+        self.ascent = ascent
+        self.descent = descent
+        self.src = src
+    }
+}
+
 /// A leaf kern: a fixed horizontal advance. `width` may be negative.
 public struct Kern: Sendable, Hashable {
     /// Horizontal offset of the reference point from the parent's, in points.
@@ -149,6 +178,8 @@ public enum RenderNode: Sendable, Hashable {
     case glyph(Glyph)
     /// A leaf kern.
     case kern(Kern)
+    /// A leaf rule.
+    case rule(Rule)
 
     /// Dispatches this node to the matching `visit` overload.
     public func accept<V: RenderVisitor>(_ visitor: inout V) -> V.Result {
@@ -156,6 +187,7 @@ public enum RenderNode: Sendable, Hashable {
         case .hbox(let box): visitor.visit(box)
         case .glyph(let glyph): visitor.visit(glyph)
         case .kern(let kern): visitor.visit(kern)
+        case .rule(let rule): visitor.visit(rule)
         }
     }
 
@@ -165,6 +197,7 @@ public enum RenderNode: Sendable, Hashable {
         case .hbox(let box): box.src
         case .glyph(let glyph): glyph.src
         case .kern(let kern): kern.src
+        case .rule(let rule): rule.src
         }
     }
 }
@@ -181,9 +214,11 @@ public protocol RenderVisitor {
     mutating func visit(_ node: Glyph) -> Result
     /// Visits a kern.
     mutating func visit(_ node: Kern) -> Result
+    /// Visits a rule.
+    mutating func visit(_ node: Rule) -> Result
 }
 
-/// An immutable compiled document: the render tree of schema version 1.
+/// An immutable compiled document: the render tree of schema version 3.
 ///
 /// Trees are plain `Sendable` values — safely shareable across threads,
 /// structurally equatable, and detached from the native engine the moment

@@ -1,6 +1,6 @@
 import { CompileError } from "./compile-error.js";
 import type { CompileStatus } from "./compile-error.js";
-import type { GlyphStyle, HBox, RenderNode, SourceRange } from "./model.js";
+import type { GlyphStyle, HBox, RenderNode, Rule, SourceRange } from "./model.js";
 import { RenderTree } from "./model.js";
 
 /**
@@ -109,6 +109,10 @@ class WireReader {
                 });
             case 3:
                 return Object.freeze({ kind: "kern", x, width, src });
+            case 4: {
+                const rule: Rule = Object.freeze({ kind: "rule", x, y, width, ascent, descent, src });
+                return rule;
+            }
             case 1: {
                 const children: RenderNode[] = [];
                 for (let index = 0; index < childCount; index += 1) children.push(this.node());

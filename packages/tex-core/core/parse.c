@@ -280,6 +280,29 @@ static const txc_math_symbol *txc_math_symbol_find(const uint8_t *name, size_t n
     return NULL;
 }
 
+/* Fraction commands (milestone M1): \frac follows the surrounding style,
+ * \dfrac and \tfrac force display and text style. */
+typedef struct txc_fraction_command {
+    const char *name;
+    txc_fraction_style style;
+} txc_fraction_command;
+
+static const txc_fraction_command TXC_FRACTION_COMMANDS[] = {
+    {"dfrac", TXC_FRACTION_STYLE_DISPLAY},
+    {"frac", TXC_FRACTION_STYLE_AUTO},
+    {"tfrac", TXC_FRACTION_STYLE_TEXT},
+};
+
+static const txc_fraction_command *txc_fraction_find(const uint8_t *name, size_t name_length) {
+    for (size_t index = 0; index < sizeof(TXC_FRACTION_COMMANDS) / sizeof(TXC_FRACTION_COMMANDS[0]); index++) {
+        const txc_fraction_command *command = &TXC_FRACTION_COMMANDS[index];
+        if (strlen(command->name) == name_length && memcmp(command->name, name, name_length) == 0) {
+            return command;
+        }
+    }
+    return NULL;
+}
+
 typedef struct txc_spacing_command {
     const char *name;
     txc_space space;
@@ -328,6 +351,7 @@ static void txc_field_reset(txc_field *field, size_t at) {
     field->list.head = NULL;
     field->list.tail = NULL;
     field->list.count = 0;
+    field->fraction = NULL;
     field->range.begin = at;
     field->range.end = at;
 }
@@ -383,6 +407,29 @@ typedef struct txc_math_glyph {
     tex_core_style style;
 } txc_math_glyph;
 
+/* Fills one field from a delivered construct: a character glyph, a closed
+ * group list, or a completed fraction. */
+static void txc_field_fill(
+    txc_field *field,
+    const txc_math_glyph *glyph,
+    const txc_list *group,
+    txc_fraction *fraction,
+    tex_core_range range
+) {
+    if (glyph != NULL) {
+        field->kind = TXC_FIELD_CHAR;
+        field->codepoint = glyph->codepoint;
+        field->style = glyph->style;
+    } else if (group != NULL) {
+        field->kind = TXC_FIELD_LIST;
+        field->list = *group;
+    } else {
+        field->kind = TXC_FIELD_FRACTION;
+        field->fraction = fraction;
+    }
+    field->range = range;
+}
+
 /* Classifies one math-mode character per TeX's default \mathcode
  * assignments: letters on the math italic face, digits and the period
  * upright, and the classed math characters. Returns false when the
@@ -433,8 +480,40 @@ typedef struct txc_frame {
     txc_pending pending;
     txc_item *pending_target;
     size_t pending_mark;
+    /* The fraction whose arguments this frame is collecting, if any:
+     * delivered constructs fill the numerator, then the denominator. On
+     * completion the fraction becomes `fraction_item`'s nucleus — the
+     * Inner atom appended at the command — or, when the command itself
+     * was a script argument, the captured script field. */
+    txc_fraction *fraction;
+    bool fraction_denominator;
+    txc_item *fraction_item;
+    txc_item *fraction_target;
+    txc_pending fraction_script;
+    size_t fraction_mark;
     struct txc_frame *parent;
 } txc_frame;
+
+static void txc_frame_init(txc_frame *frame, txc_frame_role role, txc_frame *parent) {
+    frame->list.head = NULL;
+    frame->list.tail = NULL;
+    frame->list.count = 0;
+    frame->role = role;
+    frame->open = 0;
+    frame->target = NULL;
+    frame->script = TXC_PENDING_NONE;
+    frame->mark = 0;
+    frame->pending = TXC_PENDING_NONE;
+    frame->pending_target = NULL;
+    frame->pending_mark = 0;
+    frame->fraction = NULL;
+    frame->fraction_denominator = false;
+    frame->fraction_item = NULL;
+    frame->fraction_target = NULL;
+    frame->fraction_script = TXC_PENDING_NONE;
+    frame->fraction_mark = 0;
+    frame->parent = parent;
+}
 
 /* Deepest legal `{` nesting. Layout recurses over nuclei and script
  * fields, so the parser bounds the depth it can produce. */
@@ -448,10 +527,43 @@ static txc_field *txc_script_field(txc_item *item, txc_pending pending) {
     return pending == TXC_PENDING_SUP ? &item->sup : &item->sub;
 }
 
+static const char *txc_argument_noun(const txc_frame *frame) {
+    return frame->fraction_denominator ? "denominator" : "numerator";
+}
+
+/* Completes the fraction in progress on `frame` once its denominator has
+ * arrived: the construct becomes the destination captured at the command —
+ * the appended Inner atom's nucleus or a script field. */
+static void txc_fraction_complete(txc_frame *frame, size_t end) {
+    txc_fraction *fraction = frame->fraction;
+    tex_core_range range = {fraction->command.begin, end};
+    if (frame->fraction_item != NULL) {
+        txc_item *item = frame->fraction_item;
+        txc_field_fill(&item->nucleus, NULL, NULL, fraction, range);
+        txc_field_reset(&item->sup, end);
+        txc_field_reset(&item->sub, end);
+        item->range = range;
+    } else {
+        txc_item *target = frame->fraction_target;
+        txc_field *field = txc_script_field(target, frame->fraction_script);
+        txc_field_fill(field, NULL, NULL, fraction, range);
+        field->range.begin = frame->fraction_mark;
+        target->range.end = end;
+        if (frame->fraction_script == TXC_PENDING_SUB && target->sup.kind == TXC_FIELD_EMPTY) {
+            target->sub_first = true;
+        }
+    }
+    frame->fraction = NULL;
+    frame->fraction_denominator = false;
+    frame->fraction_item = NULL;
+    frame->fraction_target = NULL;
+}
+
 /* Delivers one parsed construct — a character, a symbol command, or a
- * closed group list — into the frame: as the pending script field when one
- * is pending, or as a new atom. `range` is the construct's own range;
- * script fields extend it back to their mark. */
+ * closed group list — into the frame: as the next fraction argument when
+ * one is being collected, as the pending script field when one is
+ * pending, or as a new atom. `range` is the construct's own range; script
+ * fields extend it back to their mark. */
 static tex_core_status txc_deliver(
     txc_arena *arena,
     txc_frame *frame,
@@ -460,18 +572,21 @@ static tex_core_status txc_deliver(
     tex_core_range range,
     tex_core_error *error
 ) {
+    if (frame->fraction != NULL) {
+        txc_field *field = frame->fraction_denominator ? &frame->fraction->den : &frame->fraction->num;
+        txc_field_fill(field, glyph, group, NULL, range);
+        if (frame->fraction_denominator) {
+            txc_fraction_complete(frame, range.end);
+        } else {
+            frame->fraction_denominator = true;
+        }
+        return TEX_CORE_STATUS_OK;
+    }
     if (frame->pending != TXC_PENDING_NONE) {
         txc_item *item = frame->pending_target;
         txc_field *field = txc_script_field(item, frame->pending);
-        field->kind = glyph != NULL ? TXC_FIELD_CHAR : TXC_FIELD_LIST;
-        if (glyph != NULL) {
-            field->codepoint = glyph->codepoint;
-            field->style = glyph->style;
-        } else {
-            field->list = *group;
-        }
+        txc_field_fill(field, glyph, group, NULL, range);
         field->range.begin = frame->pending_mark;
-        field->range.end = range.end;
         item->range.end = range.end;
         if (frame->pending == TXC_PENDING_SUB && item->sup.kind == TXC_FIELD_EMPTY) {
             item->sub_first = true;
@@ -518,7 +633,8 @@ tex_core_status txc_parse(
     txc_scanner scanner;
     txc_scanner_init(&scanner, source, length);
 
-    txc_frame root = {{NULL, NULL, 0}, TXC_FRAME_ROOT, 0, NULL, TXC_PENDING_NONE, 0, TXC_PENDING_NONE, NULL, 0, NULL};
+    txc_frame root;
+    txc_frame_init(&root, TXC_FRAME_ROOT, NULL);
     txc_frame *frame = &root;
     size_t depth = 0;
     bool math = mode != TEX_CORE_MODE_DOCUMENT;
@@ -532,6 +648,15 @@ tex_core_status txc_parse(
 
         switch (token.kind) {
         case TXC_TOKEN_END:
+            if (frame->fraction != NULL) {
+                return txc_fail(
+                    error,
+                    TEX_CORE_STATUS_UNSUPPORTED,
+                    &frame->fraction->command,
+                    "missing %s argument",
+                    txc_argument_noun(frame)
+                );
+            }
             if (frame->pending != TXC_PENDING_NONE) {
                 tex_core_range mark = {frame->pending_mark, frame->pending_mark + 1};
                 return txc_fail(
@@ -582,17 +707,8 @@ tex_core_status txc_parse(
                     if (inner == NULL) {
                         return txc_fail(error, TEX_CORE_STATUS_ALLOCATION_FAILED, NULL, "allocation failed");
                     }
-                    inner->list.head = NULL;
-                    inner->list.tail = NULL;
-                    inner->list.count = 0;
+                    txc_frame_init(inner, TXC_FRAME_GROUP, frame);
                     inner->open = token.range.begin;
-                    inner->target = NULL;
-                    inner->script = TXC_PENDING_NONE;
-                    inner->mark = 0;
-                    inner->pending = TXC_PENDING_NONE;
-                    inner->pending_target = NULL;
-                    inner->pending_mark = 0;
-                    inner->parent = frame;
                     if (frame->pending != TXC_PENDING_NONE) {
                         inner->role = TXC_FRAME_SCRIPT;
                         inner->target = frame->pending_target;
@@ -600,14 +716,21 @@ tex_core_status txc_parse(
                         inner->mark = frame->pending_mark;
                         frame->pending = TXC_PENDING_NONE;
                         frame->pending_target = NULL;
-                    } else {
-                        inner->role = TXC_FRAME_GROUP;
                     }
                     frame = inner;
                     depth += 1;
                     break;
                 }
                 if (codepoint == '}') {
+                    if (frame->fraction != NULL) {
+                        return txc_fail(
+                            error,
+                            TEX_CORE_STATUS_UNSUPPORTED,
+                            &token.range,
+                            "missing %s argument",
+                            txc_argument_noun(frame)
+                        );
+                    }
                     if (frame->pending != TXC_PENDING_NONE) {
                         return txc_fail(
                             error,
@@ -644,6 +767,15 @@ tex_core_status txc_parse(
                 }
                 if (codepoint == '^' || codepoint == '_') {
                     txc_pending pending = codepoint == '^' ? TXC_PENDING_SUP : TXC_PENDING_SUB;
+                    if (frame->fraction != NULL) {
+                        return txc_fail(
+                            error,
+                            TEX_CORE_STATUS_UNSUPPORTED,
+                            &token.range,
+                            "missing %s argument",
+                            txc_argument_noun(frame)
+                        );
+                    }
                     if (frame->pending != TXC_PENDING_NONE) {
                         return txc_fail(
                             error,
@@ -722,6 +854,15 @@ tex_core_status txc_parse(
         case TXC_TOKEN_CONTROL: {
             const txc_spacing_command *command = txc_spacing(token.name, token.name_length);
             if (command != NULL) {
+                if (frame->fraction != NULL) {
+                    return txc_fail(
+                        error,
+                        TEX_CORE_STATUS_UNSUPPORTED,
+                        &token.range,
+                        "missing %s argument",
+                        txc_argument_noun(frame)
+                    );
+                }
                 if (frame->pending != TXC_PENDING_NONE) {
                     return txc_fail(
                         error,
@@ -740,10 +881,63 @@ tex_core_status txc_parse(
                 item->range = token.range;
                 break;
             }
-            /* Symbol commands are math-only: in document mode they stay
-             * structured errors until the text surface (milestone M3)
-             * arrives, exactly like TeX's missing-$ complaint. */
+            /* Symbol and fraction commands are math-only: in document mode
+             * they stay structured errors until the text surface
+             * (milestone M3) arrives, exactly like TeX's missing-$
+             * complaint. */
             if (math) {
+                const txc_fraction_command *fraction_command = txc_fraction_find(token.name, token.name_length);
+                if (fraction_command != NULL) {
+                    /* A fraction command where a fraction argument is
+                     * required is not a legal argument: undelimited
+                     * arguments are a character, a symbol command, or a
+                     * braced group. */
+                    if (frame->fraction != NULL) {
+                        return txc_fail(
+                            error,
+                            TEX_CORE_STATUS_UNSUPPORTED,
+                            &token.range,
+                            "missing %s argument",
+                            txc_argument_noun(frame)
+                        );
+                    }
+                    txc_fraction *fraction = txc_arena_alloc(arena, sizeof(txc_fraction));
+                    if (fraction == NULL) {
+                        return txc_fail(error, TEX_CORE_STATUS_ALLOCATION_FAILED, NULL, "allocation failed");
+                    }
+                    fraction->style = fraction_command->style;
+                    fraction->command = token.range;
+                    txc_field_reset(&fraction->num, token.range.end);
+                    txc_field_reset(&fraction->den, token.range.end);
+                    frame->fraction = fraction;
+                    frame->fraction_denominator = false;
+                    if (frame->pending != TXC_PENDING_NONE) {
+                        /* The fraction is itself a script argument
+                         * (x^\frac{1}{2}): capture the destination and
+                         * fill it on completion. */
+                        frame->fraction_item = NULL;
+                        frame->fraction_target = frame->pending_target;
+                        frame->fraction_script = frame->pending;
+                        frame->fraction_mark = frame->pending_mark;
+                        frame->pending = TXC_PENDING_NONE;
+                        frame->pending_target = NULL;
+                    } else {
+                        txc_item *item = txc_append(arena, &frame->list);
+                        if (item == NULL) {
+                            return txc_fail(error, TEX_CORE_STATUS_ALLOCATION_FAILED, NULL, "allocation failed");
+                        }
+                        item->kind = TXC_ITEM_ATOM;
+                        item->atom_class = TXC_ATOM_INNER;
+                        txc_field_reset(&item->nucleus, token.range.begin);
+                        txc_field_reset(&item->sup, token.range.end);
+                        txc_field_reset(&item->sub, token.range.end);
+                        item->sub_first = false;
+                        item->range = token.range;
+                        frame->fraction_item = item;
+                        frame->fraction_target = NULL;
+                    }
+                    break;
+                }
                 const txc_math_symbol *symbol = txc_math_symbol_find(token.name, token.name_length);
                 if (symbol != NULL) {
                     txc_math_glyph glyph = {symbol->atom_class, symbol->codepoint, symbol->style};

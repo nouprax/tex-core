@@ -91,7 +91,7 @@ static void txc_test_empty(txc_test *test) {
     txc_check_text(
         test,
         dump,
-        "render-tree 2\nhbox x=0.0pt y=0.0pt width=0.0pt ascent=0.0pt descent=0.0pt src=0..0\n",
+        "render-tree 3\nhbox x=0.0pt y=0.0pt width=0.0pt ascent=0.0pt descent=0.0pt src=0..0\n",
         "empty dump"
     );
     txc_check_size(test, length, strlen(dump), "dump length excludes the NUL");
@@ -129,6 +129,7 @@ static void txc_test_views(txc_test *test) {
     txc_check_text(test, tex_core_node_kind_name(TEX_CORE_NODE_HBOX), "hbox", "kind name hbox");
     txc_check_text(test, tex_core_node_kind_name(TEX_CORE_NODE_GLYPH), "glyph", "kind name glyph");
     txc_check_text(test, tex_core_node_kind_name(TEX_CORE_NODE_KERN), "kern", "kind name kern");
+    txc_check_text(test, tex_core_node_kind_name(TEX_CORE_NODE_RULE), "rule", "kind name rule");
     txc_check_text(test, tex_core_node_kind_name(TEX_CORE_NODE_NONE), "none", "kind name none");
 
     char *dump = NULL;

@@ -119,7 +119,7 @@ const tail = (match) => match[0].length - 1;
 // box's direct children from the depth sequence. Printed decimals are
 // exact reads of scaled values, so sums compare within 1e-9.
 const nodes = (tree) =>
-    [...tree.matchAll(/^((?: {2})+)(hbox|glyph|kern)((?: [a-z]+=\S+)*)$/gm)].map(([, pad, kind, fields]) => {
+    [...tree.matchAll(/^((?: {2})+)(hbox|glyph|kern|rule)((?: [a-z]+=\S+)*)$/gm)].map(([, pad, kind, fields]) => {
         const field = (name) => fields.match(new RegExp(` ${name}=(\\S+)`))?.[1];
         const pt = (name) => {
             const value = field(name);
@@ -132,6 +132,7 @@ const nodes = (tree) =>
             x: pt("x"),
             y: pt("y"),
             width: pt("width"),
+            ascent: pt("ascent"),
             italic: pt("italic"),
             size: pt("size")
         };
@@ -147,6 +148,28 @@ const near = (left, right) => Math.abs(left - right) < 1e-9;
 const scriptBox = (all) =>
     all.map((node, index) => ({ node, index })).filter(({ node }) => node.kind === "hbox" && node.y !== 0);
 const treeStates = (validate) => (subject) => subject.outcome === "tree" && validate(nodes(subject.tree), subject);
+
+// A fraction box is witnessed structurally: an hbox whose direct children
+// carry a rule with one box shifted above it and one below.
+const fractionBoxes = (all) =>
+    all
+        .map((node, index) => ({ node, index }))
+        .filter(({ node, index }) => {
+            if (node.kind !== "hbox") return false;
+            const children = childrenOf(all, index);
+            return (
+                children.some((child) => child.kind === "rule") &&
+                children.some((child) => child.kind === "hbox" && child.y > 0) &&
+                children.some((child) => child.kind === "hbox" && child.y < 0)
+            );
+        });
+const fractionParts = (all, index) => {
+    const children = childrenOf(all, index);
+    return {
+        num: children.find((child) => child.kind === "hbox" && child.y > 0),
+        den: children.find((child) => child.kind === "hbox" && child.y < 0)
+    };
+};
 
 // Validators run over the whole case: `source` is the decoded input (null
 // for the invalid-UTF-8 case), `tree` the expected file text, `mode` and
@@ -383,10 +406,70 @@ const stateValidators = {
         outcome === "error" && / message=unsupported paragraph break\n/.test(tree),
     "error.invalidUtf8": ({ outcome, tree }) => outcome === "error" && / status=invalid-utf8 /.test(tree),
     "error.incompleteControl": ({ outcome, tree }) =>
-        outcome === "error" && / message=incomplete control sequence/.test(tree)
+        outcome === "error" && / message=incomplete control sequence/.test(tree),
+    "fraction.frac": treeStates(
+        (all, { source }) => /\\frac[^a-z]/.test(source ?? "") && fractionBoxes(all).length > 0
+    ),
+    "fraction.dfrac": treeStates((all, { source }) => /\\dfrac/.test(source ?? "") && fractionBoxes(all).length > 0),
+    "fraction.tfrac": treeStates((all, { source }) => /\\tfrac/.test(source ?? "") && fractionBoxes(all).length > 0),
+    "fraction.charArgument": treeStates(
+        (all, { source }) => /\\[dt]?frac[^{a-z]/.test(source ?? "") && fractionBoxes(all).length > 0
+    ),
+    "fraction.groupArgument": treeStates(
+        (all, { source }) => /\\[dt]?frac\{/.test(source ?? "") && fractionBoxes(all).length > 0
+    ),
+    "fraction.numeratorWider": treeStates((all) =>
+        fractionBoxes(all).some(({ index }) => {
+            const { num, den } = fractionParts(all, index);
+            return num !== undefined && den !== undefined && num.width > den.width && den.x > num.x;
+        })
+    ),
+    "fraction.denominatorWider": treeStates((all) =>
+        fractionBoxes(all).some(({ index }) => {
+            const { num, den } = fractionParts(all, index);
+            return num !== undefined && den !== undefined && den.width > num.width && num.x > den.x;
+        })
+    ),
+    "fraction.nested": treeStates((all) => {
+        const boxes = fractionBoxes(all);
+        return boxes.some(({ node, index }) => {
+            let end = index + 1;
+            while (end < all.length && all[end].depth > node.depth) end += 1;
+            return boxes.some((inner) => inner.index > index && inner.index < end);
+        });
+    }),
+    "fraction.inScript": treeStates((all) => fractionBoxes(all).some(({ node }) => node.y !== 0)),
+    "fraction.scripted": treeStates((all) =>
+        fractionBoxes(all).some(({ node, index }) => {
+            for (let next = index + 1; next < all.length; next += 1) {
+                if (all[next].depth < node.depth) return false;
+                if (all[next].depth === node.depth) return all[next].kind === "hbox" && all[next].y !== 0;
+            }
+            return false;
+        })
+    ),
+    // The shift witnesses are the exact printed num1/num2 shifts of the
+    // 10pt text size (0.677 em and 0.394 em); the script witness is the
+    // 7pt rule thickness (0.049 em), which only a script-size fraction
+    // produces.
+    "fraction.display": treeStates((all) =>
+        fractionBoxes(all).some(({ index }) => near(fractionParts(all, index).num?.y ?? 0, 6.77002))
+    ),
+    "fraction.text": treeStates((all) =>
+        fractionBoxes(all).some(({ index }) => near(fractionParts(all, index).num?.y ?? 0, 3.93997))
+    ),
+    "fraction.script": treeStates((all) => all.some((node) => node.kind === "rule" && near(node.ascent, 0.34297))),
+    "kern.nullDelimiter": ({ outcome, tree }) =>
+        outcome === "tree" &&
+        [...tree.matchAll(/^ +kern .*width=1\.2pt src=(\d+)\.\.(\d+)$/gm)].some((match) => match[1] === match[2]),
+    "error.missingNumerator": ({ outcome, tree }) =>
+        outcome === "error" && / message=missing numerator argument\n$/.test(tree),
+    "error.missingDenominator": ({ outcome, tree }) =>
+        outcome === "error" && / message=missing denominator argument\n$/.test(tree)
 };
 const orderValidators = {
-    "root.hbox": ({ outcome, tree }) => outcome === "tree" && /^render-tree 2\nhbox /.test(tree),
+    "root.hbox": ({ outcome, tree }) =>
+        outcome === "tree" && new RegExp(`^render-tree ${manifest.schemaVersion}\\nhbox `).test(tree),
     "children.sourceOrder": ({ outcome, tree }) => {
         if (outcome !== "tree") return false;
         const begins = [...tree.matchAll(/^ {2}\S.* src=(\d+)\.\./gm)].map((match) => Number(match[1]));
@@ -394,7 +477,7 @@ const orderValidators = {
     }
 };
 
-if (manifest.schemaVersion !== 2) failures.push("manifest schemaVersion must be 2");
+if (manifest.schemaVersion !== 3) failures.push("manifest schemaVersion must be 3");
 if (manifest.contract !== "docs/specs/render-tree.md" || manifest.dumpGrammar !== "docs/specs/render-tree-dump.md") {
     failures.push("manifest contract paths drifted from the repository specifications");
 }
