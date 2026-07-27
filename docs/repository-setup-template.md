@@ -920,16 +920,17 @@ if [ "$actual_default" != "$DEFAULT_BRANCH" ]; then
   exit 1
 fi
 
-# Linear history: squash is the only merge method, and every squash commit
-# is titled by the pull request ("title (#N)" + description body). The
-# merge queue builds its commits from these same settings.
+# Linear history: squash is the only merge method. The title/message
+# settings are repository defaults — a direct merge can still edit them
+# before confirming — while merge-queue commits apply them mechanically
+# ("title (#N)" + description body).
 gh api --method PATCH "repos/$GH_REPO" \
   -F allow_squash_merge=true \
   -F allow_merge_commit=false \
   -F allow_rebase_merge=false \
   -f squash_merge_commit_title=PR_TITLE \
   -f squash_merge_commit_message=PR_BODY >/dev/null
-echo "merge policy: squash-only, PR-title squash messages"
+echo "merge policy: squash-only; squash messages default to the PR title"
 
 upsert_ruleset() {
   local name=$1
@@ -1002,7 +1003,7 @@ fi
 
 # The merge queue keeps every PR's required checks green against the
 # latest default branch and squashes with the repository's message
-# settings. The admin bypass mirrors the operator's standing exception;
+# defaults. The admin bypass mirrors the operator's standing exception;
 # disable either through its variable for the hardened shape.
 jq -n \
   --arg name "$MAIN_RULESET_NAME" \
