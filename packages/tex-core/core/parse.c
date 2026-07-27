@@ -8,7 +8,9 @@
 
 /* Characters with special TeX meaning that the engine does not cover yet.
  * Rejecting them keeps the supported surface honest: nothing is silently
- * skipped or demoted to a literal (plan section 5.1). */
+ * skipped or demoted to a literal (plan section 5.1). The math modes carve
+ * `{ } ^ _` out of this set as live syntax; document mode keeps rejecting
+ * all of them until the text surface (milestone M3) arrives. */
 static const char TXC_RESERVED[] = "#$%&^_{}~";
 
 static bool txc_reserved(uint32_t codepoint) {
@@ -308,6 +310,7 @@ static txc_item *txc_append(txc_arena *arena, txc_list *list) {
     if (item == NULL) {
         return NULL;
     }
+    item->next = NULL;
     if (list->tail != NULL) {
         list->tail->next = item;
     } else {
@@ -316,6 +319,17 @@ static txc_item *txc_append(txc_arena *arena, txc_list *list) {
     list->tail = item;
     list->count += 1;
     return item;
+}
+
+static void txc_field_reset(txc_field *field, size_t at) {
+    field->kind = TXC_FIELD_EMPTY;
+    field->codepoint = 0;
+    field->style = TEX_CORE_STYLE_UPRIGHT;
+    field->list.head = NULL;
+    field->list.tail = NULL;
+    field->list.count = 0;
+    field->range.begin = at;
+    field->range.end = at;
 }
 
 static txc_item *txc_append_atom(
@@ -332,8 +346,14 @@ static txc_item *txc_append_atom(
     }
     item->kind = TXC_ITEM_ATOM;
     item->atom_class = atom_class;
-    item->codepoint = codepoint;
-    item->style = style;
+    txc_field_reset(&item->nucleus, range.begin);
+    item->nucleus.kind = TXC_FIELD_CHAR;
+    item->nucleus.codepoint = codepoint;
+    item->nucleus.style = style;
+    item->nucleus.range = range;
+    txc_field_reset(&item->sup, range.end);
+    txc_field_reset(&item->sub, range.end);
+    item->sub_first = false;
     item->range = range;
     return item;
 }
@@ -354,67 +374,133 @@ static void txc_command_label(const uint8_t *name, size_t name_length, char *buf
     buffer[written] = '\0';
 }
 
-/* Appends the atom for one character token, or fails when the character is
- * outside the supported surface. Document mode typesets the text ordinaries
- * (letters, digits, period, comma); math modes add the classed math
- * characters, with letters on the math italic face per TeX's default
- * \mathcode assignments. */
-static tex_core_status txc_parse_character(
+/* One classified math glyph: the atom class, the rendered codepoint, and
+ * the face. Used both for atom nuclei and for script character fields
+ * (whose class is irrelevant — a field is not an atom). */
+typedef struct txc_math_glyph {
+    txc_atom_class atom_class;
+    uint32_t codepoint;
+    tex_core_style style;
+} txc_math_glyph;
+
+/* Classifies one math-mode character per TeX's default \mathcode
+ * assignments: letters on the math italic face, digits and the period
+ * upright, and the classed math characters. Returns false when the
+ * character is outside the math surface. */
+static bool txc_math_classify(uint32_t codepoint, txc_math_glyph *glyph) {
+    if (txc_letter_codepoint(codepoint)) {
+        glyph->atom_class = TXC_ATOM_ORD;
+        glyph->codepoint = codepoint;
+        glyph->style = TEX_CORE_STYLE_ITALIC;
+        return true;
+    }
+    if (txc_digit_codepoint(codepoint) || codepoint == '.') {
+        glyph->atom_class = TXC_ATOM_ORD;
+        glyph->codepoint = codepoint;
+        glyph->style = TEX_CORE_STYLE_UPRIGHT;
+        return true;
+    }
+    const txc_math_character *character = txc_math_character_find(codepoint);
+    if (character != NULL) {
+        glyph->atom_class = character->atom_class;
+        glyph->codepoint = character->codepoint;
+        glyph->style = TEX_CORE_STYLE_UPRIGHT;
+        return true;
+    }
+    return false;
+}
+
+/* One group in progress. The root list is the bottom frame; every `{`
+ * pushes a frame that closes back into its parent as a group atom's
+ * nucleus or as a script field. Frames live in the arena, so nesting
+ * depth is bounded by memory, not by the C stack. */
+typedef enum txc_frame_role { TXC_FRAME_ROOT = 0, TXC_FRAME_GROUP = 1, TXC_FRAME_SCRIPT = 2 } txc_frame_role;
+
+/* Which script a pending `^`/`_` will fill. */
+typedef enum txc_pending { TXC_PENDING_NONE = 0, TXC_PENDING_SUP = 1, TXC_PENDING_SUB = 2 } txc_pending;
+
+typedef struct txc_frame {
+    txc_list list;
+    txc_frame_role role;
+    /* GROUP and SCRIPT: byte offset of the opening brace. */
+    size_t open;
+    /* SCRIPT: the scripted atom in the parent frame's list, whether the
+     * script is the superscript, and the byte offset of its mark. */
+    txc_item *target;
+    txc_pending script;
+    size_t mark;
+    /* The script pending inside this frame's list, if any. */
+    txc_pending pending;
+    txc_item *pending_target;
+    size_t pending_mark;
+    struct txc_frame *parent;
+} txc_frame;
+
+/* Deepest legal `{` nesting. Layout recurses over nuclei and script
+ * fields, so the parser bounds the depth it can produce. */
+#define TXC_GROUP_DEPTH_LIMIT 255
+
+static const char *txc_script_noun(txc_pending pending) {
+    return pending == TXC_PENDING_SUP ? "superscript" : "subscript";
+}
+
+static txc_field *txc_script_field(txc_item *item, txc_pending pending) {
+    return pending == TXC_PENDING_SUP ? &item->sup : &item->sub;
+}
+
+/* Delivers one parsed construct — a character, a symbol command, or a
+ * closed group list — into the frame: as the pending script field when one
+ * is pending, or as a new atom. `range` is the construct's own range;
+ * script fields extend it back to their mark. */
+static tex_core_status txc_deliver(
     txc_arena *arena,
-    txc_list *list,
-    const txc_token *token,
-    tex_core_mode mode,
+    txc_frame *frame,
+    const txc_math_glyph *glyph,
+    const txc_list *group,
+    tex_core_range range,
     tex_core_error *error
 ) {
-    uint32_t codepoint = token->codepoint;
-    if (!txc_reserved(codepoint)) {
-        if (mode == TEX_CORE_MODE_DOCUMENT) {
-            if (txc_letter_codepoint(codepoint) || txc_digit_codepoint(codepoint) || codepoint == '.' ||
-                codepoint == ',') {
-                if (txc_append_atom(arena, list, TXC_ATOM_ORD, codepoint, TEX_CORE_STYLE_UPRIGHT, token->range) ==
-                    NULL) {
-                    return txc_fail(error, TEX_CORE_STATUS_ALLOCATION_FAILED, NULL, "allocation failed");
-                }
-                return TEX_CORE_STATUS_OK;
-            }
+    if (frame->pending != TXC_PENDING_NONE) {
+        txc_item *item = frame->pending_target;
+        txc_field *field = txc_script_field(item, frame->pending);
+        field->kind = glyph != NULL ? TXC_FIELD_CHAR : TXC_FIELD_LIST;
+        if (glyph != NULL) {
+            field->codepoint = glyph->codepoint;
+            field->style = glyph->style;
         } else {
-            if (txc_letter_codepoint(codepoint)) {
-                if (txc_append_atom(arena, list, TXC_ATOM_ORD, codepoint, TEX_CORE_STYLE_ITALIC, token->range) ==
-                    NULL) {
-                    return txc_fail(error, TEX_CORE_STATUS_ALLOCATION_FAILED, NULL, "allocation failed");
-                }
-                return TEX_CORE_STATUS_OK;
-            }
-            if (txc_digit_codepoint(codepoint) || codepoint == '.') {
-                if (txc_append_atom(arena, list, TXC_ATOM_ORD, codepoint, TEX_CORE_STYLE_UPRIGHT, token->range) ==
-                    NULL) {
-                    return txc_fail(error, TEX_CORE_STATUS_ALLOCATION_FAILED, NULL, "allocation failed");
-                }
-                return TEX_CORE_STATUS_OK;
-            }
-            const txc_math_character *character = txc_math_character_find(codepoint);
-            if (character != NULL) {
-                if (txc_append_atom(
-                        arena,
-                        list,
-                        character->atom_class,
-                        character->codepoint,
-                        TEX_CORE_STYLE_UPRIGHT,
-                        token->range
-                    ) == NULL) {
-                    return txc_fail(error, TEX_CORE_STATUS_ALLOCATION_FAILED, NULL, "allocation failed");
-                }
-                return TEX_CORE_STATUS_OK;
-            }
+            field->list = *group;
         }
+        field->range.begin = frame->pending_mark;
+        field->range.end = range.end;
+        item->range.end = range.end;
+        if (frame->pending == TXC_PENDING_SUB && item->sup.kind == TXC_FIELD_EMPTY) {
+            item->sub_first = true;
+        }
+        frame->pending = TXC_PENDING_NONE;
+        frame->pending_target = NULL;
+        return TEX_CORE_STATUS_OK;
     }
-    return txc_fail(
-        error,
-        TEX_CORE_STATUS_UNSUPPORTED,
-        &token->range,
-        "unsupported character U+%04X",
-        (unsigned)codepoint
-    );
+    if (glyph != NULL) {
+        if (txc_append_atom(arena, &frame->list, glyph->atom_class, glyph->codepoint, glyph->style, range) == NULL) {
+            return txc_fail(error, TEX_CORE_STATUS_ALLOCATION_FAILED, NULL, "allocation failed");
+        }
+        return TEX_CORE_STATUS_OK;
+    }
+    txc_item *item = txc_append(arena, &frame->list);
+    if (item == NULL) {
+        return txc_fail(error, TEX_CORE_STATUS_ALLOCATION_FAILED, NULL, "allocation failed");
+    }
+    item->kind = TXC_ITEM_ATOM;
+    item->atom_class = TXC_ATOM_ORD;
+    txc_field_reset(&item->nucleus, range.begin);
+    item->nucleus.kind = TXC_FIELD_LIST;
+    item->nucleus.list = *group;
+    item->nucleus.range = range;
+    txc_field_reset(&item->sup, range.end);
+    txc_field_reset(&item->sub, range.end);
+    item->sub_first = false;
+    item->range = range;
+    return TEX_CORE_STATUS_OK;
 }
 
 tex_core_status txc_parse(
@@ -432,6 +518,11 @@ tex_core_status txc_parse(
     txc_scanner scanner;
     txc_scanner_init(&scanner, source, length);
 
+    txc_frame root = {{NULL, NULL, 0}, TXC_FRAME_ROOT, 0, NULL, TXC_PENDING_NONE, 0, TXC_PENDING_NONE, NULL, 0, NULL};
+    txc_frame *frame = &root;
+    size_t depth = 0;
+    bool math = mode != TEX_CORE_MODE_DOCUMENT;
+
     for (;;) {
         txc_token token;
         tex_core_status status = txc_scan(&scanner, &token, error);
@@ -441,17 +532,33 @@ tex_core_status txc_parse(
 
         switch (token.kind) {
         case TXC_TOKEN_END:
+            if (frame->pending != TXC_PENDING_NONE) {
+                tex_core_range mark = {frame->pending_mark, frame->pending_mark + 1};
+                return txc_fail(
+                    error,
+                    TEX_CORE_STATUS_UNSUPPORTED,
+                    &mark,
+                    "missing %s argument",
+                    txc_script_noun(frame->pending)
+                );
+            }
+            if (frame->role != TXC_FRAME_ROOT) {
+                tex_core_range open = {frame->open, frame->open + 1};
+                return txc_fail(error, TEX_CORE_STATUS_UNSUPPORTED, &open, "unclosed group");
+            }
+            *list = frame->list;
             return TEX_CORE_STATUS_OK;
 
         case TXC_TOKEN_PAR:
             return txc_fail(error, TEX_CORE_STATUS_UNSUPPORTED, &token.range, "unsupported paragraph break");
 
         case TXC_TOKEN_SPACE: {
-            /* TeX ignores blanks in math mode. */
-            if (mode != TEX_CORE_MODE_DOCUMENT) {
+            /* TeX ignores blanks in math mode, including between a script
+             * mark and its argument. */
+            if (math) {
                 break;
             }
-            txc_item *item = txc_append(arena, list);
+            txc_item *item = txc_append(arena, &frame->list);
             if (item == NULL) {
                 return txc_fail(error, TEX_CORE_STATUS_ALLOCATION_FAILED, NULL, "allocation failed");
             }
@@ -462,17 +569,169 @@ tex_core_status txc_parse(
         }
 
         case TXC_TOKEN_CHARACTER: {
-            status = txc_parse_character(arena, list, &token, mode, error);
-            if (status != TEX_CORE_STATUS_OK) {
-                return status;
+            uint32_t codepoint = token.codepoint;
+            if (math) {
+                if (codepoint == '{') {
+                    /* Group nesting is bounded so that layout's recursion
+                     * over nuclei and script fields has a proven stack
+                     * budget; the bound is public error surface. */
+                    if (depth == TXC_GROUP_DEPTH_LIMIT) {
+                        return txc_fail(error, TEX_CORE_STATUS_UNSUPPORTED, &token.range, "group nesting too deep");
+                    }
+                    txc_frame *inner = txc_arena_alloc(arena, sizeof(txc_frame));
+                    if (inner == NULL) {
+                        return txc_fail(error, TEX_CORE_STATUS_ALLOCATION_FAILED, NULL, "allocation failed");
+                    }
+                    inner->list.head = NULL;
+                    inner->list.tail = NULL;
+                    inner->list.count = 0;
+                    inner->open = token.range.begin;
+                    inner->target = NULL;
+                    inner->script = TXC_PENDING_NONE;
+                    inner->mark = 0;
+                    inner->pending = TXC_PENDING_NONE;
+                    inner->pending_target = NULL;
+                    inner->pending_mark = 0;
+                    inner->parent = frame;
+                    if (frame->pending != TXC_PENDING_NONE) {
+                        inner->role = TXC_FRAME_SCRIPT;
+                        inner->target = frame->pending_target;
+                        inner->script = frame->pending;
+                        inner->mark = frame->pending_mark;
+                        frame->pending = TXC_PENDING_NONE;
+                        frame->pending_target = NULL;
+                    } else {
+                        inner->role = TXC_FRAME_GROUP;
+                    }
+                    frame = inner;
+                    depth += 1;
+                    break;
+                }
+                if (codepoint == '}') {
+                    if (frame->pending != TXC_PENDING_NONE) {
+                        return txc_fail(
+                            error,
+                            TEX_CORE_STATUS_UNSUPPORTED,
+                            &token.range,
+                            "missing %s argument",
+                            txc_script_noun(frame->pending)
+                        );
+                    }
+                    if (frame->role == TXC_FRAME_ROOT) {
+                        return txc_fail(error, TEX_CORE_STATUS_UNSUPPORTED, &token.range, "unmatched closing brace");
+                    }
+                    txc_frame *closed = frame;
+                    frame = frame->parent;
+                    depth -= 1;
+                    if (closed->role == TXC_FRAME_SCRIPT) {
+                        txc_field *field = txc_script_field(closed->target, closed->script);
+                        field->kind = TXC_FIELD_LIST;
+                        field->list = closed->list;
+                        field->range.begin = closed->mark;
+                        field->range.end = token.range.end;
+                        closed->target->range.end = token.range.end;
+                        if (closed->script == TXC_PENDING_SUB && closed->target->sup.kind == TXC_FIELD_EMPTY) {
+                            closed->target->sub_first = true;
+                        }
+                    } else {
+                        tex_core_range range = {closed->open, token.range.end};
+                        status = txc_deliver(arena, frame, NULL, &closed->list, range, error);
+                        if (status != TEX_CORE_STATUS_OK) {
+                            return status;
+                        }
+                    }
+                    break;
+                }
+                if (codepoint == '^' || codepoint == '_') {
+                    txc_pending pending = codepoint == '^' ? TXC_PENDING_SUP : TXC_PENDING_SUB;
+                    if (frame->pending != TXC_PENDING_NONE) {
+                        return txc_fail(
+                            error,
+                            TEX_CORE_STATUS_UNSUPPORTED,
+                            &token.range,
+                            "missing %s argument",
+                            txc_script_noun(frame->pending)
+                        );
+                    }
+                    txc_item *target = frame->list.tail;
+                    if (target == NULL || target->kind != TXC_ITEM_ATOM) {
+                        /* TeX gives a script with nothing to attach to an
+                         * empty-nucleus Ord atom of its own. */
+                        tex_core_range at = {token.range.begin, token.range.begin};
+                        target = txc_append(arena, &frame->list);
+                        if (target == NULL) {
+                            return txc_fail(error, TEX_CORE_STATUS_ALLOCATION_FAILED, NULL, "allocation failed");
+                        }
+                        target->kind = TXC_ITEM_ATOM;
+                        target->atom_class = TXC_ATOM_ORD;
+                        txc_field_reset(&target->nucleus, at.begin);
+                        txc_field_reset(&target->sup, at.begin);
+                        txc_field_reset(&target->sub, at.begin);
+                        target->sub_first = false;
+                        target->range = at;
+                    }
+                    if (txc_script_field(target, pending)->kind != TXC_FIELD_EMPTY) {
+                        return txc_fail(
+                            error,
+                            TEX_CORE_STATUS_UNSUPPORTED,
+                            &token.range,
+                            "double %s",
+                            txc_script_noun(pending)
+                        );
+                    }
+                    frame->pending = pending;
+                    frame->pending_target = target;
+                    frame->pending_mark = token.range.begin;
+                    break;
+                }
+                if (!txc_reserved(codepoint)) {
+                    txc_math_glyph glyph;
+                    if (txc_math_classify(codepoint, &glyph)) {
+                        status = txc_deliver(arena, frame, &glyph, NULL, token.range, error);
+                        if (status != TEX_CORE_STATUS_OK) {
+                            return status;
+                        }
+                        break;
+                    }
+                }
+            } else if (!txc_reserved(codepoint)) {
+                if (txc_letter_codepoint(codepoint) || txc_digit_codepoint(codepoint) || codepoint == '.' ||
+                    codepoint == ',') {
+                    if (txc_append_atom(
+                            arena,
+                            &frame->list,
+                            TXC_ATOM_ORD,
+                            codepoint,
+                            TEX_CORE_STYLE_UPRIGHT,
+                            token.range
+                        ) == NULL) {
+                        return txc_fail(error, TEX_CORE_STATUS_ALLOCATION_FAILED, NULL, "allocation failed");
+                    }
+                    break;
+                }
             }
-            break;
+            return txc_fail(
+                error,
+                TEX_CORE_STATUS_UNSUPPORTED,
+                &token.range,
+                "unsupported character U+%04X",
+                (unsigned)codepoint
+            );
         }
 
         case TXC_TOKEN_CONTROL: {
             const txc_spacing_command *command = txc_spacing(token.name, token.name_length);
             if (command != NULL) {
-                txc_item *item = txc_append(arena, list);
+                if (frame->pending != TXC_PENDING_NONE) {
+                    return txc_fail(
+                        error,
+                        TEX_CORE_STATUS_UNSUPPORTED,
+                        &token.range,
+                        "missing %s argument",
+                        txc_script_noun(frame->pending)
+                    );
+                }
+                txc_item *item = txc_append(arena, &frame->list);
                 if (item == NULL) {
                     return txc_fail(error, TEX_CORE_STATUS_ALLOCATION_FAILED, NULL, "allocation failed");
                 }
@@ -484,18 +743,13 @@ tex_core_status txc_parse(
             /* Symbol commands are math-only: in document mode they stay
              * structured errors until the text surface (milestone M3)
              * arrives, exactly like TeX's missing-$ complaint. */
-            if (mode != TEX_CORE_MODE_DOCUMENT) {
+            if (math) {
                 const txc_math_symbol *symbol = txc_math_symbol_find(token.name, token.name_length);
                 if (symbol != NULL) {
-                    if (txc_append_atom(
-                            arena,
-                            list,
-                            symbol->atom_class,
-                            symbol->codepoint,
-                            symbol->style,
-                            token.range
-                        ) == NULL) {
-                        return txc_fail(error, TEX_CORE_STATUS_ALLOCATION_FAILED, NULL, "allocation failed");
+                    txc_math_glyph glyph = {symbol->atom_class, symbol->codepoint, symbol->style};
+                    status = txc_deliver(arena, frame, &glyph, NULL, token.range, error);
+                    if (status != TEX_CORE_STATUS_OK) {
+                        return status;
                     }
                     break;
                 }

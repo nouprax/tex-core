@@ -21,9 +21,11 @@ struct tex_core_node {
     txc_scaled ascent;
     txc_scaled descent;
     txc_scaled italic;
-    /* TEX_CORE_NODE_GLYPH only. */
+    /* TEX_CORE_NODE_GLYPH only. `size` is the glyph's em in scaled
+     * points: the text size or a script size. */
     uint32_t codepoint;
     tex_core_style style;
+    txc_scaled size;
     tex_core_range range;
     const struct tex_core_node **children;
     size_t child_count;

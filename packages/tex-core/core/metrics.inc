@@ -315,3 +315,20 @@ static const txc_metric TXC_METRICS_ITALIC[] = {
     {0x03F1, 33883, 28217, 12743, 0},
     {0x03F5, 26601, 28217, 0, 0},
 };
+
+/* Style parameters (the TeXbook Appendix G sigmas and xis, via KaTeX
+ * src/fontMetrics.js): rows in txc_parameter order, columns in
+ * txc_mathsize order (text, script, scriptscript), each value an em
+ * fraction of that size's own font. */
+static const int32_t TXC_PARAMETERS[][3] = {
+    {65536, 76743, 96469}, /* quad */
+    {28246, 28246, 28246}, /* xHeight */
+    {27066, 32965, 33030}, /* sup1 */
+    {23790, 28246, 26477}, /* sup2 */
+    {18940, 18743, 19268}, /* sup3 */
+    {9830, 9372, 13107}, /* sub1 */
+    {16187, 18743, 26214}, /* sub2 */
+    {25297, 23134, 32375}, /* supDrop */
+    {3277, 4653, 6554}, /* subDrop */
+    {2621, 3211, 3211}, /* defaultRuleThickness */
+};

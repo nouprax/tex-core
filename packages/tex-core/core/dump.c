@@ -58,7 +58,8 @@ static bool txc_dump_node(txc_buffer *buffer, const txc_node *node, unsigned dep
 
     switch (node->kind) {
     case TEX_CORE_NODE_HBOX:
-        if (!txc_buffer_text(buffer, "hbox") || !txc_buffer_measure(buffer, "width", node->width) ||
+        if (!txc_buffer_text(buffer, "hbox") || !txc_buffer_measure(buffer, "x", node->x) ||
+            !txc_buffer_measure(buffer, "y", node->y) || !txc_buffer_measure(buffer, "width", node->width) ||
             !txc_buffer_measure(buffer, "ascent", node->ascent) ||
             !txc_buffer_measure(buffer, "descent", node->descent) || !txc_buffer_range(buffer, node->range) ||
             !txc_buffer_text(buffer, "\n")) {
@@ -77,7 +78,7 @@ static bool txc_dump_node(txc_buffer *buffer, const txc_node *node, unsigned dep
         return txc_buffer_text(buffer, "glyph") && txc_buffer_measure(buffer, "x", node->x) &&
                txc_buffer_measure(buffer, "y", node->y) && txc_buffer_text(buffer, codepoint) &&
                txc_buffer_text(buffer, node->style == TEX_CORE_STYLE_ITALIC ? " style=italic" : " style=upright") &&
-               txc_buffer_text(buffer, " family=main") && txc_buffer_measure(buffer, "size", TXC_EM_SP) &&
+               txc_buffer_text(buffer, " family=main") && txc_buffer_measure(buffer, "size", node->size) &&
                txc_buffer_measure(buffer, "width", node->width) && txc_buffer_measure(buffer, "ascent", node->ascent) &&
                txc_buffer_measure(buffer, "descent", node->descent) &&
                txc_buffer_measure(buffer, "italic", node->italic) && txc_buffer_range(buffer, node->range) &&
@@ -97,7 +98,7 @@ static bool txc_dump_node(txc_buffer *buffer, const txc_node *node, unsigned dep
 
 tex_core_status txc_dump(const txc_node *root, char **dump, size_t *length) {
     txc_buffer buffer = {NULL, 0, 0};
-    if (!txc_buffer_text(&buffer, "render-tree 1\n") || !txc_dump_node(&buffer, root, 0)) {
+    if (!txc_buffer_text(&buffer, "render-tree 2\n") || !txc_dump_node(&buffer, root, 0)) {
         txc_free(buffer.data);
         return TEX_CORE_STATUS_ALLOCATION_FAILED;
     }

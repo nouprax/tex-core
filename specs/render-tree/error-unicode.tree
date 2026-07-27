@@ -1,2 +1,2 @@
-render-error 1
+render-error 2
 error status=unsupported src=0..2 message=unsupported character U+03C0

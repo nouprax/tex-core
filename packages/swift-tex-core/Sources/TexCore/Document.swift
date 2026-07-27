@@ -115,6 +115,8 @@ extension RenderNode {
             }
             self = .hbox(
                 HBox(
+                    x: frame.x,
+                    y: frame.y,
                     width: frame.width,
                     ascent: frame.ascent,
                     descent: frame.descent,

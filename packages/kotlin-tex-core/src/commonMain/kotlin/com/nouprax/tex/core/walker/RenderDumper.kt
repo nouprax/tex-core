@@ -23,13 +23,17 @@ internal object RenderDumper {
 }
 
 private class DumpVisitor : RenderVisitor<Unit> {
-    val output = StringBuilder("render-tree 1\n")
+    val output = StringBuilder("render-tree 2\n")
     private var depth = 0
 
     override fun visit(node: HBox) {
         indent()
         output
-            .append("hbox width=")
+            .append("hbox x=")
+            .append(measure(node.x))
+            .append(" y=")
+            .append(measure(node.y))
+            .append(" width=")
             .append(measure(node.width))
             .append(" ascent=")
             .append(measure(node.ascent))
