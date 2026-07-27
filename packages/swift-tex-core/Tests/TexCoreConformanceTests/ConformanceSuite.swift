@@ -61,7 +61,7 @@ private func errorRecord(_ error: CompileError) -> String {
         case .allocationFailed: "allocation-failed"
         }
     let src = error.range.map { "\($0.begin)..\($0.end)" } ?? "none"
-    return "render-error 1\nerror status=\(status) src=\(src) message=\(error.message)\n"
+    return "render-error 2\nerror status=\(status) src=\(src) message=\(error.message)\n"
 }
 
 private struct KindCollector: RenderVisitor {
@@ -88,7 +88,7 @@ private func loadManifest() throws -> GeneratedManifest {
         Bundle.module.url(forResource: "render-tree-fixtures", withExtension: "json")
     )
     let manifest = try JSONDecoder().decode(GeneratedManifest.self, from: Data(contentsOf: resource))
-    #expect(manifest.schemaVersion == 1)
+    #expect(manifest.schemaVersion == 2)
     #expect(!manifest.cases.isEmpty)
     return manifest
 }

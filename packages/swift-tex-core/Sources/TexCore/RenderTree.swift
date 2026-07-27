@@ -30,9 +30,14 @@ public enum GlyphFamily: String, Sendable, CaseIterable {
     case main
 }
 
-/// A horizontal box: the compile root. Measures are absolute points and
-/// exact integer multiples of 2^-16 pt (see the schema contract).
+/// A horizontal box: the compile root, a braced group's nucleus, or a
+/// script box. Measures are absolute points and exact integer multiples
+/// of 2^-16 pt (see the schema contract).
 public struct HBox: Sendable, Hashable {
+    /// Horizontal offset of the reference point from the parent's, in points.
+    public let x: Double
+    /// Baseline shift within the parent; positive is up.
+    public let y: Double
     /// The advance of the box's content in points.
     public let width: Double
     /// The maximum extent above the baseline over the children, in points.
@@ -45,7 +50,17 @@ public struct HBox: Sendable, Hashable {
     public let children: [RenderNode]
 
     /// Creates a box value.
-    public init(width: Double, ascent: Double, descent: Double, src: SourceRange, children: [RenderNode]) {
+    public init(
+        x: Double,
+        y: Double,
+        width: Double,
+        ascent: Double,
+        descent: Double,
+        src: SourceRange,
+        children: [RenderNode]
+    ) {
+        self.x = x
+        self.y = y
         self.width = width
         self.ascent = ascent
         self.descent = descent

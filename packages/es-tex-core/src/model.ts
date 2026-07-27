@@ -24,6 +24,10 @@ export type GlyphFamily = "main";
  */
 export interface HBox {
     readonly kind: "hbox";
+    /** Offset of the box's reference point within its parent, in points. */
+    readonly x: number;
+    /** Baseline shift within the parent; positive is up. */
+    readonly y: number;
     /** The advance of the box's content in points. */
     readonly width: number;
     /** The maximum extent above the baseline over the children, in points. */
@@ -85,7 +89,7 @@ export interface Kern {
 export type RenderNode = HBox | Glyph | Kern;
 
 /**
- * An immutable compiled document: the render tree of schema version 1.
+ * An immutable compiled document: the render tree of schema version 2.
  *
  * Trees are plain frozen values — structurally comparable and detached from
  * the WASM engine the moment `Document.compile` returns.

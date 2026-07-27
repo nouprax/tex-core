@@ -5,7 +5,20 @@
         "file": "src/fontMetricsData.js",
         "source": "https://registry.npmjs.org/katex/-/katex-0.16.22.tgz",
         "license": "MIT",
-        "note": "Glyph metrics subset (em-relative depth/height/italic/skew/width) for the tex-core glyph inventory: from Main-Regular the ASCII letters, digits, and punctuation/operator/delimiter characters the math grammar maps to upright atoms, the uppercase Greek letters, and the symbol codepoints of the milestone M1 symbol-command set (binary operators, relations, arrows, letter-like and miscellaneous ordinaries, delimiter atoms); from Math-Italic the ASCII letters and lowercase Greek letters. Interword and rule spacing come from TeX font dimensions recorded in the generator, not from this table."
+        "note": "Glyph metrics subset (em-relative depth/height/italic/skew/width) for the tex-core glyph inventory: from Main-Regular the ASCII letters, digits, and punctuation/operator/delimiter characters the math grammar maps to upright atoms, the uppercase Greek letters, and the symbol codepoints of the milestone M1 symbol-command set (binary operators, relations, arrows, letter-like and miscellaneous ordinaries, delimiter atoms); from Math-Italic the ASCII letters and lowercase Greek letters. Interword and rule spacing come from TeX font dimensions recorded in the generator, not from this table. The parameters table vendors the sigmasAndXis subset the M1 script layout needs (quad, xHeight, sup1-3, sub1-2, supDrop, subDrop, defaultRuleThickness) from src/fontMetrics.js: three columns per row for the text/script/scriptscript sizes, em-relative to each size's own font; the remaining sigmas and xis arrive with their milestones.",
+        "parametersFile": "src/fontMetrics.js"
+    },
+    "parameters": {
+        "quad": [1.0, 1.171, 1.472],
+        "xHeight": [0.431, 0.431, 0.431],
+        "sup1": [0.413, 0.503, 0.504],
+        "sup2": [0.363, 0.431, 0.404],
+        "sup3": [0.289, 0.286, 0.294],
+        "sub1": [0.15, 0.143, 0.2],
+        "sub2": [0.247, 0.286, 0.4],
+        "supDrop": [0.386, 0.353, 0.494],
+        "subDrop": [0.05, 0.071, 0.1],
+        "defaultRuleThickness": [0.04, 0.049, 0.049]
     },
     "fonts": {
         "Main-Regular": {

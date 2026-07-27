@@ -1,6 +1,7 @@
 # Canonical render-tree dump
 
-Status: schemaVersion 1, frozen with Phase 3 on 2026-07-20.
+Status: schemaVersion 2 (milestone M1 scripts change-set); schemaVersion 1
+was frozen with Phase 3 on 2026-07-20.
 
 The dump is the deterministic public diagnostic representation of the render
 tree and the reviewed expected representation used by conformance tests. It
@@ -24,7 +25,7 @@ and has no trailing whitespace.
 The first line is the schema line:
 
 ```text
-render-tree 1
+render-tree 2
 ```
 
 The integer is the render-tree `schemaVersion` and moves only with a
@@ -36,7 +37,7 @@ pairs. A node's children follow its line, indented one level deeper, in
 child (source) order. The root node has depth zero.
 
 ```text
-hbox width=<m> ascent=<m> descent=<m> src=<b>..<e>
+hbox x=<m> y=<m> width=<m> ascent=<m> descent=<m> src=<b>..<e>
   glyph x=<m> y=<m> cp=U+XXXX style=<s> family=<f> size=<m> width=<m> ascent=<m> descent=<m> italic=<m> src=<b>..<e>
   kern x=<m> width=<m> src=<b>..<e>
 ```
@@ -66,7 +67,7 @@ authority):
 
 | Kind | Ordered fields |
 | --- | --- |
-| `hbox` | `width`, `ascent`, `descent`, `src` |
+| `hbox` | `x`, `y`, `width`, `ascent`, `descent`, `src` |
 | `glyph` | `x`, `y`, `cp`, `style`, `family`, `size`, `width`, `ascent`, `descent`, `italic`, `src` |
 | `kern` | `x`, `width`, `src` |
 

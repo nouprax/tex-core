@@ -1,6 +1,8 @@
 # Render-tree contract
 
-Status: schemaVersion 1, frozen with Phase 3 on 2026-07-20.
+Status: schemaVersion 2 (milestone M1 scripts change-set: nested boxes,
+positioned `hbox`, script sizes); schemaVersion 1 was frozen with Phase 3
+on 2026-07-20.
 
 This document is the language-neutral public render-tree contract implemented
 by the C engine and, as they land, the Swift, Kotlin, and ES bindings
@@ -39,8 +41,9 @@ This library never draws.
   (2^16 sp = 1 pt); the public tree publishes absolute points as `double`.
   A published value is always an exact integer-sp multiple of 2^-16 pt, so
   equality is exact and platform-independent.
-- The walking skeleton typesets at a fixed 10 pt em; `size` on every glyph
-  is that em size in points.
+- The engine typesets at a 10 pt text size; script and scriptscript
+  material is set at 7 pt and 5 pt. `size` on every glyph is the em it
+  was set at, in points.
 - Each node's `x`/`y` place its reference point relative to its parent's
   reference point. A box's reference point sits at its left edge on the
   baseline; `x` grows rightward, `y` grows upward (positive `y` is above
@@ -55,8 +58,8 @@ in the source-range section.
 
 | Kind | Fields in canonical order | Semantics and invariants |
 | --- | --- | --- |
-| `hbox` | `width: measure`, `ascent: measure`, `descent: measure`, `src: range`, `children: [node]` | horizontal box; the compile root; `width` is the advance of its content, `ascent`/`descent` the maxima over children; the root box spans the whole input |
-| `glyph` | `x: measure`, `y: measure`, `cp: codepoint`, `style: style`, `family: family`, `size: measure`, `width: measure`, `ascent: measure`, `descent: measure`, `italic: measure`, `src: range` | leaf; one glyph named by Unicode codepoint + style + family + size, never a private glyph ID; `italic` is the italic correction, included in the advance of a math Ord glyph |
+| `hbox` | `x: measure`, `y: measure`, `width: measure`, `ascent: measure`, `descent: measure`, `src: range`, `children: [node]` | horizontal box: the compile root, a braced group's nucleus, or a script box; `x`/`y` place its reference point in its parent (the root sits at the origin), a script box's `y` is its baseline shift; `width` is the advance of its content — plus TeX's `\scriptspace` (0.5 pt) on a script box — `ascent`/`descent` the maxima over children floored at zero; the root box spans the whole input |
+| `glyph` | `x: measure`, `y: measure`, `cp: codepoint`, `style: style`, `family: family`, `size: measure`, `width: measure`, `ascent: measure`, `descent: measure`, `italic: measure`, `src: range` | leaf; one glyph named by Unicode codepoint + style + family + size, never a private glyph ID; `italic` is the italic correction, included in the advance of a math Ord glyph unless its atom carries a subscript — the correction then offsets the superscript box instead, exactly as TeX |
 | `kern` | `x: measure`, `width: measure`, `src: range` | leaf; fixed horizontal advance; `width` may be negative; the engine resolves interword spacing, explicit spacing commands, and math inter-atom spacing to kerns (glue arrives with stretch/shrink later, as a schema change) |
 
 Field types:
@@ -71,15 +74,54 @@ Field types:
 Math inter-atom spacing: in the math modes every atom carries one of TeX's
 classes (Ord, Op, Bin, Rel, Open, Close, Punct, Inner — TeXbook chapter
 17), contextual Bin atoms resolve to Ord exactly as in TeX's first mlist
-pass, and the chapter-18 pair table inserts a thin (3/18 em), medium
-(4/18 em), or thick (5/18 em) kern directly before the right atom of a
-spaced pair — after any explicit spacing between the two, which never
-suppresses the inserted space. The class itself is not a tree field: it is
+pass, and the chapter-18 pair table inserts a thin (3 mu), medium (4 mu),
+or thick (5 mu) kern directly before the right atom of a spaced pair —
+after any explicit spacing between the two, which never suppresses the
+inserted space. As in TeX, the medium and thick pairs — and the thin pairs
+TeX marks conditional — are inserted only in display and text styles,
+never inside script material. One mu is 1/18 of the current size's quad,
+so the same commands and pairs shrink inside scripts; `\quad` and
+`\qquad` are em-based and always measure the 10 pt text em, exactly as
+TeX's em unit in math mode. The class itself is not a tree field: it is
 layout input, visible through the inserted kerns. An inter-atom kern's
 `src` is the source gap between the two atoms it separates,
 `[left.src.end, right.src.begin)` — empty when the atoms are adjacent, and
 covering the blanks or explicit-spacing bytes between them otherwise.
 Document mode has no atom classes and never receives inter-atom kerns.
+
+## Math styles and scripts
+
+Math material is set in TeX's styles: display math opens in display
+style, inline math in text style, both at the 10 pt text size.
+Superscripts and subscripts are set one style smaller — script material at
+7 pt, scriptscript material at 5 pt, deeper nesting stays scriptscript —
+with TeX's cramped variants inside subscripts. A braced group `{…}` is one
+Ord atom whose nucleus is laid out in the surrounding style and boxed; a
+group's box never changes style.
+
+Script geometry follows TeXbook Appendix G rule 18 (tex.web's
+`make_scripts`) over the vendored Computer Modern parameters
+(`scripts/metrics/katex-font-metrics.json`): superscript minimum shifts
+`sup1`/`sup2`/`sup3` for display/other/cramped styles, subscript shifts
+`sub1`/`sub2`, box-nucleus drops `supDrop`/`subDrop`, the x-height
+quarter and four-fifths clearances, and the four-rule-thickness clash
+fixup when both scripts are present. Every script box takes TeX's
+`clean_box` simplification — a box holding exactly one glyph drops that
+glyph's italic correction from its width — and then gains `\scriptspace`
+(0.5 pt) of width. A superscript sits `italic` to the right of its
+subscript (rule 18f); each script box appears in `children` at its source
+position, so a subscript written first precedes its superscript.
+
+The script grammar is TeX's: `^`/`_` attach to the preceding atom, a
+script with nothing to attach to gets an empty-nucleus Ord atom of its
+own, a repeated script on one atom is the structured error
+`double superscript`/`double subscript`, a script mark without a legal
+argument (a character, symbol command, or group) is
+`missing superscript argument`/`missing subscript argument`, an
+unterminated group is `unclosed group`, a stray `}` is
+`unmatched closing brace`, and `{` nesting deeper than 255 groups is
+`group nesting too deep`. Document mode keeps rejecting `{ } ^ _` as
+unsupported characters until the M3 text surface.
 
 ## Source ranges
 
@@ -114,8 +156,9 @@ and is pinned by the corpus error cases in the corpus error-record form
 
 ## Versioning and change protocol
 
-The schema carries `schemaVersion` 1, printed in the dump schema line and
-frozen in the manifest. Any intentional change to grammar, layout, metrics,
+The schema carries `schemaVersion` 2, printed in the dump schema line and
+frozen in the manifest; version 2 added `x`/`y` to `hbox`, nested boxes,
+and per-glyph script sizes. Any intentional change to grammar, layout, metrics,
 schema, or dump — including widening `style`/`family`, adding node kinds or
 fields, or resolving glue — is a public behavior change under plan §5.5:
 one reviewed commit updates this contract, the engine, all shipped

@@ -21,7 +21,7 @@ test("api: compile returns a detached frozen value tree", () => {
 
 test("api: options default to document mode and dumps are canonical", () => {
     const tree = Document.compile("");
-    assert.equal(tree.dump(), "render-tree 1\nhbox width=0.0pt ascent=0.0pt descent=0.0pt src=0..0\n");
+    assert.equal(tree.dump(), "render-tree 2\nhbox x=0.0pt y=0.0pt width=0.0pt ascent=0.0pt descent=0.0pt src=0..0\n");
     assert.equal(tree.dump(), tree.dump());
 });
 

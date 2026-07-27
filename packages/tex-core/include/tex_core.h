@@ -22,9 +22,10 @@
  * The supported surface (milestone M1 in progress): document mode compiles
  * ordinary text atoms (ASCII letters, digits, period, comma) and explicit
  * spacing commands; the math modes add the classed math characters
- * (+ - * / = < > ( ) [ ] , ; : ! ? |) and the M1 symbol commands (Greek
+ * (+ - * / = < > ( ) [ ] , ; : ! ? |), the M1 symbol commands (Greek
  * letters, binary operators, relations, arrows, letter-like and delimiter
- * symbols), laid out with TeX's inter-atom spacing. The full self-contained
+ * symbols), braced groups, and superscripts/subscripts set at TeX's script
+ * sizes, laid out with TeX's inter-atom spacing. The full self-contained
  * LaTeX surface arrives with the 1.0.0 milestones; every extension of the
  * surface is a reviewed public-behavior change.
  */

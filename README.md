@@ -25,19 +25,21 @@ two projects remain independently consumable.
 
 ## Status
 
-**Pre-release; infrastructure phases 1–9 of the setup plan are complete and
-the engine is climbing milestone M1 (math core).** The C engine, its
-render-tree contract (schemaVersion 1), the Swift, Kotlin Multiplatform,
-and ES/WASM bindings, the fail-closed CI quality gates, and the release
-workflows are all in place. `Document.compile` covers ordinary text atoms
-with explicit spacing in document mode and, in the math modes, classed
-math atoms — the ASCII math characters plus the M1 symbol-command set
-(Greek letters, binary operators, relations, arrows, letter-like and
-delimiter symbols) — laid out with TeX's inter-atom spacing over embedded
-Computer Modern metrics, with byte-identical canonical dumps on every
-platform. The rest of the M1–M4 surface (scripts, fractions, radicals, big
-operators, text galley, domain notations) and the registry setup of phase
-10 land before `1.0.0`. Nothing is published yet.
+**Pre-release; the infrastructure phases (1–10) of the setup plan are
+complete and the engine is climbing milestone M1 (math core).** The C
+engine, its render-tree contract (schemaVersion 2), the Swift, Kotlin
+Multiplatform, and ES/WASM bindings, the fail-closed CI quality gates, and
+the release workflows are all in place. `Document.compile` covers ordinary
+text atoms with explicit spacing in document mode and, in the math modes,
+classed math atoms — the ASCII math characters plus the M1 symbol-command
+set (Greek letters, binary operators, relations, arrows, letter-like and
+delimiter symbols) — with braced groups, superscripts, and subscripts set
+at TeX's script sizes per Appendix G, laid out with TeX's inter-atom
+spacing over embedded Computer Modern metrics, with byte-identical
+canonical dumps on every platform. The rest of the M1–M4 surface
+(fractions, radicals, big operators, `\left`/`\right`, accents, style
+switches, text galley, domain notations) lands before `1.0.0`. Nothing
+usable is published yet.
 
 Build and test the C core:
 

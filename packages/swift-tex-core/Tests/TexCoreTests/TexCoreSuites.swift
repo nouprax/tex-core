@@ -37,7 +37,7 @@ import TexCore
     @Test("the dump is canonical and deterministic")
     func dump() throws {
         let tree = try Document.compile("", options: CompileOptions(mode: .document))
-        #expect(tree.dump() == "render-tree 1\nhbox width=0.0pt ascent=0.0pt descent=0.0pt src=0..0\n")
+        #expect(tree.dump() == "render-tree 2\nhbox x=0.0pt y=0.0pt width=0.0pt ascent=0.0pt descent=0.0pt src=0..0\n")
     }
 
     @Test("trees compile and share safely across concurrent tasks")

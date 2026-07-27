@@ -114,6 +114,40 @@ const demoted = (subject, pattern, offset, witness) => {
 const head = () => 0;
 const tail = (match) => match[0].length - 1;
 
+// The script/group states are likewise witnessed in the expected tree.
+// `nodes` parses every dump line with its depth; `childrenOf` recovers a
+// box's direct children from the depth sequence. Printed decimals are
+// exact reads of scaled values, so sums compare within 1e-9.
+const nodes = (tree) =>
+    [...tree.matchAll(/^((?: {2})+)(hbox|glyph|kern)((?: [a-z]+=\S+)*)$/gm)].map(([, pad, kind, fields]) => {
+        const field = (name) => fields.match(new RegExp(` ${name}=(\\S+)`))?.[1];
+        const pt = (name) => {
+            const value = field(name);
+            return value === undefined ? undefined : Number(value.slice(0, -2));
+        };
+        return {
+            depth: pad.length / 2,
+            kind,
+            cp: field("cp") === undefined ? undefined : Number.parseInt(field("cp").slice(2), 16),
+            x: pt("x"),
+            y: pt("y"),
+            width: pt("width"),
+            italic: pt("italic"),
+            size: pt("size")
+        };
+    });
+const childrenOf = (all, index) => {
+    const children = [];
+    for (let next = index + 1; next < all.length && all[next].depth > all[index].depth; next += 1) {
+        if (all[next].depth === all[index].depth + 1) children.push(all[next]);
+    }
+    return children;
+};
+const near = (left, right) => Math.abs(left - right) < 1e-9;
+const scriptBox = (all) =>
+    all.map((node, index) => ({ node, index })).filter(({ node }) => node.kind === "hbox" && node.y !== 0);
+const treeStates = (validate) => (subject) => subject.outcome === "tree" && validate(nodes(subject.tree), subject);
+
 // Validators run over the whole case: `source` is the decoded input (null
 // for the invalid-UTF-8 case), `tree` the expected file text, `mode` and
 // `outcome` the manifest values. A declared state must validate; every
@@ -264,6 +298,83 @@ const stateValidators = {
     "measure.negative": ({ tree }) => /=-/.test(tree),
     "input.empty": ({ bytes }) => bytes !== undefined && bytes.length === 0,
     "input.noFinalNewline": ({ bytes }) => bytes !== undefined && bytes.length > 0 && bytes.at(-1) !== 0x0a,
+    "script.sup": treeStates((all) => all.some((node) => node.kind === "hbox" && node.y > 0)),
+    "script.sub": treeStates((all) => all.some((node) => node.kind === "hbox" && node.y < 0)),
+    "script.both": treeStates(
+        (all) =>
+            all.some((node) => node.kind === "hbox" && node.y > 0) &&
+            all.some((node) => node.kind === "hbox" && node.y < 0)
+    ),
+    "script.subFirst": treeStates((all) =>
+        all.some((node, index) => {
+            if (node.kind !== "hbox" || !(node.y < 0)) return false;
+            for (let next = index + 1; next < all.length; next += 1) {
+                if (all[next].depth < node.depth) return false;
+                if (all[next].depth === node.depth) return all[next].kind === "hbox" && all[next].y > 0;
+            }
+            return false;
+        })
+    ),
+    "script.display": ({ mode, outcome, tree }) =>
+        mode === "mathDisplay" && outcome === "tree" && nodes(tree).some((node) => node.kind === "hbox" && node.y > 0),
+    "script.group": treeStates((all) =>
+        scriptBox(all).some(({ index }) => childrenOf(all, index).filter((child) => child.kind === "glyph").length >= 2)
+    ),
+    "script.simplified": treeStates((all) =>
+        scriptBox(all).some(({ node, index }) => {
+            const children = childrenOf(all, index);
+            return children.length === 1 && children[0].kind === "glyph" && near(node.width, children[0].width + 0.5);
+        })
+    ),
+    "script.scriptscript": treeStates((all) => all.some((node) => node.kind === "glyph" && node.size === 5)),
+    "size.script": treeStates((all) => all.some((node) => node.kind === "glyph" && node.size === 7)),
+    "size.scriptscript": treeStates((all) => all.some((node) => node.kind === "glyph" && node.size === 5)),
+    "group.nucleus": treeStates((all) =>
+        all.some((node, index) => node.kind === "hbox" && node.y === 0 && childrenOf(all, index).length > 0)
+    ),
+    "group.empty": treeStates((all) =>
+        all.some((node, index) => node.kind === "hbox" && childrenOf(all, index).length === 0)
+    ),
+    "italic.withheld": treeStates((all) =>
+        all.some(
+            (node, index) =>
+                node.kind === "glyph" &&
+                node.italic > 0 &&
+                all[index + 1]?.kind === "hbox" &&
+                all[index + 1].depth === node.depth &&
+                all[index + 1].y < 0 &&
+                near(all[index + 1].x, node.x + node.width)
+        )
+    ),
+    "italic.offset": treeStates((all) =>
+        all.some((node) => {
+            if (node.kind !== "glyph" || !(node.italic > 0)) return false;
+            return all.some(
+                (box) =>
+                    box.kind === "hbox" &&
+                    box.depth === node.depth &&
+                    box.y > 0 &&
+                    near(box.x, node.x + node.width + node.italic)
+            );
+        })
+    ),
+    "spacing.scriptDropped": treeStates((all) =>
+        scriptBox(all).some(({ index }) => {
+            const children = childrenOf(all, index);
+            return (
+                children.some((child) => child.kind === "glyph" && binCp.has(child.cp)) &&
+                children.every((child) => child.kind !== "kern")
+            );
+        })
+    ),
+    "error.doubleScript": ({ outcome, tree }) =>
+        outcome === "error" && / message=double (superscript|subscript)\n$/.test(tree),
+    "error.missingScriptArgument": ({ outcome, tree }) =>
+        outcome === "error" && / message=missing (superscript|subscript) argument\n$/.test(tree),
+    "error.unclosedGroup": ({ outcome, tree }) => outcome === "error" && / message=unclosed group\n$/.test(tree),
+    "error.unmatchedBrace": ({ outcome, tree }) =>
+        outcome === "error" && / message=unmatched closing brace\n$/.test(tree),
+    "error.deepNesting": ({ outcome, tree }) => outcome === "error" && / message=group nesting too deep\n$/.test(tree),
     "error.unsupportedCharacter": ({ outcome, tree }) =>
         outcome === "error" && / message=unsupported character U\+/.test(tree),
     "error.unsupportedCommand": ({ outcome, tree }) =>
@@ -275,7 +386,7 @@ const stateValidators = {
         outcome === "error" && / message=incomplete control sequence/.test(tree)
 };
 const orderValidators = {
-    "root.hbox": ({ outcome, tree }) => outcome === "tree" && /^render-tree 1\nhbox /.test(tree),
+    "root.hbox": ({ outcome, tree }) => outcome === "tree" && /^render-tree 2\nhbox /.test(tree),
     "children.sourceOrder": ({ outcome, tree }) => {
         if (outcome !== "tree") return false;
         const begins = [...tree.matchAll(/^ {2}\S.* src=(\d+)\.\./gm)].map((match) => Number(match[1]));
@@ -283,7 +394,7 @@ const orderValidators = {
     }
 };
 
-if (manifest.schemaVersion !== 1) failures.push("manifest schemaVersion must be 1");
+if (manifest.schemaVersion !== 2) failures.push("manifest schemaVersion must be 2");
 if (manifest.contract !== "docs/specs/render-tree.md" || manifest.dumpGrammar !== "docs/specs/render-tree-dump.md") {
     failures.push("manifest contract paths drifted from the repository specifications");
 }

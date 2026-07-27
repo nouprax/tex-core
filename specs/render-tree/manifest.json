@@ -1,5 +1,5 @@
 {
-    "schemaVersion": 1,
+    "schemaVersion": 2,
     "contract": "docs/specs/render-tree.md",
     "dumpGrammar": "docs/specs/render-tree-dump.md",
     "format": {
@@ -77,6 +77,26 @@
             "measure.negative",
             "input.empty",
             "input.noFinalNewline",
+            "script.sup",
+            "script.sub",
+            "script.both",
+            "script.subFirst",
+            "script.display",
+            "script.group",
+            "script.simplified",
+            "script.scriptscript",
+            "size.script",
+            "size.scriptscript",
+            "group.nucleus",
+            "group.empty",
+            "italic.withheld",
+            "italic.offset",
+            "spacing.scriptDropped",
+            "error.doubleScript",
+            "error.missingScriptArgument",
+            "error.unclosedGroup",
+            "error.unmatchedBrace",
+            "error.deepNesting",
             "error.unsupportedCharacter",
             "error.unsupportedCommand",
             "error.paragraphBreak",
@@ -709,6 +729,382 @@
                     "mode.document",
                     "outcome.error",
                     "error.unsupportedCommand"
+                ],
+                "orders": []
+            }
+        },
+        {
+            "name": "math-sup",
+            "input": "math-sup.tex",
+            "expected": "math-sup.tree",
+            "compileOptions": {
+                "mode": "mathInline"
+            },
+            "outcome": "tree",
+            "coverage": {
+                "kinds": [
+                    "hbox",
+                    "glyph"
+                ],
+                "states": [
+                    "mode.mathInline",
+                    "outcome.tree",
+                    "children.populated",
+                    "atom.lower",
+                    "atom.digit",
+                    "glyph.style.italic",
+                    "glyph.style.upright",
+                    "glyph.italic.zero",
+                    "script.sup",
+                    "size.script",
+                    "measure.zero"
+                ],
+                "orders": [
+                    "root.hbox",
+                    "children.sourceOrder"
+                ]
+            }
+        },
+        {
+            "name": "math-sub",
+            "input": "math-sub.tex",
+            "expected": "math-sub.tree",
+            "compileOptions": {
+                "mode": "mathInline"
+            },
+            "outcome": "tree",
+            "coverage": {
+                "kinds": [
+                    "hbox",
+                    "glyph"
+                ],
+                "states": [
+                    "mode.mathInline",
+                    "outcome.tree",
+                    "children.populated",
+                    "atom.lower",
+                    "glyph.style.italic",
+                    "glyph.italic.positive",
+                    "script.sub",
+                    "size.script",
+                    "italic.withheld",
+                    "measure.negative"
+                ],
+                "orders": [
+                    "root.hbox",
+                    "children.sourceOrder"
+                ]
+            }
+        },
+        {
+            "name": "math-scripts-both",
+            "input": "math-scripts-both.tex",
+            "expected": "math-scripts-both.tree",
+            "compileOptions": {
+                "mode": "mathInline"
+            },
+            "outcome": "tree",
+            "coverage": {
+                "kinds": [
+                    "hbox",
+                    "glyph"
+                ],
+                "states": [
+                    "mode.mathInline",
+                    "outcome.tree",
+                    "children.populated",
+                    "atom.lower",
+                    "atom.digit",
+                    "glyph.italic.positive",
+                    "script.sup",
+                    "script.sub",
+                    "script.both",
+                    "script.subFirst",
+                    "size.script",
+                    "italic.withheld",
+                    "italic.offset",
+                    "measure.negative"
+                ],
+                "orders": [
+                    "root.hbox",
+                    "children.sourceOrder"
+                ]
+            }
+        },
+        {
+            "name": "math-sup-display",
+            "input": "math-sup-display.tex",
+            "expected": "math-sup-display.tree",
+            "compileOptions": {
+                "mode": "mathDisplay"
+            },
+            "outcome": "tree",
+            "coverage": {
+                "kinds": [
+                    "hbox",
+                    "glyph"
+                ],
+                "states": [
+                    "mode.mathDisplay",
+                    "outcome.tree",
+                    "children.populated",
+                    "atom.lower",
+                    "atom.digit",
+                    "script.sup",
+                    "script.display",
+                    "size.script"
+                ],
+                "orders": [
+                    "root.hbox",
+                    "children.sourceOrder"
+                ]
+            }
+        },
+        {
+            "name": "math-sup-group",
+            "input": "math-sup-group.tex",
+            "expected": "math-sup-group.tree",
+            "compileOptions": {
+                "mode": "mathInline"
+            },
+            "outcome": "tree",
+            "coverage": {
+                "kinds": [
+                    "hbox",
+                    "glyph"
+                ],
+                "states": [
+                    "mode.mathInline",
+                    "outcome.tree",
+                    "children.populated",
+                    "atom.lower",
+                    "atom.bin",
+                    "script.sup",
+                    "script.group",
+                    "spacing.scriptDropped",
+                    "size.script"
+                ],
+                "orders": [
+                    "root.hbox",
+                    "children.sourceOrder"
+                ]
+            }
+        },
+        {
+            "name": "math-group",
+            "input": "math-group.tex",
+            "expected": "math-group.tree",
+            "compileOptions": {
+                "mode": "mathInline"
+            },
+            "outcome": "tree",
+            "coverage": {
+                "kinds": [
+                    "hbox",
+                    "glyph"
+                ],
+                "states": [
+                    "mode.mathInline",
+                    "outcome.tree",
+                    "children.populated",
+                    "atom.lower",
+                    "group.nucleus",
+                    "measure.zero"
+                ],
+                "orders": [
+                    "root.hbox",
+                    "children.sourceOrder"
+                ]
+            }
+        },
+        {
+            "name": "math-sup-single-group",
+            "input": "math-sup-single-group.tex",
+            "expected": "math-sup-single-group.tree",
+            "compileOptions": {
+                "mode": "mathInline"
+            },
+            "outcome": "tree",
+            "coverage": {
+                "kinds": [
+                    "hbox",
+                    "glyph"
+                ],
+                "states": [
+                    "mode.mathInline",
+                    "outcome.tree",
+                    "children.populated",
+                    "atom.lower",
+                    "script.sup",
+                    "script.simplified",
+                    "size.script"
+                ],
+                "orders": [
+                    "root.hbox",
+                    "children.sourceOrder"
+                ]
+            }
+        },
+        {
+            "name": "math-scriptscript",
+            "input": "math-scriptscript.tex",
+            "expected": "math-scriptscript.tree",
+            "compileOptions": {
+                "mode": "mathInline"
+            },
+            "outcome": "tree",
+            "coverage": {
+                "kinds": [
+                    "hbox",
+                    "glyph"
+                ],
+                "states": [
+                    "mode.mathInline",
+                    "outcome.tree",
+                    "children.populated",
+                    "atom.lower",
+                    "atom.digit",
+                    "glyph.italic.positive",
+                    "script.sup",
+                    "script.scriptscript",
+                    "size.script",
+                    "size.scriptscript",
+                    "italic.offset"
+                ],
+                "orders": [
+                    "root.hbox",
+                    "children.sourceOrder"
+                ]
+            }
+        },
+        {
+            "name": "math-empty-group",
+            "input": "math-empty-group.tex",
+            "expected": "math-empty-group.tree",
+            "compileOptions": {
+                "mode": "mathInline"
+            },
+            "outcome": "tree",
+            "coverage": {
+                "kinds": [
+                    "hbox"
+                ],
+                "states": [
+                    "mode.mathInline",
+                    "outcome.tree",
+                    "children.populated",
+                    "group.empty",
+                    "measure.zero"
+                ],
+                "orders": [
+                    "root.hbox"
+                ]
+            }
+        },
+        {
+            "name": "error-double-sup",
+            "input": "error-double-sup.tex",
+            "expected": "error-double-sup.tree",
+            "compileOptions": {
+                "mode": "mathInline"
+            },
+            "outcome": "error",
+            "coverage": {
+                "kinds": [],
+                "states": [
+                    "mode.mathInline",
+                    "outcome.error",
+                    "error.doubleScript"
+                ],
+                "orders": []
+            }
+        },
+        {
+            "name": "error-missing-sub",
+            "input": "error-missing-sub.tex",
+            "expected": "error-missing-sub.tree",
+            "compileOptions": {
+                "mode": "mathInline"
+            },
+            "outcome": "error",
+            "coverage": {
+                "kinds": [],
+                "states": [
+                    "mode.mathInline",
+                    "outcome.error",
+                    "error.missingScriptArgument"
+                ],
+                "orders": []
+            }
+        },
+        {
+            "name": "error-unclosed-group",
+            "input": "error-unclosed-group.tex",
+            "expected": "error-unclosed-group.tree",
+            "compileOptions": {
+                "mode": "mathInline"
+            },
+            "outcome": "error",
+            "coverage": {
+                "kinds": [],
+                "states": [
+                    "mode.mathInline",
+                    "outcome.error",
+                    "error.unclosedGroup"
+                ],
+                "orders": []
+            }
+        },
+        {
+            "name": "error-unmatched-close",
+            "input": "error-unmatched-close.tex",
+            "expected": "error-unmatched-close.tree",
+            "compileOptions": {
+                "mode": "mathInline"
+            },
+            "outcome": "error",
+            "coverage": {
+                "kinds": [],
+                "states": [
+                    "mode.mathInline",
+                    "outcome.error",
+                    "error.unmatchedBrace"
+                ],
+                "orders": []
+            }
+        },
+        {
+            "name": "error-deep-nesting",
+            "input": "error-deep-nesting.tex",
+            "expected": "error-deep-nesting.tree",
+            "compileOptions": {
+                "mode": "mathInline"
+            },
+            "outcome": "error",
+            "coverage": {
+                "kinds": [],
+                "states": [
+                    "mode.mathInline",
+                    "outcome.error",
+                    "error.deepNesting"
+                ],
+                "orders": []
+            }
+        },
+        {
+            "name": "error-document-script",
+            "input": "error-document-script.tex",
+            "expected": "error-document-script.tree",
+            "compileOptions": {
+                "mode": "document"
+            },
+            "outcome": "error",
+            "coverage": {
+                "kinds": [],
+                "states": [
+                    "mode.document",
+                    "outcome.error",
+                    "error.unsupportedCharacter"
                 ],
                 "orders": []
             }
