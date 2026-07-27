@@ -6,10 +6,13 @@ not promised to remain compatible between releases.
 
 ## Unreleased
 
-- Pin the linear-history merge policy in `bootstrap-repository.sh`:
-  squash is the only allowed merge method and squash commits take the
-  pull request's title (`… (#N)`) and description, for direct merges and
-  the merge queue alike.
+- Pin the linear-history merge policy in `bootstrap-repository.sh` and
+  the template's embedded copy: squash is the only allowed merge method,
+  squash commits take the pull request's title (`… (#N)`) and
+  description, and the main ruleset recipe now carries the merge queue
+  (squash method, ALLGREEN grouping) and the standing admin bypass, each
+  behind a variable — so a bootstrap re-run reproduces the live control
+  plane instead of stripping it.
 - Continue milestone M1 (math core) with superscripts, subscripts, and
   braced groups, moving the render-tree contract to schemaVersion 2:
   `hbox` gains `x`/`y` and nests (a braced group is one Ord atom boxed in
