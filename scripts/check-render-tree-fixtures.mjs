@@ -7,7 +7,7 @@
 import { readFile, readdir } from "node:fs/promises";
 import path from "node:path";
 import process from "node:process";
-import { TextDecoder } from "node:util";
+import { TextDecoder, TextEncoder } from "node:util";
 
 const root = process.cwd();
 const contractPath = path.join(root, "docs/specs/render-tree.md");
@@ -73,6 +73,47 @@ const glyphMeasure = (tree, field) =>
     [...tree.matchAll(new RegExp(`^ +glyph .* ${field}=(-?[\\d.]+)pt `, "gm"))].map((match) => Number(match[1]));
 const kernLines = (tree) => [...tree.matchAll(/^ +kern /gm)].length;
 
+// The bin-demotion states are witnessed in the expected tree, not just in the
+// source: each validator locates the demoted glyph under the source pattern
+// and checks the neighboring glyph/kern sequence for the spacing that only
+// the demoted (Ord) row produces — a fixture whose tree kept the Bin spacing
+// cannot certify demotion. The witnesses require the fixture to place an
+// ordinary atom on the distinguishing side of the demoted glyph.
+const encoder = new TextEncoder();
+const THIN = "1.66672pt";
+const MEDIUM = "2.22229pt";
+const THICK = "2.77771pt";
+const binCp = set([0x2b, 0x2212, 0x2217]);
+const relCp = set([0x3a, 0x3c, 0x3d, 0x3e]);
+const openCp = set([0x28, 0x5b]);
+const closeCp = set([0x29, 0x5d]);
+const punctCp = set([0x2c, 0x3b]);
+const ordinary = (child) =>
+    child?.kind === "glyph" &&
+    ((child.cp >= 0x30 && child.cp <= 0x39) ||
+        (child.cp >= 0x41 && child.cp <= 0x5a) ||
+        (child.cp >= 0x61 && child.cp <= 0x7a));
+const glyphIn = (child, cps) => child?.kind === "glyph" && cps.has(child.cp);
+const kernOf = (child, width) => child?.kind === "kern" && child.width === width;
+const rootChildren = (tree) =>
+    [...tree.matchAll(/^ {2}(glyph|kern)((?: [a-z]+=\S+)*)$/gm)].map(([, kind, fields]) => {
+        const field = (name) => fields.match(new RegExp(` ${name}=(\\S+)`))?.[1];
+        const [begin, end] = (field("src") ?? "0..0").split("..").map(Number);
+        return { kind, cp: Number.parseInt(field("cp")?.slice(2) ?? "0", 16), width: field("width"), begin, end };
+    });
+const demoted = (subject, pattern, offset, witness) => {
+    const { mode, outcome, source, tree } = subject;
+    if (mode === "document" || outcome !== "tree" || source === null) return false;
+    const children = rootChildren(tree);
+    return [...source.matchAll(pattern)].some((match) => {
+        const byte = encoder.encode(source.slice(0, match.index + offset(match))).length;
+        const index = children.findIndex((child) => child.kind === "glyph" && child.begin <= byte && byte < child.end);
+        return index !== -1 && glyphIn(children[index], binCp) && witness(children, index);
+    });
+};
+const head = () => 0;
+const tail = (match) => match[0].length - 1;
+
 // Validators run over the whole case: `source` is the decoded input (null
 // for the invalid-UTF-8 case), `tree` the expected file text, `mode` and
 // `outcome` the manifest values. A declared state must validate; every
@@ -90,6 +131,18 @@ const stateValidators = {
     "atom.digit": ({ tree }) => / cp=U\+003[0-9] /.test(tree),
     "atom.period": ({ tree }) => / cp=U\+002E /.test(tree),
     "atom.comma": ({ tree }) => / cp=U\+002C /.test(tree),
+    "atom.bin": ({ mode, source, tree }) =>
+        mode !== "document" && /[+*-]/.test(source ?? "") && / cp=U\+(002B|2212|2217) /.test(tree),
+    "atom.rel": ({ mode, source, tree }) =>
+        mode !== "document" && /[=<>:]/.test(source ?? "") && / cp=U\+003[ACDE] /.test(tree),
+    "atom.open": ({ mode, source, tree }) =>
+        mode !== "document" && /[([]/.test(source ?? "") && / cp=U\+00(28|5B) /.test(tree),
+    "atom.close": ({ mode, source, tree }) =>
+        mode !== "document" && /[)\]!?]/.test(source ?? "") && / cp=U\+00(29|5D|21|3F) /.test(tree),
+    "atom.punct": ({ mode, source, tree }) =>
+        mode !== "document" && /[,;]/.test(source ?? "") && / cp=U\+00(2C|3B) /.test(tree),
+    "atom.remapped": ({ mode, source, tree }) =>
+        mode !== "document" && /[-*|]/.test(source ?? "") && / cp=U\+2(212|217|223) /.test(tree),
     "glyph.style.upright": ({ tree }) => / style=upright /.test(tree),
     "glyph.style.italic": ({ tree }) => / style=italic /.test(tree),
     "glyph.italic.zero": ({ tree }) => glyphMeasure(tree, "italic").some((value) => value === 0),
@@ -109,6 +162,104 @@ const stateValidators = {
     "command.negativeThin": ({ source }) => /\\!/.test(source ?? ""),
     "command.quad": ({ source }) => /\\quad/.test(source ?? ""),
     "command.qquad": ({ source }) => /\\qquad/.test(source ?? ""),
+    "command.symbol.greekLower": ({ tree }) => / cp=U\+03(B[1-9A-F]|C[0-9]|D[156]|F[15]) style=italic /.test(tree),
+    "command.symbol.greekUpper": ({ tree }) => / cp=U\+03(9[348BE]|A[035689]) style=upright /.test(tree),
+    "command.symbol.ordinary": ({ source }) =>
+        /\\(infty|partial|ell|wp|Re|Im|aleph|forall|exists|neg|lnot|emptyset|nabla|surd|top|bot|angle|triangle|prime|flat|natural|sharp|clubsuit|diamondsuit|heartsuit|spadesuit|backslash)/.test(
+            source ?? ""
+        ),
+    "command.symbol.bin": ({ source }) =>
+        /\\(pm|mp|times|div|cdot|ast|star|circ|bullet|cap|cup|sqcap|sqcup|uplus|vee|lor|wedge|land|setminus|wr|diamond|oplus|ominus|otimes|oslash|odot|dagger|ddagger|amalg)/.test(
+            source ?? ""
+        ),
+    "command.symbol.rel": ({ source }) =>
+        /\\(leq?|geq?|equiv|prec|succ|ll|gg|subset|supset|subseteq|supseteq|in|ni|owns|vdash|dashv|smile|frown|mid|parallel|perp|models|asymp|sim|simeq|approx|cong|doteq|propto|bowtie)/.test(
+            source ?? ""
+        ),
+    "command.symbol.arrow": ({ source }) =>
+        /\\(to\b|gets|mapsto|leftarrow|rightarrow|Leftarrow|Rightarrow|leftrightarrow|Longrightarrow|uparrow|downarrow|nearrow|searrow|swarrow|nwarrow|harpoon)/.test(
+            source ?? ""
+        ),
+    "command.symbol.delimiter": ({ source }) =>
+        /\\(lbrace|rbrace|langle|rangle|lfloor|rfloor|lceil|rceil|[{}|])/.test(source ?? ""),
+    "command.symbol.alias": ({ source }) => /\\(le|ge|to|gets|lnot|land|lor|owns)\b/.test(source ?? ""),
+    "space.interAtom.none": ({ mode, outcome, tree }) =>
+        mode !== "document" && outcome === "tree" && /^ {2}glyph .*\n {2}glyph /m.test(tree),
+    "space.interAtom.thin": ({ mode, source, tree }) =>
+        mode !== "document" && !/\\,/.test(source ?? "") && / width=1\.66672pt /.test(tree),
+    "space.interAtom.medium": ({ mode, source, tree }) =>
+        mode !== "document" && !/\\:/.test(source ?? "") && / width=2\.22229pt /.test(tree),
+    "space.interAtom.thick": ({ mode, source, tree }) =>
+        mode !== "document" && !/\\;/.test(source ?? "") && / width=2\.77771pt /.test(tree),
+    "space.interAtom.acrossExplicit": ({ mode, tree }) => mode !== "document" && /^ {2}kern .*\n {2}kern /m.test(tree),
+    "kern.boundaryRange": ({ tree }) =>
+        [...tree.matchAll(/^ {2}kern .* src=(\d+)\.\.(\d+)$/gm)].some((match) => match[1] === match[2]),
+    "bin.kept": ({ mode, source, tree }) =>
+        mode !== "document" && /[+*]|\\pm|\\times|\\cdot/.test(source ?? "") && / width=2\.22229pt /.test(tree),
+    "bin.demoted.leading": (subject) =>
+        demoted(subject, /^[+*-]/g, head, (children, index) => index === 0 && ordinary(children[1])),
+    "bin.demoted.trailing": (subject) =>
+        demoted(
+            subject,
+            /[+*-]\n?$/g,
+            head,
+            (children, index) => index === children.length - 1 && ordinary(children[index - 1])
+        ),
+    "bin.demoted.afterBin": (subject) =>
+        demoted(
+            subject,
+            /[+*][+*-]/g,
+            tail,
+            (children, index) =>
+                kernOf(children[index - 1], MEDIUM) &&
+                glyphIn(children[index - 2], binCp) &&
+                ordinary(children[index + 1])
+        ),
+    "bin.demoted.afterRel": (subject) =>
+        demoted(
+            subject,
+            /[=<>:][+*-]/g,
+            tail,
+            (children, index) => kernOf(children[index - 1], THICK) && glyphIn(children[index - 2], relCp)
+        ),
+    "bin.demoted.afterOpen": (subject) =>
+        demoted(
+            subject,
+            /[([][+*-]/g,
+            tail,
+            (children, index) => glyphIn(children[index - 1], openCp) && ordinary(children[index + 1])
+        ),
+    "bin.demoted.afterPunct": (subject) =>
+        demoted(
+            subject,
+            /[,;] ?[+*-]/g,
+            tail,
+            (children, index) => kernOf(children[index - 1], THIN) && glyphIn(children[index - 2], punctCp)
+        ),
+    "bin.demoted.beforeRel": (subject) =>
+        demoted(
+            subject,
+            /[+*-][=<>:]/g,
+            head,
+            (children, index) =>
+                ordinary(children[index - 1]) &&
+                kernOf(children[index + 1], THICK) &&
+                glyphIn(children[index + 2], relCp)
+        ),
+    "bin.demoted.beforeClose": (subject) =>
+        demoted(
+            subject,
+            /[+*-][)\]]/g,
+            head,
+            (children, index) => ordinary(children[index - 1]) && glyphIn(children[index + 1], closeCp)
+        ),
+    "bin.demoted.beforePunct": (subject) =>
+        demoted(
+            subject,
+            /[+*-][,;]/g,
+            head,
+            (children, index) => ordinary(children[index - 1]) && glyphIn(children[index + 1], punctCp)
+        ),
     "measure.zero": ({ tree }) => /=0\.0pt/.test(tree),
     "measure.negative": ({ tree }) => /=-/.test(tree),
     "input.empty": ({ bytes }) => bytes !== undefined && bytes.length === 0,

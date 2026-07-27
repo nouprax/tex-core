@@ -97,6 +97,10 @@ int main(void) {
     txc_sweep(&test, "x", TEX_CORE_MODE_MATH_INLINE);
     txc_sweep(&test, "abc \\quad xyz \\, tail", TEX_CORE_MODE_DOCUMENT);
     txc_sweep(&test, "The quick brown fox jumps over the lazy dog 0123456789.", TEX_CORE_MODE_DOCUMENT);
+    /* Classed math atoms, symbol commands, and inter-atom spacing kerns
+     * allocate in parse and layout; sweep both math modes over them. */
+    txc_sweep(&test, "\\alpha+(\\beta-1)=\\gamma, x", TEX_CORE_MODE_MATH_DISPLAY);
+    txc_sweep(&test, "a\\,+b\\;=c", TEX_CORE_MODE_MATH_INLINE);
     txc_allocation_limit(-1);
     return txc_test_finish(&test, "allocfail");
 }

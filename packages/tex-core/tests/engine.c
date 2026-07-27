@@ -223,6 +223,200 @@ static void txc_test_whitespace(txc_test *test) {
     tex_core_render_tree_free(tree);
 }
 
+/* Inter-atom spacing amounts in scaled points at the 10pt em: thin 10923,
+ * medium 14564, thick 18204 in 16.16 em units — the same values as the
+ * explicit \, \: \; commands. */
+#define TXC_POINTS_THIN (109230.0 / 65536.0)
+#define TXC_POINTS_MEDIUM (145640.0 / 65536.0)
+#define TXC_POINTS_THICK (182040.0 / 65536.0)
+
+static void
+txc_check_kern_at(txc_test *test, const tex_core_node *root, size_t index, double width, const char *label) {
+    const tex_core_node *kern = tex_core_node_child(root, index);
+    txc_check(test, tex_core_node_get_kind(kern) == TEX_CORE_NODE_KERN, "%s: child %zu is a kern", label, index);
+    txc_check(test, tex_core_node_frame(kern).width == width, "%s: kern width at child %zu", label, index);
+}
+
+static void txc_test_math_classes(txc_test *test) {
+    /* Bin atoms take medium spacing against ordinaries; Rel atoms thick. */
+    tex_core_render_tree *tree = txc_compile(test, "a+b", TEX_CORE_MODE_MATH_INLINE, "math a+b");
+    const tex_core_node *root = tex_core_render_tree_root(tree);
+    txc_check_size(test, tex_core_node_child_count(root), 5, "a+b children");
+    txc_check_kern_at(test, root, 1, TXC_POINTS_MEDIUM, "a+b");
+    txc_check_kern_at(test, root, 3, TXC_POINTS_MEDIUM, "a+b");
+    const tex_core_node *plus = tex_core_node_child(root, 2);
+    txc_check_int(test, (long long)tex_core_node_glyph(plus).codepoint, 0x2B, "plus keeps its codepoint");
+    txc_check_int(test, tex_core_node_glyph(plus).style, TEX_CORE_STYLE_UPRIGHT, "math characters are upright");
+    /* The inter-atom kern's source range is the gap between the atoms —
+     * empty for adjacent atoms. */
+    tex_core_range gap = tex_core_node_range(tex_core_node_child(root, 1));
+    txc_check_size(test, gap.begin, 1, "inter-atom kern range begin");
+    txc_check_size(test, gap.end, 1, "inter-atom kern range end");
+    tex_core_render_tree_free(tree);
+
+    tree = txc_compile(test, "a=b", TEX_CORE_MODE_MATH_INLINE, "math a=b");
+    root = tex_core_render_tree_root(tree);
+    txc_check_size(test, tex_core_node_child_count(root), 5, "a=b children");
+    txc_check_kern_at(test, root, 1, TXC_POINTS_THICK, "a=b");
+    txc_check_kern_at(test, root, 3, TXC_POINTS_THICK, "a=b");
+    tex_core_render_tree_free(tree);
+
+    /* Punct spaces only to its right (Ord-Punct 0, Punct-Ord thin). */
+    tree = txc_compile(test, "a,b", TEX_CORE_MODE_MATH_INLINE, "math a,b");
+    root = tex_core_render_tree_root(tree);
+    txc_check_size(test, tex_core_node_child_count(root), 4, "a,b children");
+    txc_check_kern_at(test, root, 2, TXC_POINTS_THIN, "a,b");
+    tex_core_render_tree_free(tree);
+
+    /* The colon character is a relation; \colon is punctuation. */
+    tree = txc_compile(test, "a:b", TEX_CORE_MODE_MATH_INLINE, "math a:b");
+    root = tex_core_render_tree_root(tree);
+    txc_check_size(test, tex_core_node_child_count(root), 5, "a:b children");
+    txc_check_kern_at(test, root, 1, TXC_POINTS_THICK, "a:b");
+    tex_core_render_tree_free(tree);
+    tree = txc_compile(test, "a\\colon b", TEX_CORE_MODE_MATH_INLINE, "math a colon b");
+    root = tex_core_render_tree_root(tree);
+    txc_check_size(test, tex_core_node_child_count(root), 4, "a colon b children");
+    txc_check_int(
+        test,
+        (long long)tex_core_node_glyph(tex_core_node_child(root, 1)).codepoint,
+        0x3A,
+        "\\colon renders the colon"
+    );
+    txc_check_kern_at(test, root, 2, TXC_POINTS_THIN, "a colon b");
+    tex_core_render_tree_free(tree);
+
+    /* Remapped math characters render the plain TeX glyphs. */
+    static const struct {
+        const char *source;
+        uint32_t codepoint;
+    } remapped[] = {{"-", 0x2212}, {"*", 0x2217}, {"|", 0x2223}};
+    for (size_t index = 0; index < sizeof(remapped) / sizeof(remapped[0]); index++) {
+        tree = txc_compile(test, remapped[index].source, TEX_CORE_MODE_MATH_INLINE, remapped[index].source);
+        root = tex_core_render_tree_root(tree);
+        txc_check(
+            test,
+            tex_core_node_glyph(tex_core_node_child(root, 0)).codepoint == remapped[index].codepoint,
+            "remapped codepoint for %s",
+            remapped[index].source
+        );
+        tex_core_render_tree_free(tree);
+    }
+
+    /* Document mode has no atom classes: the comma stays a plain ordinary
+     * and no spacing is inserted. */
+    tree = txc_compile(test, "a,b", TEX_CORE_MODE_DOCUMENT, "document a,b");
+    root = tex_core_render_tree_root(tree);
+    txc_check_size(test, tex_core_node_child_count(root), 3, "document a,b children");
+    tex_core_render_tree_free(tree);
+}
+
+static void txc_test_bin_context(txc_test *test) {
+    /* A leading Bin is an ordinary atom (TeXbook chapter 18). */
+    tex_core_render_tree *tree = txc_compile(test, "-a", TEX_CORE_MODE_MATH_INLINE, "math -a");
+    const tex_core_node *root = tex_core_render_tree_root(tree);
+    txc_check_size(test, tex_core_node_child_count(root), 2, "-a has no spacing");
+    tex_core_render_tree_free(tree);
+
+    /* A Bin after a Bin demotes; the surviving Bin still spaces. */
+    tree = txc_compile(test, "a+-b", TEX_CORE_MODE_MATH_INLINE, "math a+-b");
+    root = tex_core_render_tree_root(tree);
+    txc_check_size(test, tex_core_node_child_count(root), 6, "a+-b children");
+    txc_check_kern_at(test, root, 1, TXC_POINTS_MEDIUM, "a+-b");
+    txc_check_kern_at(test, root, 3, TXC_POINTS_MEDIUM, "a+-b");
+    tex_core_render_tree_free(tree);
+
+    /* A Bin before a Rel demotes retroactively. */
+    tree = txc_compile(test, "a-=b", TEX_CORE_MODE_MATH_INLINE, "math a-=b");
+    root = tex_core_render_tree_root(tree);
+    txc_check_size(test, tex_core_node_child_count(root), 6, "a-=b children");
+    txc_check_int(
+        test,
+        tex_core_node_get_kind(tex_core_node_child(root, 1)),
+        TEX_CORE_NODE_GLYPH,
+        "demoted minus binds tight to its left"
+    );
+    txc_check_kern_at(test, root, 2, TXC_POINTS_THICK, "a-=b");
+    tex_core_render_tree_free(tree);
+
+    /* Bins demote after Open and before Close; a trailing Bin demotes. */
+    tree = txc_compile(test, "(-a-)", TEX_CORE_MODE_MATH_INLINE, "math (-a-)");
+    root = tex_core_render_tree_root(tree);
+    txc_check_size(test, tex_core_node_child_count(root), 5, "(-a-) has no spacing");
+    tex_core_render_tree_free(tree);
+    tree = txc_compile(test, "a-", TEX_CORE_MODE_MATH_INLINE, "math a-");
+    root = tex_core_render_tree_root(tree);
+    txc_check_size(test, tex_core_node_child_count(root), 2, "a- has no spacing");
+    tex_core_render_tree_free(tree);
+
+    /* Explicit spacing neither suppresses the inter-atom space nor changes
+     * demotion: both kerns appear, explicit first. */
+    tree = txc_compile(test, "a\\,+b", TEX_CORE_MODE_MATH_INLINE, "math a thin +b");
+    root = tex_core_render_tree_root(tree);
+    txc_check_size(test, tex_core_node_child_count(root), 6, "a thin +b children");
+    txc_check_kern_at(test, root, 1, TXC_POINTS_THIN, "a thin +b explicit");
+    txc_check_kern_at(test, root, 2, TXC_POINTS_MEDIUM, "a thin +b inter-atom");
+    tex_core_render_tree_free(tree);
+}
+
+static void txc_test_symbol_commands(txc_test *test) {
+    /* Lowercase Greek takes the math italic face; uppercase stays upright. */
+    tex_core_render_tree *tree = txc_compile(test, "\\alpha", TEX_CORE_MODE_MATH_INLINE, "alpha");
+    const tex_core_node *glyph = tex_core_node_child(tex_core_render_tree_root(tree), 0);
+    txc_check_int(test, (long long)tex_core_node_glyph(glyph).codepoint, 0x3B1, "alpha codepoint");
+    txc_check_int(test, tex_core_node_glyph(glyph).style, TEX_CORE_STYLE_ITALIC, "alpha is italic");
+    tex_core_render_tree_free(tree);
+    tree = txc_compile(test, "\\Gamma", TEX_CORE_MODE_MATH_INLINE, "Gamma");
+    glyph = tex_core_node_child(tex_core_render_tree_root(tree), 0);
+    txc_check_int(test, (long long)tex_core_node_glyph(glyph).codepoint, 0x393, "Gamma codepoint");
+    txc_check_int(test, tex_core_node_glyph(glyph).style, TEX_CORE_STYLE_UPRIGHT, "Gamma is upright");
+    tex_core_render_tree_free(tree);
+
+    /* Symbol commands carry their class into spacing. */
+    tree = txc_compile(test, "a\\leq b", TEX_CORE_MODE_MATH_DISPLAY, "a leq b");
+    const tex_core_node *root = tex_core_render_tree_root(tree);
+    txc_check_size(test, tex_core_node_child_count(root), 5, "a leq b children");
+    txc_check_kern_at(test, root, 1, TXC_POINTS_THICK, "a leq b");
+    txc_check_kern_at(test, root, 3, TXC_POINTS_THICK, "a leq b");
+    tex_core_render_tree_free(tree);
+
+    /* Aliases resolve to the same glyph and class. */
+    static const struct {
+        const char *alias;
+        uint32_t codepoint;
+    } aliases[] = {{"\\le", 0x2264}, {"\\to", 0x2192}, {"\\gets", 0x2190}, {"\\lnot", 0xAC}, {"\\owns", 0x220B}};
+    for (size_t index = 0; index < sizeof(aliases) / sizeof(aliases[0]); index++) {
+        tree = txc_compile(test, aliases[index].alias, TEX_CORE_MODE_MATH_INLINE, aliases[index].alias);
+        glyph = tex_core_node_child(tex_core_render_tree_root(tree), 0);
+        txc_check(
+            test,
+            tex_core_node_glyph(glyph).codepoint == aliases[index].codepoint,
+            "alias codepoint for %s",
+            aliases[index].alias
+        );
+        tex_core_render_tree_free(tree);
+    }
+
+    /* Control-symbol delimiters reach the brace glyphs the bare reserved
+     * characters reject. */
+    tree = txc_compile(test, "\\{x\\}", TEX_CORE_MODE_MATH_INLINE, "braces");
+    root = tex_core_render_tree_root(tree);
+    txc_check_size(test, tex_core_node_child_count(root), 3, "braces children");
+    txc_check_int(
+        test,
+        (long long)tex_core_node_glyph(tex_core_node_child(root, 0)).codepoint,
+        0x7B,
+        "left brace codepoint"
+    );
+    txc_check_int(
+        test,
+        (long long)tex_core_node_glyph(tex_core_node_child(root, 2)).codepoint,
+        0x7D,
+        "right brace codepoint"
+    );
+    tex_core_render_tree_free(tree);
+}
+
 int main(void) {
     txc_test test = {0, 0};
     txc_test_math_glyph(&test);
@@ -231,5 +425,8 @@ int main(void) {
     txc_test_italic_correction(&test);
     txc_test_spacing(&test);
     txc_test_whitespace(&test);
+    txc_test_math_classes(&test);
+    txc_test_bin_context(&test);
+    txc_test_symbol_commands(&test);
     return txc_test_finish(&test, "engine");
 }
