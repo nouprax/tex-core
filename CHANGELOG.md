@@ -8,8 +8,10 @@ not promised to remain compatible between releases.
 
 - Pin the linear-history merge policy in `bootstrap-repository.sh` and
   the template's embedded copy: squash is the only allowed merge method,
-  squash commits take the pull request's title (`… (#N)`) and
-  description, and the main ruleset recipe now carries the merge queue
+  squash commits default to the pull request's title (`… (#N)`) and
+  description — merge-queue commits apply the default mechanically, a
+  direct merge can still edit it — and the main ruleset recipe carries
+  the merge queue
   (squash method, ALLGREEN grouping) and the standing admin bypass, each
   behind a variable — so a bootstrap re-run reproduces the live control
   plane instead of stripping it.
