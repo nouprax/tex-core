@@ -9,7 +9,7 @@ is the product-only manifest staged into the release source archive
 from it).
 
 - `Sources/TexCore` — the immutable `Sendable` value tree (`RenderTree`,
-  `HBox`/`Glyph`/`Kern`, `RenderVisitor`), `Document.compile` over the
+  `HBox`/`Glyph`/`Kern`/`Rule`, `RenderVisitor`), `Document.compile` over the
   three input modes, the structured `CompileError`, and the canonical
   dumper. Trees are detached values: no C pointer or lifetime survives
   `compile`.
