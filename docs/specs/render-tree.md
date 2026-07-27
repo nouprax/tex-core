@@ -1,8 +1,8 @@
 # Render-tree contract
 
-Status: schemaVersion 2 (milestone M1 scripts change-set: nested boxes,
-positioned `hbox`, script sizes); schemaVersion 1 was frozen with Phase 3
-on 2026-07-20.
+Status: schemaVersion 3 (milestone M1 fractions change-set: the `rule`
+node kind and generalized fractions); schemaVersion 2 (scripts change-set)
+landed 2026-07-27; schemaVersion 1 was frozen with Phase 3 on 2026-07-20.
 
 This document is the language-neutral public render-tree contract implemented
 by the C engine and, as they land, the Swift, Kotlin, and ES bindings
@@ -58,9 +58,10 @@ in the source-range section.
 
 | Kind | Fields in canonical order | Semantics and invariants |
 | --- | --- | --- |
-| `hbox` | `x: measure`, `y: measure`, `width: measure`, `ascent: measure`, `descent: measure`, `src: range`, `children: [node]` | horizontal box: the compile root, a braced group's nucleus, or a script box; `x`/`y` place its reference point in its parent (the root sits at the origin), a script box's `y` is its baseline shift; `width` is the advance of its content — plus TeX's `\scriptspace` (0.5 pt) on a script box — `ascent`/`descent` the maxima over children floored at zero; the root box spans the whole input |
+| `hbox` | `x: measure`, `y: measure`, `width: measure`, `ascent: measure`, `descent: measure`, `src: range`, `children: [node]` | horizontal box: the compile root, a braced group's nucleus, a script box, a fraction atom's box, or a numerator/denominator box; `x`/`y` place its reference point in its parent (the root sits at the origin), a script, numerator, or denominator box's `y` is its baseline shift; `width` is the advance of its content — plus TeX's `\scriptspace` (0.5 pt) on a script box — `ascent`/`descent` the maxima over children floored at zero; the root box spans the whole input |
 | `glyph` | `x: measure`, `y: measure`, `cp: codepoint`, `style: style`, `family: family`, `size: measure`, `width: measure`, `ascent: measure`, `descent: measure`, `italic: measure`, `src: range` | leaf; one glyph named by Unicode codepoint + style + family + size, never a private glyph ID; `italic` is the italic correction, included in the advance of a math Ord glyph unless its atom carries a subscript — the correction then offsets the superscript box instead, exactly as TeX |
-| `kern` | `x: measure`, `width: measure`, `src: range` | leaf; fixed horizontal advance; `width` may be negative; the engine resolves interword spacing, explicit spacing commands, and math inter-atom spacing to kerns (glue arrives with stretch/shrink later, as a schema change) |
+| `kern` | `x: measure`, `width: measure`, `src: range` | leaf; fixed horizontal advance; `width` may be negative; the engine resolves interword spacing, explicit spacing commands, math inter-atom spacing, and the null-delimiter spaces flanking a fraction to kerns (glue arrives with stretch/shrink later, as a schema change) |
+| `rule` | `x: measure`, `y: measure`, `width: measure`, `ascent: measure`, `descent: measure`, `src: range` | leaf; a solid rectangle: its reference point sits at its left edge on the parent's baseline shifted by `y`, and the ink extends `ascent` up, `descent` down, and `width` right from there; today produced only as the fraction bar (`ascent` is the rule thickness, `descent` is zero, and `src` is the fraction command's own token) |
 
 Field types:
 
@@ -116,12 +117,47 @@ The script grammar is TeX's: `^`/`_` attach to the preceding atom, a
 script with nothing to attach to gets an empty-nucleus Ord atom of its
 own, a repeated script on one atom is the structured error
 `double superscript`/`double subscript`, a script mark without a legal
-argument (a character, symbol command, or group) is
+argument (a character, symbol command, fraction command, or group) is
 `missing superscript argument`/`missing subscript argument`, an
 unterminated group is `unclosed group`, a stray `}` is
 `unmatched closing brace`, and `{` nesting deeper than 255 groups is
 `group nesting too deep`. Document mode keeps rejecting `{ } ^ _` as
 unsupported characters until the M3 text surface.
+
+## Fractions
+
+`\frac`, `\dfrac`, and `\tfrac` are math-mode commands taking exactly two
+arguments — numerator, then denominator. An argument is a single math
+character, a symbol command, or a braced group; anything else where an
+argument is required (including a bare fraction command, a script mark, or
+end of input) is the structured error `missing numerator argument`/
+`missing denominator argument`, locating the offending token — or the
+fraction command itself at end of input. A fraction command is also a
+legal script argument (`x^\frac{1}{2}`), filling the script field the way
+a group does.
+
+A fraction is one Inner atom for spacing and Bin demotion, and scripts
+attach to it like to any box nucleus. Layout is TeXbook Appendix G rule 15
+(tex.web's `make_fraction`): `\frac` is set in the surrounding style
+(cramping included), `\dfrac` forces display style and `\tfrac` text style
+exactly as `\displaystyle`/`\textstyle`; the numerator is set one step
+smaller (`num_style`), the denominator one step smaller and cramped
+(`denom_style`). The numerator shifts up `num1` (display) or `num2`
+(other styles), the denominator down `denom1`/`denom2`, and each shift
+grows until the gap to the bar reaches three rule thicknesses in display
+style, one otherwise. The bar is a `rule` of the current size's
+`defaultRuleThickness`, vertically centered on the math axis
+(`axisHeight`) with its top `half(thickness)` above it, rounding up; all
+parameters resolve at the fraction's own style size, so a fraction inside
+a script uses the script columns. Both boxes are TeX's `clean_box` over
+the field; the narrower of the two centers over the wider one, its inset
+`half(excess)` rounding up. TeX's null delimiters flank the pair: one
+kern of `\nulldelimiterspace` (1.2 pt, absolute at every size) on each
+side, with an empty source range at the construct's edge. The fraction
+box's `width` is the common numerator/denominator width plus the two
+kerns; its `ascent`/`descent` are the shifted numerator top and
+denominator bottom. Child order is source order: left kern, `rule` (its
+`src` is the command token), numerator box, denominator box, right kern.
 
 ## Source ranges
 
@@ -156,9 +192,10 @@ and is pinned by the corpus error cases in the corpus error-record form
 
 ## Versioning and change protocol
 
-The schema carries `schemaVersion` 2, printed in the dump schema line and
-frozen in the manifest; version 2 added `x`/`y` to `hbox`, nested boxes,
-and per-glyph script sizes. Any intentional change to grammar, layout, metrics,
+The schema carries `schemaVersion` 3, printed in the dump schema line and
+frozen in the manifest; version 3 added the `rule` node kind and
+fractions, version 2 added `x`/`y` to `hbox`, nested boxes, and per-glyph
+script sizes. Any intentional change to grammar, layout, metrics,
 schema, or dump — including widening `style`/`family`, adding node kinds or
 fields, or resolving glue — is a public behavior change under plan §5.5:
 one reviewed commit updates this contract, the engine, all shipped

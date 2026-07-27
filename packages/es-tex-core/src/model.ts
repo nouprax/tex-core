@@ -70,6 +70,28 @@ export interface Glyph {
     readonly src: SourceRange;
 }
 
+/**
+ * A leaf rule: a solid rectangle. Its reference point sits at its left
+ * edge on the parent's baseline shifted by `y`; the ink extends `ascent`
+ * up, `descent` down, and `width` right. Today produced only as the
+ * fraction bar.
+ */
+export interface Rule {
+    readonly kind: "rule";
+    /** Horizontal offset of the reference point from the parent's, in points. */
+    readonly x: number;
+    /** Vertical offset from the parent baseline, positive upward, in points. */
+    readonly y: number;
+    /** The ink width in points. */
+    readonly width: number;
+    /** Ink extent above the reference point in points. */
+    readonly ascent: number;
+    /** Ink extent below the reference point in points. */
+    readonly descent: number;
+    /** The source bytes this rule was compiled from. */
+    readonly src: SourceRange;
+}
+
 /** A leaf kern: a fixed horizontal advance. `width` may be negative. */
 export interface Kern {
     readonly kind: "kern";
@@ -86,10 +108,10 @@ export interface Kern {
  * node kinds, discriminated by `kind`, so `switch` statements over a node
  * are exhaustive by construction.
  */
-export type RenderNode = HBox | Glyph | Kern;
+export type RenderNode = HBox | Glyph | Kern | Rule;
 
 /**
- * An immutable compiled document: the render tree of schema version 2.
+ * An immutable compiled document: the render tree of schema version 3.
  *
  * Trees are plain frozen values — structurally comparable and detached from
  * the WASM engine the moment `Document.compile` returns.

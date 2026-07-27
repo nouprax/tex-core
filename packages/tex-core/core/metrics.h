@@ -39,7 +39,12 @@ typedef enum txc_parameter {
     TXC_PARAMETER_SUP_DROP = 7,
     TXC_PARAMETER_SUB_DROP = 8,
     TXC_PARAMETER_RULE_THICKNESS = 9,
-    TXC_PARAMETER_COUNT = 10
+    TXC_PARAMETER_NUM1 = 10,
+    TXC_PARAMETER_NUM2 = 11,
+    TXC_PARAMETER_DENOM1 = 12,
+    TXC_PARAMETER_DENOM2 = 13,
+    TXC_PARAMETER_AXIS_HEIGHT = 14,
+    TXC_PARAMETER_COUNT = 15
 } txc_parameter;
 
 /* Returns the metrics for a codepoint in a face style, or NULL when the

@@ -24,8 +24,9 @@
  * spacing commands; the math modes add the classed math characters
  * (+ - * / = < > ( ) [ ] , ; : ! ? |), the M1 symbol commands (Greek
  * letters, binary operators, relations, arrows, letter-like and delimiter
- * symbols), braced groups, and superscripts/subscripts set at TeX's script
- * sizes, laid out with TeX's inter-atom spacing. The full self-contained
+ * symbols), braced groups, superscripts/subscripts set at TeX's script
+ * sizes, and fractions (\frac, \dfrac, \tfrac), laid out with TeX's
+ * inter-atom spacing. The full self-contained
  * LaTeX surface arrives with the 1.0.0 milestones; every extension of the
  * surface is a reviewed public-behavior change.
  */
@@ -114,7 +115,8 @@ typedef enum tex_core_node_kind {
     TEX_CORE_NODE_NONE = 0,
     TEX_CORE_NODE_HBOX = 1,
     TEX_CORE_NODE_GLYPH = 2,
-    TEX_CORE_NODE_KERN = 3
+    TEX_CORE_NODE_KERN = 3,
+    TEX_CORE_NODE_RULE = 4
 } tex_core_node_kind;
 
 typedef enum tex_core_style { TEX_CORE_STYLE_UPRIGHT = 0, TEX_CORE_STYLE_ITALIC = 1 } tex_core_style;

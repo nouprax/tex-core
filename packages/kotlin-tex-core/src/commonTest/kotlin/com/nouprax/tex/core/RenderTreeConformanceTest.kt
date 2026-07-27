@@ -5,6 +5,7 @@ import com.nouprax.tex.core.model.CompileStatus
 import com.nouprax.tex.core.model.Glyph
 import com.nouprax.tex.core.model.HBox
 import com.nouprax.tex.core.model.Kern
+import com.nouprax.tex.core.model.Rule
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -53,10 +54,11 @@ class RenderTreeConformanceTest {
                         is HBox -> "hbox"
                         is Glyph -> "glyph"
                         is Kern -> "kern"
+                        is Rule -> "rule"
                     }
             }
         }
-        assertEquals(setOf("hbox", "glyph", "kern"), kinds)
+        assertEquals(setOf("hbox", "glyph", "kern", "rule"), kinds)
     }
 
     private fun errorRecord(failure: CompileException): String {
@@ -68,6 +70,6 @@ class RenderTreeConformanceTest {
                 CompileStatus.ALLOCATION_FAILED -> "allocation-failed"
             }
         val src = failure.range?.let { "${it.begin}..${it.end}" } ?: "none"
-        return "render-error 2\nerror status=$status src=$src message=${failure.errorMessage}\n"
+        return "render-error 3\nerror status=$status src=$src message=${failure.errorMessage}\n"
     }
 }

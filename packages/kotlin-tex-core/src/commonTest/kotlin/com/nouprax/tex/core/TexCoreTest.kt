@@ -10,6 +10,7 @@ import com.nouprax.tex.core.model.GlyphStyle
 import com.nouprax.tex.core.model.HBox
 import com.nouprax.tex.core.model.Kern
 import com.nouprax.tex.core.model.RenderNode
+import com.nouprax.tex.core.model.Rule
 import com.nouprax.tex.core.model.SourceRange
 import com.nouprax.tex.core.walker.RenderVisitor
 import kotlin.test.Test
@@ -52,7 +53,7 @@ class TexCoreTest {
     fun dumpIsCanonicalAndDeterministic() {
         val tree = Document.compile("")
         assertEquals(
-            "render-tree 2\nhbox x=0.0pt y=0.0pt width=0.0pt ascent=0.0pt descent=0.0pt src=0..0\n",
+            "render-tree 3\nhbox x=0.0pt y=0.0pt width=0.0pt ascent=0.0pt descent=0.0pt src=0..0\n",
             tree.dump(),
         )
         assertEquals(tree.dump(), tree.dump())
@@ -62,11 +63,11 @@ class TexCoreTest {
     fun unsupportedInputThrowsStructuredError() {
         val failure =
             assertFailsWith<CompileException> {
-                Document.compile("\\frac x y", CompileOptions(CompileMode.MATH_INLINE))
+                Document.compile("\\sqrt x", CompileOptions(CompileMode.MATH_INLINE))
             }
         assertEquals(CompileStatus.UNSUPPORTED, failure.status)
         assertEquals(SourceRange(0, 5), failure.range)
-        assertEquals("unsupported command \\frac", failure.errorMessage)
+        assertEquals("unsupported command \\sqrt", failure.errorMessage)
     }
 
     @Test
@@ -98,6 +99,13 @@ class TexCoreTest {
         assertEquals(1, counter.boxes)
         assertEquals(2, counter.glyphs)
         assertEquals(1, counter.kerns)
+        assertEquals(0, counter.rules)
+
+        val fraction = Document.compile("\\frac{1}{2}", CompileOptions(mode = CompileMode.MATH_INLINE))
+        val fractionCounter = KindCounter()
+        fraction.root.accept(fractionCounter)
+        assertEquals(1, fractionCounter.rules)
+        assertEquals(2, fractionCounter.kerns)
     }
 
     @Test
@@ -113,6 +121,7 @@ private class KindCounter : RenderVisitor<Unit> {
     var boxes = 0
     var glyphs = 0
     var kerns = 0
+    var rules = 0
 
     override fun visit(node: HBox) {
         boxes += 1
@@ -127,6 +136,10 @@ private class KindCounter : RenderVisitor<Unit> {
 
     override fun visit(node: Kern) {
         kerns += 1
+    }
+
+    override fun visit(node: Rule) {
+        rules += 1
     }
 }
 
