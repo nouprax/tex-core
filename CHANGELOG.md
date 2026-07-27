@@ -6,7 +6,28 @@ not promised to remain compatible between releases.
 
 ## Unreleased
 
-- Begin milestone M1 (math core): math-mode atoms now carry TeX's classes
+- Continue milestone M1 (math core) with superscripts, subscripts, and
+  braced groups, moving the render-tree contract to schemaVersion 2:
+  `hbox` gains `x`/`y` and nests (a braced group is one Ord atom boxed in
+  the surrounding style; script boxes carry their baseline shift in `y`),
+  and glyphs carry the em they were set at (10 pt text, 7 pt script, 5 pt
+  scriptscript). Script geometry follows TeXbook Appendix G rule 18 over a
+  vendored KaTeX sigmasAndXis subset (sup1-3, sub1-2, supDrop/subDrop,
+  x-height clearances, the four-rule-thickness clash fixup), with TeX's
+  clean_box simplification, `\scriptspace` padding, and the italic
+  correction withheld from a subscripted nucleus and offsetting the
+  superscript instead. Inter-atom and mu-based explicit spacing now
+  resolve against the current size's quad and honor TeX's
+  conditionality — medium, thick, and conditional thin pairs vanish
+  inside script styles. The script grammar errors are structured and
+  pinned (`double superscript`/`double subscript`, `missing … argument`,
+  `unclosed group`, `unmatched closing brace`, `group nesting too deep`
+  past 255 groups); document mode keeps rejecting `{ } ^ _`. The shared
+  corpus grows to 36 cases (nine script/group trees, six new error
+  records) with tree-witnessed coverage validators, and all four bindings
+  replay it byte-exactly — binding changes are limited to the `HBox`
+  value types, dumpers, and schema-line pins; the TXC1 wire format
+  already carried the new fields. math-mode atoms now carry TeX's classes
   (Ord, Bin, Rel, Open, Close, Punct), layout resolves contextual Bin
   atoms to Ord exactly as TeX's first mlist pass and inserts the
   TeXbook chapter-18 inter-atom spacing as kern nodes whose source range

@@ -1,11 +1,13 @@
 /* Parser: token stream to semantic list. The semantic lists are internal;
  * the public contract is the render tree only (plan section 5.2). The
- * grammar covers classed math atoms (characters and symbol commands) plus
- * explicit spacing; document mode still typesets ordinary text atoms only. */
+ * grammar covers classed math atoms (characters and symbol commands) with
+ * braced groups, superscripts, and subscripts, plus explicit spacing;
+ * document mode still typesets ordinary text atoms only. */
 
 #ifndef TXC_PARSE_H
 #define TXC_PARSE_H
 
+#include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
 
@@ -31,7 +33,7 @@ typedef enum txc_atom_class {
 } txc_atom_class;
 
 /* Explicit spacing amounts. WORD is the interword space; the math spaces
- * are the classic mu-based commands resolved against the fixed em. */
+ * are the classic mu-based commands resolved against the style's quad. */
 typedef enum txc_space {
     TXC_SPACE_WORD = 0,
     TXC_SPACE_THIN = 1,
@@ -42,24 +44,49 @@ typedef enum txc_space {
     TXC_SPACE_QQUAD = 6
 } txc_space;
 
+struct txc_item;
+
+typedef struct txc_list {
+    struct txc_item *head;
+    struct txc_item *tail;
+    size_t count;
+} txc_list;
+
+/* One noad field (TeXbook chapter 17): an atom's nucleus, superscript, or
+ * subscript is empty, a single character, or a braced sub-list. */
+typedef enum txc_field_kind { TXC_FIELD_EMPTY = 0, TXC_FIELD_CHAR = 1, TXC_FIELD_LIST = 2 } txc_field_kind;
+
+typedef struct txc_field {
+    txc_field_kind kind;
+    /* TXC_FIELD_CHAR only. */
+    uint32_t codepoint;
+    tex_core_style style;
+    /* TXC_FIELD_LIST only. */
+    txc_list list;
+    /* The field's own source construct: the character or symbol command,
+     * the braced group including its braces, or — for a script field —
+     * the script mark through the end of its argument. Empty fields have
+     * an empty range at the attachment point. */
+    tex_core_range range;
+} txc_field;
+
 typedef struct txc_item {
     txc_item_kind kind;
     /* TXC_ITEM_ATOM only. Layout resolves contextual Bin demotion in
-     * place, so atom_class is final only once layout runs. */
-    uint32_t codepoint;
-    tex_core_style style;
+     * place, so atom_class is final only once layout runs. Scripts never
+     * change an atom's class. `sub_first` records which script appeared
+     * first in source, because child order is source order. */
     txc_atom_class atom_class;
+    txc_field nucleus;
+    txc_field sup;
+    txc_field sub;
+    bool sub_first;
     /* TXC_ITEM_SPACE only. */
     txc_space space;
+    /* The whole construct: nucleus through the last script. */
     tex_core_range range;
     struct txc_item *next;
 } txc_item;
-
-typedef struct txc_list {
-    txc_item *head;
-    txc_item *tail;
-    size_t count;
-} txc_list;
 
 /* Parses the whole source into `list`, allocating items from `arena`. */
 tex_core_status txc_parse(

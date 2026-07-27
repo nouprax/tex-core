@@ -114,6 +114,8 @@ class WireReader {
                 for (let index = 0; index < childCount; index += 1) children.push(this.node());
                 const box: HBox = Object.freeze({
                     kind: "hbox",
+                    x,
+                    y,
                     width,
                     ascent,
                     descent,

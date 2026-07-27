@@ -10,11 +10,12 @@
 
 typedef int32_t txc_scaled;
 
-/* The walking skeleton typesets at a fixed 10 pt em. */
+/* The text-size em: 10 pt. The script and scriptscript sizes (7 pt and
+ * 5 pt) are the layout module's TXC_MATHSIZE ems. */
 #define TXC_EM_SP 655360
 
-/* Scales a 16.16 fixed-point em fraction to scaled points at the em size. */
-txc_scaled txc_em(int32_t fraction);
+/* Scales a 16.16 fixed-point em fraction to scaled points at `em`. */
+txc_scaled txc_em(int32_t fraction, txc_scaled em);
 
 #define TXC_SCALED_FORMAT_CAPACITY 24
 

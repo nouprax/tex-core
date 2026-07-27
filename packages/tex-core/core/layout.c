@@ -3,13 +3,44 @@
 #include "error.h"
 #include "metrics.h"
 
-/* Explicit spacing amounts as 16.16 em fractions.
+/* TeX math styles (TeXbook chapter 17, tex.web section 688): 0 display,
+ * 2 text, 4 script, 6 scriptscript; odd values are the cramped variants.
+ * Style arithmetic follows tex.web section 702. */
+#define TXC_STYLE_DISPLAY 0
+#define TXC_STYLE_TEXT 2
+#define TXC_STYLE_SCRIPT 4
+
+static txc_mathsize txc_style_size(int style) {
+    if (style < TXC_STYLE_SCRIPT) {
+        return TXC_MATHSIZE_TEXT;
+    }
+    return style < 6 ? TXC_MATHSIZE_SCRIPT : TXC_MATHSIZE_SCRIPTSCRIPT;
+}
+
+static int txc_sup_style(int style) { return 2 * (style / 4) + TXC_STYLE_SCRIPT + (style % 2); }
+
+static int txc_sub_style(int style) { return 2 * (style / 4) + TXC_STYLE_SCRIPT + 1; }
+
+/* The em of each math size: 10 pt text, 7 pt script, 5 pt scriptscript. */
+static const txc_scaled TXC_MATHSIZE_EM[3] = {655360, 458752, 327680};
+
+/* TeX's \scriptspace: 0.5 pt of padding on every script box. */
+#define TXC_SCRIPT_SPACE 32768
+
+static txc_scaled txc_param(txc_parameter parameter, txc_mathsize size) {
+    return txc_em(txc_parameter_value(parameter, size), TXC_MATHSIZE_EM[size]);
+}
+
+/* Explicit spacing amounts as 16.16 fractions.
  *
  * The interword space is cmr10's fontdimen 2 (3.33333 pt at the 10 pt
  * design size); the engine resolves glue to its natural width, so stretch
  * and shrink do not appear yet. The math spaces are the classic mu amounts
- * (18 mu = 1 em): \, = 3 mu, \: = 4 mu, \; = 5 mu, \! = -3 mu, \quad = 1 em,
- * \qquad = 2 em. */
+ * (18 mu = 1 quad): \, = 3 mu, \: = 4 mu, \; = 5 mu, \! = -3 mu. Mu-based
+ * widths resolve against the current size's quad, exactly as TeX's cur_mu;
+ * \quad and \qquad are em-based (1 em and 2 em) and resolve against the
+ * text em, exactly as TeX's em unit in math mode, which measures the
+ * surrounding text font, not the script size. */
 #define TXC_SPACE_EM_WORD 21845
 #define TXC_SPACE_EM_THIN 10923
 #define TXC_SPACE_EM_MEDIUM 14564
@@ -17,52 +48,60 @@
 #define TXC_SPACE_EM_QUAD 65536
 #define TXC_SPACE_EM_QQUAD 131072
 
-static txc_scaled txc_space_width(txc_space space) {
+static txc_scaled txc_quad(txc_mathsize size) {
+    return txc_em(txc_parameter_value(TXC_PARAMETER_QUAD, size), TXC_MATHSIZE_EM[size]);
+}
+
+static txc_scaled txc_space_width(txc_space space, txc_mathsize size) {
     switch (space) {
     case TXC_SPACE_WORD:
-        return txc_em(TXC_SPACE_EM_WORD);
+        return txc_em(TXC_SPACE_EM_WORD, TXC_EM_SP);
     case TXC_SPACE_THIN:
-        return txc_em(TXC_SPACE_EM_THIN);
+        return txc_em(TXC_SPACE_EM_THIN, txc_quad(size));
     case TXC_SPACE_MEDIUM:
-        return txc_em(TXC_SPACE_EM_MEDIUM);
+        return txc_em(TXC_SPACE_EM_MEDIUM, txc_quad(size));
     case TXC_SPACE_THICK:
-        return txc_em(TXC_SPACE_EM_THICK);
+        return txc_em(TXC_SPACE_EM_THICK, txc_quad(size));
     case TXC_SPACE_NEGATIVE_THIN:
-        return -txc_em(TXC_SPACE_EM_THIN);
+        return -txc_em(TXC_SPACE_EM_THIN, txc_quad(size));
     case TXC_SPACE_QUAD:
-        return txc_em(TXC_SPACE_EM_QUAD);
+        return txc_em(TXC_SPACE_EM_QUAD, TXC_EM_SP);
     case TXC_SPACE_QQUAD:
-        return txc_em(TXC_SPACE_EM_QQUAD);
+        return txc_em(TXC_SPACE_EM_QQUAD, TXC_EM_SP);
     }
     return 0;
 }
 
-/* Inter-atom spacing (TeXbook chapter 18): 0 none, 1 thin, 2 medium,
- * 3 thick, indexed [left class][right class] in txc_atom_class order
- * Ord, Op, Bin, Rel, Open, Close, Punct, Inner. These are the display- and
- * text-style amounts; the pairs the TeXbook marks impossible (a Bin next
- * to anything txc_resolve_bin_atoms demotes it beside) are 0. Script
- * styles, which drop the medium and thick pairs and arrive with scripts,
- * are a later M1 increment. */
+/* Inter-atom spacing (TeXbook chapter 18, tex.web's math_spacing string),
+ * indexed [left class][right class] in txc_atom_class order Ord, Op, Bin,
+ * Rel, Open, Close, Punct, Inner. The digits carry TeX's conditionality:
+ * 0 none; 1 thin only in display and text styles; 2 thin in every style;
+ * 3 medium and 4 thick, both only in display and text styles. The pairs
+ * the TeXbook marks impossible (a Bin next to anything
+ * txc_resolve_bin_atoms demotes it beside) are 0. */
 static const uint8_t TXC_MATH_SPACING[8][8] = {
-    /* Ord   */ {0, 1, 2, 3, 0, 0, 0, 1},
-    /* Op    */ {1, 1, 0, 3, 0, 0, 0, 1},
-    /* Bin   */ {2, 2, 0, 0, 2, 0, 0, 2},
-    /* Rel   */ {3, 3, 0, 0, 3, 0, 0, 3},
+    /* Ord   */ {0, 2, 3, 4, 0, 0, 0, 1},
+    /* Op    */ {2, 2, 0, 4, 0, 0, 0, 1},
+    /* Bin   */ {3, 3, 0, 0, 3, 0, 0, 3},
+    /* Rel   */ {4, 4, 0, 0, 4, 0, 0, 4},
     /* Open  */ {0, 0, 0, 0, 0, 0, 0, 0},
-    /* Close */ {0, 1, 2, 3, 0, 0, 0, 1},
+    /* Close */ {0, 2, 3, 4, 0, 0, 0, 1},
     /* Punct */ {1, 1, 0, 1, 1, 1, 1, 1},
-    /* Inner */ {1, 1, 2, 3, 1, 0, 1, 1},
+    /* Inner */ {1, 2, 3, 4, 1, 0, 1, 1},
 };
 
-static txc_scaled txc_inter_atom_width(uint8_t amount) {
-    switch (amount) {
+static txc_scaled txc_inter_atom_width(uint8_t digit, int style) {
+    bool scripted = style >= TXC_STYLE_SCRIPT;
+    txc_mathsize size = txc_style_size(style);
+    switch (digit) {
     case 1:
-        return txc_em(TXC_SPACE_EM_THIN);
+        return scripted ? 0 : txc_em(TXC_SPACE_EM_THIN, txc_quad(size));
     case 2:
-        return txc_em(TXC_SPACE_EM_MEDIUM);
+        return txc_em(TXC_SPACE_EM_THIN, txc_quad(size));
     case 3:
-        return txc_em(TXC_SPACE_EM_THICK);
+        return scripted ? 0 : txc_em(TXC_SPACE_EM_MEDIUM, txc_quad(size));
+    case 4:
+        return scripted ? 0 : txc_em(TXC_SPACE_EM_THICK, txc_quad(size));
     default:
         return 0;
     }
@@ -78,7 +117,8 @@ static bool txc_bin_demoting(txc_atom_class atom_class) {
  * Ord when it opens the list or follows a Bin, Op, Rel, Open, or Punct
  * (using the previous atom's already-resolved class); a Bin directly
  * before a Rel, Close, or Punct becomes Ord retroactively; a trailing Bin
- * becomes Ord. Explicit spacing between atoms never affects demotion. */
+ * becomes Ord. Explicit spacing between atoms never affects demotion.
+ * Every sub-list resolves independently when its own layout runs. */
 static void txc_resolve_bin_atoms(const txc_list *list) {
     txc_item *previous = NULL;
     for (txc_item *item = list->head; item != NULL; item = item->next) {
@@ -103,21 +143,394 @@ static void txc_resolve_bin_atoms(const txc_list *list) {
     }
 }
 
-/* Counts the inter-atom spaces the resolved list needs, so the child array
- * can be allocated exactly. */
-static size_t txc_count_inter_atom_spaces(const txc_list *list) {
-    size_t count = 0;
+static tex_core_status txc_mlist(
+    txc_arena *arena,
+    const txc_list *list,
+    int style,
+    bool math,
+    tex_core_range range,
+    txc_node **out,
+    tex_core_error *error
+);
+
+static tex_core_status txc_alloc_fail(tex_core_error *error) {
+    return txc_fail(error, TEX_CORE_STATUS_ALLOCATION_FAILED, NULL, "allocation failed");
+}
+
+/* Builds the box for a script field, TeX's clean_box (tex.web sections
+ * 720-721): a character field boxes one glyph and — like clean_box's
+ * trivial-box simplification, which strips a lone italic-correction kern —
+ * takes the glyph's width without its italic correction; a list field
+ * lays out the sub-list at the script style and then applies the same
+ * simplification when it produced exactly one glyph. Every script box
+ * gains TeX's \scriptspace of width. */
+static tex_core_status
+txc_script_box(txc_arena *arena, const txc_field *field, int style, txc_node **out, tex_core_error *error) {
+    txc_node *box;
+    if (field->kind == TXC_FIELD_CHAR) {
+        const txc_metric *metric = txc_metric_find(field->style, field->codepoint);
+        if (metric == NULL) {
+            return txc_fail(
+                error,
+                TEX_CORE_STATUS_UNSUPPORTED,
+                &field->range,
+                "unsupported character U+%04X",
+                (unsigned)field->codepoint
+            );
+        }
+        txc_scaled em = TXC_MATHSIZE_EM[txc_style_size(style)];
+        box = txc_arena_alloc(arena, sizeof(txc_node));
+        const txc_node **children = txc_arena_alloc(arena, sizeof(*children));
+        txc_node *glyph = txc_arena_alloc(arena, sizeof(txc_node));
+        if (box == NULL || children == NULL || glyph == NULL) {
+            return txc_alloc_fail(error);
+        }
+        glyph->kind = TEX_CORE_NODE_GLYPH;
+        glyph->x = 0;
+        glyph->y = 0;
+        glyph->codepoint = field->codepoint;
+        glyph->style = field->style;
+        glyph->size = em;
+        glyph->width = txc_em(metric->width, em);
+        glyph->ascent = txc_em(metric->height, em);
+        glyph->descent = txc_em(metric->depth, em);
+        glyph->italic = txc_em(metric->italic, em);
+        glyph->range = field->range;
+        glyph->children = NULL;
+        glyph->child_count = 0;
+        children[0] = glyph;
+        box->kind = TEX_CORE_NODE_HBOX;
+        box->x = 0;
+        box->y = 0;
+        box->codepoint = 0;
+        box->style = TEX_CORE_STYLE_UPRIGHT;
+        box->size = 0;
+        box->width = glyph->width;
+        box->ascent = glyph->ascent > 0 ? glyph->ascent : 0;
+        box->descent = glyph->descent > 0 ? glyph->descent : 0;
+        box->italic = 0;
+        box->range = field->range;
+        box->children = children;
+        box->child_count = 1;
+    } else {
+        tex_core_status status = txc_mlist(arena, &field->list, style, true, field->range, &box, error);
+        if (status != TEX_CORE_STATUS_OK) {
+            return status;
+        }
+        if (box->child_count == 1 && box->children[0]->kind == TEX_CORE_NODE_GLYPH) {
+            box->width = box->children[0]->width;
+        }
+    }
+    box->width += TXC_SCRIPT_SPACE;
+    *out = box;
+    return TEX_CORE_STATUS_OK;
+}
+
+static txc_scaled txc_max(txc_scaled left, txc_scaled right) { return left > right ? left : right; }
+
+/* Nodes one atom contributes to its list: the nucleus rendering plus one
+ * box per script. Shared by the counting and building passes. */
+static size_t txc_atom_nodes(const txc_item *item) {
+    size_t count = item->nucleus.kind != TXC_FIELD_EMPTY ? 1 : 0;
+    count += item->sup.kind != TXC_FIELD_EMPTY ? 1 : 0;
+    count += item->sub.kind != TXC_FIELD_EMPTY ? 1 : 0;
+    return count;
+}
+
+/* Lays out one atom at `*cursor`, appending its nodes: the nucleus glyph
+ * or box, then the script boxes shifted per TeXbook Appendix G rule 18
+ * (tex.web's make_scripts, sections 756-759). The italic correction is in
+ * the advance of a char nucleus — and offsets the superscript — unless a
+ * subscript is present, which attaches flush and withholds it. */
+static tex_core_status txc_atom(
+    txc_arena *arena,
+    const txc_item *item,
+    int style,
+    txc_scaled *cursor,
+    const txc_node **children,
+    size_t *index,
+    tex_core_error *error
+) {
+    txc_mathsize size = txc_style_size(style);
+    txc_scaled em = TXC_MATHSIZE_EM[size];
+    txc_mathsize drop = style < TXC_STYLE_SCRIPT ? TXC_MATHSIZE_SCRIPT : TXC_MATHSIZE_SCRIPTSCRIPT;
+    bool has_sup = item->sup.kind != TXC_FIELD_EMPTY;
+    bool has_sub = item->sub.kind != TXC_FIELD_EMPTY;
+
+    txc_scaled nucleus_width = 0;
+    txc_scaled delta = 0;
+    txc_scaled shift_up = 0;
+    txc_scaled shift_down = 0;
+
+    if (item->nucleus.kind == TXC_FIELD_CHAR) {
+        const txc_metric *metric = txc_metric_find(item->nucleus.style, item->nucleus.codepoint);
+        if (metric == NULL) {
+            return txc_fail(
+                error,
+                TEX_CORE_STATUS_UNSUPPORTED,
+                &item->nucleus.range,
+                "unsupported character U+%04X",
+                (unsigned)item->nucleus.codepoint
+            );
+        }
+        txc_node *glyph = txc_arena_alloc(arena, sizeof(txc_node));
+        if (glyph == NULL) {
+            return txc_alloc_fail(error);
+        }
+        glyph->kind = TEX_CORE_NODE_GLYPH;
+        glyph->x = *cursor;
+        glyph->y = 0;
+        glyph->codepoint = item->nucleus.codepoint;
+        glyph->style = item->nucleus.style;
+        glyph->size = em;
+        glyph->width = txc_em(metric->width, em);
+        glyph->ascent = txc_em(metric->height, em);
+        glyph->descent = txc_em(metric->depth, em);
+        glyph->italic = txc_em(metric->italic, em);
+        glyph->range = item->nucleus.range;
+        glyph->children = NULL;
+        glyph->child_count = 0;
+        children[(*index)++] = glyph;
+        nucleus_width = glyph->width;
+        delta = glyph->italic;
+    } else if (item->nucleus.kind == TXC_FIELD_LIST) {
+        txc_node *box;
+        tex_core_status status = txc_mlist(arena, &item->nucleus.list, style, true, item->nucleus.range, &box, error);
+        if (status != TEX_CORE_STATUS_OK) {
+            return status;
+        }
+        box->x = *cursor;
+        box->y = 0;
+        children[(*index)++] = box;
+        nucleus_width = box->width;
+        shift_up = box->ascent - txc_param(TXC_PARAMETER_SUP_DROP, drop);
+        shift_down = box->descent + txc_param(TXC_PARAMETER_SUB_DROP, drop);
+    } else {
+        shift_up = -txc_param(TXC_PARAMETER_SUP_DROP, drop);
+        shift_down = txc_param(TXC_PARAMETER_SUB_DROP, drop);
+    }
+
+    if (!has_sup && !has_sub) {
+        *cursor += nucleus_width + delta;
+        return TEX_CORE_STATUS_OK;
+    }
+
+    txc_node *sup = NULL;
+    txc_node *sub = NULL;
+    if (has_sup) {
+        tex_core_status status = txc_script_box(arena, &item->sup, txc_sup_style(style), &sup, error);
+        if (status != TEX_CORE_STATUS_OK) {
+            return status;
+        }
+    }
+    if (has_sub) {
+        tex_core_status status = txc_script_box(arena, &item->sub, txc_sub_style(style), &sub, error);
+        if (status != TEX_CORE_STATUS_OK) {
+            return status;
+        }
+    }
+
+    txc_scaled x_height = txc_param(TXC_PARAMETER_X_HEIGHT, size);
+    if (has_sup) {
+        txc_parameter minimum = TXC_PARAMETER_SUP2;
+        if (style % 2 == 1) {
+            minimum = TXC_PARAMETER_SUP3;
+        } else if (style < TXC_STYLE_TEXT) {
+            minimum = TXC_PARAMETER_SUP1;
+        }
+        shift_up = txc_max(shift_up, txc_param(minimum, size));
+        shift_up = txc_max(shift_up, sup->descent + x_height / 4);
+    }
+    if (has_sub && !has_sup) {
+        shift_down = txc_max(shift_down, txc_param(TXC_PARAMETER_SUB1, size));
+        shift_down = txc_max(shift_down, sub->ascent - (x_height * 4) / 5);
+    } else if (has_sub) {
+        /* Both scripts: keep 4 rule thicknesses between them, then raise
+         * the pair so the superscript's bottom clears 4/5 of x-height. */
+        shift_down = txc_max(shift_down, txc_param(TXC_PARAMETER_SUB2, size));
+        txc_scaled thickness = txc_param(TXC_PARAMETER_RULE_THICKNESS, size);
+        txc_scaled clearance = 4 * thickness - ((shift_up - sup->descent) - (sub->ascent - shift_down));
+        if (clearance > 0) {
+            shift_down += clearance;
+            txc_scaled raise = (x_height * 4) / 5 - (shift_up - sup->descent);
+            if (raise > 0) {
+                shift_up += raise;
+                shift_down -= raise;
+            }
+        }
+    }
+
+    /* A char nucleus keeps its italic kern before a lone superscript
+     * (tex.web section 755: the kern is appended when the subscript is
+     * empty); with a subscript present the correction instead offsets the
+     * superscript to the right of the subscript. */
+    txc_scaled base = *cursor + nucleus_width;
+    txc_scaled advance;
+    if (has_sup && !has_sub) {
+        sup->x = base + delta;
+        sup->y = shift_up;
+        advance = nucleus_width + delta + sup->width;
+    } else if (has_sub && !has_sup) {
+        sub->x = base;
+        sub->y = -shift_down;
+        advance = nucleus_width + sub->width;
+    } else {
+        sup->x = base + delta;
+        sup->y = shift_up;
+        sub->x = base;
+        sub->y = -shift_down;
+        advance = nucleus_width + txc_max(delta + sup->width, sub->width);
+    }
+    if (item->sub_first) {
+        if (sub != NULL) {
+            children[(*index)++] = sub;
+        }
+        if (sup != NULL) {
+            children[(*index)++] = sup;
+        }
+    } else {
+        if (sup != NULL) {
+            children[(*index)++] = sup;
+        }
+        if (sub != NULL) {
+            children[(*index)++] = sub;
+        }
+    }
+    *cursor += advance;
+    return TEX_CORE_STATUS_OK;
+}
+
+/* Lays out one list into a box node. Math lists resolve Bin demotion and
+ * insert the inter-atom spacing kerns of their own style; sub-lists set
+ * script styles recursively. */
+static tex_core_status txc_mlist(
+    txc_arena *arena,
+    const txc_list *list,
+    int style,
+    bool math,
+    tex_core_range range,
+    txc_node **out,
+    tex_core_error *error
+) {
+    if (math) {
+        txc_resolve_bin_atoms(list);
+    }
+
+    size_t child_capacity = 0;
     const txc_item *previous_atom = NULL;
     for (const txc_item *item = list->head; item != NULL; item = item->next) {
-        if (item->kind != TXC_ITEM_ATOM) {
+        if (item->kind == TXC_ITEM_ATOM) {
+            child_capacity += txc_atom_nodes(item);
+            if (math && previous_atom != NULL &&
+                txc_inter_atom_width(TXC_MATH_SPACING[previous_atom->atom_class][item->atom_class], style) != 0) {
+                child_capacity += 1;
+            }
+            previous_atom = item;
+        } else {
+            child_capacity += 1;
+        }
+    }
+
+    txc_node *hbox = txc_arena_alloc(arena, sizeof(txc_node));
+    const txc_node **children = NULL;
+    if (child_capacity > 0 && hbox != NULL) {
+        children = txc_arena_alloc(arena, child_capacity * sizeof(*children));
+    }
+    if (hbox == NULL || (child_capacity > 0 && children == NULL)) {
+        return txc_alloc_fail(error);
+    }
+
+    txc_scaled cursor = 0;
+    size_t index = 0;
+    previous_atom = NULL;
+    for (const txc_item *item = list->head; item != NULL; item = item->next) {
+        if (math && item->kind == TXC_ITEM_ATOM && previous_atom != NULL) {
+            /* TeX inserts the pair's space directly before the right atom,
+             * after (never instead of) any explicit spacing between the
+             * two (tex.web section 766). The kern's source range is the
+             * gap between the atoms. */
+            txc_scaled width =
+                txc_inter_atom_width(TXC_MATH_SPACING[previous_atom->atom_class][item->atom_class], style);
+            if (width != 0) {
+                txc_node *space = txc_arena_alloc(arena, sizeof(txc_node));
+                if (space == NULL) {
+                    return txc_alloc_fail(error);
+                }
+                space->kind = TEX_CORE_NODE_KERN;
+                space->x = cursor;
+                space->y = 0;
+                space->codepoint = 0;
+                space->style = TEX_CORE_STYLE_UPRIGHT;
+                space->size = 0;
+                space->width = width;
+                space->ascent = 0;
+                space->descent = 0;
+                space->italic = 0;
+                space->range.begin = previous_atom->range.end;
+                space->range.end = item->range.begin;
+                space->children = NULL;
+                space->child_count = 0;
+                cursor += width;
+                children[index++] = space;
+            }
+        }
+
+        if (item->kind == TXC_ITEM_ATOM) {
+            tex_core_status status = txc_atom(arena, item, style, &cursor, children, &index, error);
+            if (status != TEX_CORE_STATUS_OK) {
+                return status;
+            }
+            previous_atom = item;
+        } else {
+            txc_node *node = txc_arena_alloc(arena, sizeof(txc_node));
+            if (node == NULL) {
+                return txc_alloc_fail(error);
+            }
+            node->kind = TEX_CORE_NODE_KERN;
+            node->x = cursor;
+            node->y = 0;
+            node->codepoint = 0;
+            node->style = TEX_CORE_STYLE_UPRIGHT;
+            node->size = 0;
+            node->width = txc_space_width(item->space, txc_style_size(style));
+            node->ascent = 0;
+            node->descent = 0;
+            node->italic = 0;
+            node->range = item->range;
+            node->children = NULL;
+            node->child_count = 0;
+            cursor += node->width;
+            children[index++] = node;
+        }
+    }
+
+    txc_scaled ascent = 0;
+    txc_scaled descent = 0;
+    for (size_t child = 0; child < index; child++) {
+        const txc_node *node = children[child];
+        if (node->kind == TEX_CORE_NODE_KERN) {
             continue;
         }
-        if (previous_atom != NULL && TXC_MATH_SPACING[previous_atom->atom_class][item->atom_class] != 0) {
-            count += 1;
-        }
-        previous_atom = item;
+        ascent = txc_max(ascent, node->ascent + node->y);
+        descent = txc_max(descent, node->descent - node->y);
     }
-    return count;
+
+    hbox->kind = TEX_CORE_NODE_HBOX;
+    hbox->x = 0;
+    hbox->y = 0;
+    hbox->codepoint = 0;
+    hbox->style = TEX_CORE_STYLE_UPRIGHT;
+    hbox->size = 0;
+    hbox->width = cursor;
+    hbox->ascent = ascent;
+    hbox->descent = descent;
+    hbox->italic = 0;
+    hbox->range = range;
+    hbox->children = children;
+    hbox->child_count = index;
+
+    *out = hbox;
+    return TEX_CORE_STATUS_OK;
 }
 
 tex_core_status txc_layout(
@@ -129,103 +542,16 @@ tex_core_status txc_layout(
     tex_core_error *error
 ) {
     /* Atom classes drive spacing in math lists only; document mode is a
-     * plain horizontal text list. */
+     * plain horizontal text list. Display math opens in display style,
+     * inline math in text style. */
     bool math = mode != TEX_CORE_MODE_DOCUMENT;
-    if (math) {
-        txc_resolve_bin_atoms(list);
+    int style = mode == TEX_CORE_MODE_MATH_DISPLAY ? TXC_STYLE_DISPLAY : TXC_STYLE_TEXT;
+    tex_core_range range = {0, source_length};
+    txc_node *hbox;
+    tex_core_status status = txc_mlist(arena, list, style, math, range, &hbox, error);
+    if (status != TEX_CORE_STATUS_OK) {
+        return status;
     }
-    size_t child_capacity = list->count + (math ? txc_count_inter_atom_spaces(list) : 0);
-
-    txc_node *hbox = txc_arena_alloc(arena, sizeof(txc_node));
-    const txc_node **children = NULL;
-    if (child_capacity > 0 && hbox != NULL) {
-        children = txc_arena_alloc(arena, child_capacity * sizeof(*children));
-    }
-    if (hbox == NULL || (child_capacity > 0 && children == NULL)) {
-        return txc_fail(error, TEX_CORE_STATUS_ALLOCATION_FAILED, NULL, "allocation failed");
-    }
-
-    txc_scaled cursor = 0;
-    txc_scaled ascent = 0;
-    txc_scaled descent = 0;
-    size_t index = 0;
-    const txc_item *previous_atom = NULL;
-    for (const txc_item *item = list->head; item != NULL; item = item->next) {
-        if (math && item->kind == TXC_ITEM_ATOM && previous_atom != NULL) {
-            /* TeX inserts the pair's space directly before the right atom,
-             * after any explicit spacing between the two (tex.web section
-             * 766: intervening glue does not suppress inter-atom glue).
-             * The kern's source range is the gap between the atoms. */
-            uint8_t amount = TXC_MATH_SPACING[previous_atom->atom_class][item->atom_class];
-            if (amount != 0) {
-                txc_node *space = txc_arena_alloc(arena, sizeof(txc_node));
-                if (space == NULL) {
-                    return txc_fail(error, TEX_CORE_STATUS_ALLOCATION_FAILED, NULL, "allocation failed");
-                }
-                space->kind = TEX_CORE_NODE_KERN;
-                space->x = cursor;
-                space->y = 0;
-                space->width = txc_inter_atom_width(amount);
-                space->range.begin = previous_atom->range.end;
-                space->range.end = item->range.begin;
-                cursor += space->width;
-                children[index++] = space;
-            }
-        }
-
-        txc_node *node = txc_arena_alloc(arena, sizeof(txc_node));
-        if (node == NULL) {
-            return txc_fail(error, TEX_CORE_STATUS_ALLOCATION_FAILED, NULL, "allocation failed");
-        }
-        node->x = cursor;
-        node->y = 0;
-        node->range = item->range;
-
-        if (item->kind == TXC_ITEM_ATOM) {
-            const txc_metric *metric = txc_metric_find(item->style, item->codepoint);
-            if (metric == NULL) {
-                return txc_fail(
-                    error,
-                    TEX_CORE_STATUS_UNSUPPORTED,
-                    &item->range,
-                    "unsupported character U+%04X",
-                    (unsigned)item->codepoint
-                );
-            }
-            node->kind = TEX_CORE_NODE_GLYPH;
-            node->codepoint = item->codepoint;
-            node->style = item->style;
-            node->width = txc_em(metric->width);
-            node->ascent = txc_em(metric->height);
-            node->descent = txc_em(metric->depth);
-            node->italic = txc_em(metric->italic);
-            /* TeX appends the italic correction to a math glyph's advance
-             * (Appendix G); with no scripts yet this is unconditional. */
-            cursor += node->width + node->italic;
-            if (node->ascent > ascent) {
-                ascent = node->ascent;
-            }
-            if (node->descent > descent) {
-                descent = node->descent;
-            }
-            previous_atom = item;
-        } else {
-            node->kind = TEX_CORE_NODE_KERN;
-            node->width = txc_space_width(item->space);
-            cursor += node->width;
-        }
-        children[index++] = node;
-    }
-
-    hbox->kind = TEX_CORE_NODE_HBOX;
-    hbox->width = cursor;
-    hbox->ascent = ascent;
-    hbox->descent = descent;
-    hbox->range.begin = 0;
-    hbox->range.end = source_length;
-    hbox->children = children;
-    hbox->child_count = index;
-
     *root = hbox;
     return TEX_CORE_STATUS_OK;
 }

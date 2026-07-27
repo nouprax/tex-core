@@ -88,7 +88,12 @@ static void txc_test_empty(txc_test *test) {
     char *dump = NULL;
     size_t length = 0;
     txc_check_int(test, tex_core_render_tree_dump(tree, &dump, &length), TEX_CORE_STATUS_OK, "empty tree dumps");
-    txc_check_text(test, dump, "render-tree 1\nhbox width=0.0pt ascent=0.0pt descent=0.0pt src=0..0\n", "empty dump");
+    txc_check_text(
+        test,
+        dump,
+        "render-tree 2\nhbox x=0.0pt y=0.0pt width=0.0pt ascent=0.0pt descent=0.0pt src=0..0\n",
+        "empty dump"
+    );
     txc_check_size(test, length, strlen(dump), "dump length excludes the NUL");
     tex_core_dump_free(dump);
     tex_core_render_tree_free(tree);
