@@ -40,8 +40,8 @@ abstract class GenerateRenderTreeFixtures : DefaultTask() {
                 .toPath()
         val manifestFile = root.resolve("manifest.json").toFile()
         val manifest = JsonSlurper().parse(manifestFile) as? Map<*, *> ?: error("manifest must be an object")
-        require((manifest["schemaVersion"] as? Number)?.toInt() == 2) {
-            "shared render-tree manifest must use schemaVersion 2"
+        require((manifest["schemaVersion"] as? Number)?.toInt() == 3) {
+            "shared render-tree manifest must use schemaVersion 3"
         }
         val cases = manifest["cases"] as? List<*> ?: error("manifest cases must be an array")
         require(cases.isNotEmpty()) { "shared render-tree manifest must contain at least one case" }

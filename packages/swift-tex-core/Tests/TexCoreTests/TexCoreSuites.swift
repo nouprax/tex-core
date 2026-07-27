@@ -37,7 +37,7 @@ import TexCore
     @Test("the dump is canonical and deterministic")
     func dump() throws {
         let tree = try Document.compile("", options: CompileOptions(mode: .document))
-        #expect(tree.dump() == "render-tree 2\nhbox x=0.0pt y=0.0pt width=0.0pt ascent=0.0pt descent=0.0pt src=0..0\n")
+        #expect(tree.dump() == "render-tree 3\nhbox x=0.0pt y=0.0pt width=0.0pt ascent=0.0pt descent=0.0pt src=0..0\n")
     }
 
     @Test("trees compile and share safely across concurrent tasks")
@@ -60,13 +60,13 @@ import TexCore
     @Test("unsupported input throws the structured fail-fast error")
     func unsupported() {
         do {
-            _ = try Document.compile("\\frac x y", options: CompileOptions(mode: .mathInline))
+            _ = try Document.compile("\\sqrt x", options: CompileOptions(mode: .mathInline))
             Issue.record("compile unexpectedly succeeded")
         } catch let error as CompileError {
             #expect(error.status == .unsupported)
             #expect(error.range == SourceRange(begin: 0, end: 5))
-            #expect(error.message == "unsupported command \\frac")
-            #expect(error.description == "unsupported command \\frac (bytes 0..5)")
+            #expect(error.message == "unsupported command \\sqrt")
+            #expect(error.description == "unsupported command \\sqrt (bytes 0..5)")
         } catch {
             Issue.record("unexpected error type: \(error)")
         }
@@ -109,6 +109,13 @@ import TexCore
         #expect(counter.boxes == 1)
         #expect(counter.glyphs == 2)
         #expect(counter.kerns == 1)
+        #expect(counter.rules == 0)
+
+        let fraction = try Document.compile("\\frac{1}{2}", options: CompileOptions(mode: .mathInline))
+        var fractionCounter = KindCounter()
+        fractionCounter.visit(fraction.root)
+        #expect(fractionCounter.rules == 1)
+        #expect(fractionCounter.kerns == 2)
     }
 
     @Test("nodes expose their source ranges uniformly")
@@ -123,6 +130,7 @@ private struct KindCounter: RenderVisitor {
     var boxes = 0
     var glyphs = 0
     var kerns = 0
+    var rules = 0
 
     mutating func visit(_ node: HBox) {
         boxes += 1
@@ -137,5 +145,9 @@ private struct KindCounter: RenderVisitor {
 
     mutating func visit(_ node: Kern) {
         kerns += 1
+    }
+
+    mutating func visit(_ node: Rule) {
+        rules += 1
     }
 }

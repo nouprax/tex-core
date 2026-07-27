@@ -13,7 +13,7 @@ dump byte for byte.
   Android; the same bridge compiles as a static archive for Kotlin/Native
   cinterop. The payload is transport, never a public format, and no
   production path consumes dump text.
-- `src/commonMain` — the value tree (`RenderTree`, `HBox`/`Glyph`/`Kern`),
+- `src/commonMain` — the value tree (`RenderTree`, `HBox`/`Glyph`/`Kern`/`Rule`),
   `CompileOptions`/`CompileException`, the wire decoder, and the canonical
   dumper (Knuth `print_scaled` over recovered scaled points).
 - `src/commonTest` — API/concurrency suites plus the conformance replay of

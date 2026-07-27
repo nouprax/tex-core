@@ -1,4 +1,4 @@
-import type { Glyph, HBox, Kern, RenderNode } from "./model.js";
+import type { Glyph, HBox, Kern, RenderNode, Rule } from "./model.js";
 
 /**
  * An exhaustive typed visitor over render nodes: one method per schema node
@@ -9,6 +9,7 @@ export interface RenderVisitor<R> {
     visitHBox(node: HBox): R;
     visitGlyph(node: Glyph): R;
     visitKern(node: Kern): R;
+    visitRule(node: Rule): R;
 }
 
 /** Dispatches a node to the matching visitor method. */
@@ -20,5 +21,7 @@ export function accept<R>(node: RenderNode, visitor: RenderVisitor<R>): R {
             return visitor.visitGlyph(node);
         case "kern":
             return visitor.visitKern(node);
+        case "rule":
+            return visitor.visitRule(node);
     }
 }

@@ -21,7 +21,7 @@ test("api: compile returns a detached frozen value tree", () => {
 
 test("api: options default to document mode and dumps are canonical", () => {
     const tree = Document.compile("");
-    assert.equal(tree.dump(), "render-tree 2\nhbox x=0.0pt y=0.0pt width=0.0pt ascent=0.0pt descent=0.0pt src=0..0\n");
+    assert.equal(tree.dump(), "render-tree 3\nhbox x=0.0pt y=0.0pt width=0.0pt ascent=0.0pt descent=0.0pt src=0..0\n");
     assert.equal(tree.dump(), tree.dump());
 });
 
@@ -35,15 +35,15 @@ test("api: repeated compiles are structurally identical", () => {
 test("errors: unsupported input throws the structured fail-fast error", () => {
     let failure;
     try {
-        Document.compile("\\frac x y", { mode: "mathInline" });
+        Document.compile("\\sqrt x", { mode: "mathInline" });
     } catch (error) {
         failure = error;
     }
     assert.ok(failure instanceof CompileError);
     assert.equal(failure.status, "unsupported");
     assert.deepEqual(failure.range, { begin: 0, end: 5 });
-    assert.equal(failure.errorMessage, "unsupported command \\frac");
-    assert.equal(failure.message, "unsupported command \\frac (bytes 0..5)");
+    assert.equal(failure.errorMessage, "unsupported command \\sqrt");
+    assert.equal(failure.message, "unsupported command \\sqrt (bytes 0..5)");
 });
 
 test("errors: invalid bytes throw the encoding error, never replace", () => {

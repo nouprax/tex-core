@@ -6,7 +6,30 @@ not promised to remain compatible between releases.
 
 ## Unreleased
 
-- Pin the linear-history merge policy in `bootstrap-repository.sh` and
+- Continue milestone M1 (math core) with generalized fractions, moving the
+  render-tree contract to schemaVersion 3: the math modes gain `\frac`,
+  `\dfrac`, and `\tfrac` — two mandatory arguments each (a character, a
+  symbol command, or a braced group), also legal as script arguments —
+  and the schema gains the `rule` leaf node, today produced only as the
+  fraction bar. Layout is TeXbook Appendix G rule 15 (`make_fraction`):
+  numerator and denominator are clean boxes one style step down (the
+  denominator cramped), shifted by `num1`/`num2` and `denom1`/`denom2`
+  and pushed apart until each gap to the bar reaches three rule
+  thicknesses in display style and one otherwise; the bar takes the
+  current size's `defaultRuleThickness` centered on `axisHeight`; the
+  narrower part centers over the wider; TeX's null delimiters flank the
+  pair as absolute 1.2 pt kerns with empty source ranges. `\dfrac` and
+  `\tfrac` force display and text style exactly as
+  `\displaystyle`/`\textstyle`, every parameter resolves at the
+  fraction's own style size, the atom spaces as Inner, and scripts attach
+  to it like to any box nucleus. The vendored KaTeX parameter table grows
+  the five fraction sigmas, the argument-grammar errors are structured
+  and pinned (`missing numerator argument`/`missing denominator
+  argument`, at the offending token or the command at end of input), the
+  shared corpus grows to 47 cases (eight fraction trees, three error
+  records) with tree-witnessed fraction validators, and all four bindings
+  gain the `Rule` node type, visitor case, wire decoding, and dump line,
+  replaying the grown corpus byte-exactly.
   the template's embedded copy: squash is the only allowed merge method,
   squash commits default to the pull request's title (`… (#N)`) and
   description — merge-queue commits apply the default mechanically, a

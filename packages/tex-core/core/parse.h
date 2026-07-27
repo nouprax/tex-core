@@ -1,8 +1,8 @@
 /* Parser: token stream to semantic list. The semantic lists are internal;
  * the public contract is the render tree only (plan section 5.2). The
  * grammar covers classed math atoms (characters and symbol commands) with
- * braced groups, superscripts, and subscripts, plus explicit spacing;
- * document mode still typesets ordinary text atoms only. */
+ * braced groups, superscripts, subscripts, and fractions, plus explicit
+ * spacing; document mode still typesets ordinary text atoms only. */
 
 #ifndef TXC_PARSE_H
 #define TXC_PARSE_H
@@ -16,9 +16,9 @@
 
 typedef enum txc_item_kind { TXC_ITEM_ATOM = 0, TXC_ITEM_SPACE = 1 } txc_item_kind;
 
-/* TeX math atom classes (TeXbook chapter 17). The parser produces Ord, Bin,
- * Rel, Open, Close, and Punct atoms today; Op arrives with big operators
- * and function names, Inner with fractions and \ldots. The spacing table in
+/* TeX math atom classes (TeXbook chapter 17). The parser produces Ord,
+ * Bin, Rel, Open, Close, Punct, and — for fractions — Inner atoms today;
+ * Op arrives with big operators and function names. The spacing table in
  * layout already covers all eight classes. Document-mode atoms always carry
  * TXC_ATOM_ORD; atom classes never affect text layout. */
 typedef enum txc_atom_class {
@@ -53,8 +53,16 @@ typedef struct txc_list {
 } txc_list;
 
 /* One noad field (TeXbook chapter 17): an atom's nucleus, superscript, or
- * subscript is empty, a single character, or a braced sub-list. */
-typedef enum txc_field_kind { TXC_FIELD_EMPTY = 0, TXC_FIELD_CHAR = 1, TXC_FIELD_LIST = 2 } txc_field_kind;
+ * subscript is empty, a single character, a braced sub-list, or a
+ * fraction construct. */
+typedef enum txc_field_kind {
+    TXC_FIELD_EMPTY = 0,
+    TXC_FIELD_CHAR = 1,
+    TXC_FIELD_LIST = 2,
+    TXC_FIELD_FRACTION = 3
+} txc_field_kind;
+
+struct txc_fraction;
 
 typedef struct txc_field {
     txc_field_kind kind;
@@ -63,12 +71,34 @@ typedef struct txc_field {
     tex_core_style style;
     /* TXC_FIELD_LIST only. */
     txc_list list;
+    /* TXC_FIELD_FRACTION only. */
+    struct txc_fraction *fraction;
     /* The field's own source construct: the character or symbol command,
-     * the braced group including its braces, or — for a script field —
-     * the script mark through the end of its argument. Empty fields have
-     * an empty range at the attachment point. */
+     * the braced group including its braces, the fraction command through
+     * its last argument, or — for a script field — the script mark
+     * through the end of its argument. Empty fields have an empty range
+     * at the attachment point. */
     tex_core_range range;
 } txc_field;
+
+/* The style a fraction command forces on its own layout: \frac follows
+ * the surrounding style, \dfrac and \tfrac force display and text style
+ * exactly as \displaystyle/\textstyle (uncramped). */
+typedef enum txc_fraction_style {
+    TXC_FRACTION_STYLE_AUTO = 0,
+    TXC_FRACTION_STYLE_DISPLAY = 1,
+    TXC_FRACTION_STYLE_TEXT = 2
+} txc_fraction_style;
+
+/* A generalized fraction (TeXbook chapter 17 fraction noads): numerator
+ * over denominator, both mandatory. `command` is the fraction command's
+ * own token — the source the bar is attributed to. */
+typedef struct txc_fraction {
+    txc_field num;
+    txc_field den;
+    txc_fraction_style style;
+    tex_core_range command;
+} txc_fraction;
 
 typedef struct txc_item {
     txc_item_kind kind;

@@ -35,7 +35,12 @@ const parameterOrder = [
     "sub2",
     "supDrop",
     "subDrop",
-    "defaultRuleThickness"
+    "defaultRuleThickness",
+    "num1",
+    "num2",
+    "denom1",
+    "denom2",
+    "axisHeight"
 ];
 
 const fixed = (value) => {

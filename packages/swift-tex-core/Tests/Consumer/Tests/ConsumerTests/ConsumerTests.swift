@@ -11,6 +11,6 @@ import TexCore
             return
         }
         #expect(glyph.style == .italic)
-        #expect(tree.dump().hasPrefix("render-tree 2\n"))
+        #expect(tree.dump().hasPrefix("render-tree 3\n"))
     }
 }

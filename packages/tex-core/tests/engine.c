@@ -417,6 +417,153 @@ static void txc_test_symbol_commands(txc_test *test) {
     tex_core_render_tree_free(tree);
 }
 
+/* Expected script-size points: the em fraction scaled by the 7pt em. */
+static double txc_expected_script_points(double em_value) {
+    long long fraction = (long long)(em_value * 65536.0 + 0.5);
+    return (double)(fraction * 7) / 65536.0;
+}
+
+static void txc_test_fractions(txc_test *test) {
+    /* \nulldelimiterspace is 1.2pt (78643sp) at every size. */
+    const double null_delimiter = 78643.0 / 65536.0;
+
+    /* Text style: shifts num2/denom2, bar defaultRuleThickness thick,
+     * centered on axisHeight with its top half(thickness) above (KaTeX
+     * text columns: num2 0.394, denom2 0.345, thickness 0.04, axis 0.25).
+     * The 1/2 parts set at the script size share the digit width, so no
+     * centering inset appears. */
+    tex_core_render_tree *tree = txc_compile(test, "\\frac{1}{2}", TEX_CORE_MODE_MATH_INLINE, "frac 1 2");
+    const tex_core_node *root = tex_core_render_tree_root(tree);
+    txc_check_size(test, tex_core_node_child_count(root), 1, "frac is one atom");
+    const tex_core_node *box = tex_core_node_child(root, 0);
+    txc_check_size(test, tex_core_node_child_count(box), 5, "frac box children");
+    const tex_core_node *left = tex_core_node_child(box, 0);
+    const tex_core_node *rule = tex_core_node_child(box, 1);
+    const tex_core_node *num = tex_core_node_child(box, 2);
+    const tex_core_node *den = tex_core_node_child(box, 3);
+    const tex_core_node *right = tex_core_node_child(box, 4);
+    txc_check_int(test, tex_core_node_get_kind(left), TEX_CORE_NODE_KERN, "left null delimiter is a kern");
+    txc_check(test, tex_core_node_frame(left).width == null_delimiter, "left null delimiter width");
+    txc_check_int(test, tex_core_node_get_kind(rule), TEX_CORE_NODE_RULE, "the bar is a rule");
+    txc_check(test, tex_core_node_frame(rule).ascent == txc_expected_points(0.04), "bar thickness");
+    txc_check(test, tex_core_node_frame(rule).descent == 0.0, "bar descent");
+    /* Bar bottom = axis + half(thickness) - thickness in scaled points:
+     * 163840 + 13105 - 26210. */
+    txc_check(test, tex_core_node_frame(rule).y == 150735.0 / 65536.0, "bar sits on the axis");
+    txc_check_size(test, tex_core_node_range(rule).begin, 0, "bar src begin is the command");
+    txc_check_size(test, tex_core_node_range(rule).end, 5, "bar src end is the command");
+    txc_check(test, tex_core_node_frame(num).y == txc_expected_points(0.394), "numerator shift num2");
+    txc_check(test, tex_core_node_frame(den).y == -txc_expected_points(0.345), "denominator shift denom2");
+    txc_check(
+        test,
+        tex_core_node_frame(num).x == null_delimiter && tex_core_node_frame(den).x == null_delimiter,
+        "equal-width parts take no centering inset"
+    );
+    txc_check(test, tex_core_node_glyph(tex_core_node_child(num, 0)).size == 7.0, "numerator sets at the script size");
+    txc_check(test, tex_core_node_frame(right).width == null_delimiter, "right null delimiter width");
+    tex_core_frame frame = tex_core_node_frame(box);
+    txc_check(
+        test,
+        frame.width == 2.0 * null_delimiter + tex_core_node_frame(rule).width,
+        "frac box width spans the delimiters"
+    );
+    txc_check(
+        test,
+        frame.ascent == tex_core_node_frame(num).y + tex_core_node_frame(num).ascent,
+        "frac box ascent tracks the numerator"
+    );
+    tex_core_render_tree_free(tree);
+
+    /* Display style: shifts num1/denom1, parts one style down at the text
+     * size, the narrower part centered over the wider. */
+    tree = txc_compile(test, "\\frac{a+b}{2}", TEX_CORE_MODE_MATH_DISPLAY, "display frac");
+    box = tex_core_node_child(tex_core_render_tree_root(tree), 0);
+    num = tex_core_node_child(box, 2);
+    den = tex_core_node_child(box, 3);
+    txc_check(test, tex_core_node_frame(num).y == txc_expected_points(0.677), "display numerator shift num1");
+    txc_check(test, tex_core_node_frame(den).y == -txc_expected_points(0.686), "display denominator shift denom1");
+    txc_check(test, tex_core_node_glyph(tex_core_node_child(num, 0)).size == 10.0, "display parts keep the text size");
+    double inset = (tex_core_node_frame(num).width - tex_core_node_frame(den).width) / 2.0;
+    txc_check(
+        test,
+        tex_core_node_frame(den).x == null_delimiter + inset,
+        "the narrower denominator centers over the numerator"
+    );
+    tex_core_render_tree_free(tree);
+
+    /* \dfrac forces display style; \tfrac forces text style. */
+    tree = txc_compile(test, "\\dfrac{1}{2}", TEX_CORE_MODE_MATH_INLINE, "dfrac");
+    box = tex_core_node_child(tex_core_render_tree_root(tree), 0);
+    txc_check(
+        test,
+        tex_core_node_frame(tex_core_node_child(box, 2)).y == txc_expected_points(0.677),
+        "dfrac takes the display shift"
+    );
+    tex_core_render_tree_free(tree);
+    tree = txc_compile(test, "\\tfrac{1}{2}", TEX_CORE_MODE_MATH_DISPLAY, "tfrac");
+    box = tex_core_node_child(tex_core_render_tree_root(tree), 0);
+    txc_check(
+        test,
+        tex_core_node_frame(tex_core_node_child(box, 2)).y == txc_expected_points(0.394),
+        "tfrac takes the text shift"
+    );
+    txc_check(
+        test,
+        tex_core_node_glyph(tex_core_node_child(tex_core_node_child(box, 2), 0)).size == 7.0,
+        "tfrac parts drop to the script size"
+    );
+    tex_core_render_tree_free(tree);
+
+    /* Undelimited character arguments parse like braced ones. */
+    tree = txc_compile(test, "\\frac12", TEX_CORE_MODE_MATH_INLINE, "frac char args");
+    box = tex_core_node_child(tex_core_render_tree_root(tree), 0);
+    txc_check_size(test, tex_core_node_child_count(box), 5, "char-arg frac box children");
+    txc_check(
+        test,
+        tex_core_node_frame(tex_core_node_child(box, 2)).y == txc_expected_points(0.394),
+        "char-arg numerator shift"
+    );
+    tex_core_render_tree_free(tree);
+
+    /* A fraction is a legal script argument, set one style deeper: script
+     * columns for the fraction, scriptscript parts (KaTeX script columns:
+     * num2 0.384, thickness 0.049). */
+    tree = txc_compile(test, "x^\\frac{1}{2}", TEX_CORE_MODE_MATH_INLINE, "frac as superscript");
+    root = tex_core_render_tree_root(tree);
+    const tex_core_node *sup = tex_core_node_child(root, 1);
+    txc_check_size(test, tex_core_node_child_count(sup), 5, "superscript fraction box children");
+    rule = tex_core_node_child(sup, 1);
+    txc_check_int(test, tex_core_node_get_kind(rule), TEX_CORE_NODE_RULE, "superscript fraction keeps its bar");
+    txc_check(test, tex_core_node_frame(rule).ascent == txc_expected_script_points(0.049), "script bar thickness");
+    num = tex_core_node_child(sup, 2);
+    txc_check(test, tex_core_node_frame(num).y == txc_expected_script_points(0.384), "script numerator shift");
+    txc_check(test, tex_core_node_glyph(tex_core_node_child(num, 0)).size == 5.0, "scriptscript parts");
+    txc_check(
+        test,
+        tex_core_node_frame(tex_core_node_child(sup, 0)).width == null_delimiter,
+        "null delimiters stay 1.2pt inside scripts"
+    );
+    tex_core_render_tree_free(tree);
+
+    /* Scripts attach to the fraction atom like to any box nucleus. */
+    tree = txc_compile(test, "\\frac{1}{2}^3", TEX_CORE_MODE_MATH_INLINE, "scripted fraction");
+    root = tex_core_render_tree_root(tree);
+    txc_check_size(test, tex_core_node_child_count(root), 2, "scripted fraction children");
+    txc_check(test, tex_core_node_frame(tex_core_node_child(root, 1)).y > 0.0, "superscript shifts up");
+    tex_core_render_tree_free(tree);
+
+    /* The fraction atom is Inner: thin space against an ordinary, medium
+     * against a kept Bin, thick against a Rel. */
+    tree = txc_compile(test, "1+\\frac{1}{2}=x", TEX_CORE_MODE_MATH_INLINE, "inner spacing");
+    root = tex_core_render_tree_root(tree);
+    txc_check_size(test, tex_core_node_child_count(root), 9, "inner spacing children");
+    txc_check_kern_at(test, root, 1, TXC_POINTS_MEDIUM, "ord to kept bin");
+    txc_check_kern_at(test, root, 3, TXC_POINTS_MEDIUM, "bin to fraction");
+    txc_check_kern_at(test, root, 5, TXC_POINTS_THICK, "fraction to rel");
+    txc_check_kern_at(test, root, 7, TXC_POINTS_THICK, "rel to ord");
+    tex_core_render_tree_free(tree);
+}
+
 int main(void) {
     txc_test test = {0, 0};
     txc_test_math_glyph(&test);
@@ -428,5 +575,6 @@ int main(void) {
     txc_test_math_classes(&test);
     txc_test_bin_context(&test);
     txc_test_symbol_commands(&test);
+    txc_test_fractions(&test);
     return txc_test_finish(&test, "engine");
 }

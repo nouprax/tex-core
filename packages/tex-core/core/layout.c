@@ -21,11 +21,22 @@ static int txc_sup_style(int style) { return 2 * (style / 4) + TXC_STYLE_SCRIPT 
 
 static int txc_sub_style(int style) { return 2 * (style / 4) + TXC_STYLE_SCRIPT + 1; }
 
+static int txc_num_style(int style) { return style + 2 - 2 * (style / 6); }
+
+static int txc_denom_style(int style) { return 2 * (style / 2) + 1 + 2 - 2 * (style / 6); }
+
+/* TeX's half(): odd scaled values round up (tex.web section 100). */
+static txc_scaled txc_half(txc_scaled value) { return value % 2 != 0 ? (value + 1) / 2 : value / 2; }
+
 /* The em of each math size: 10 pt text, 7 pt script, 5 pt scriptscript. */
 static const txc_scaled TXC_MATHSIZE_EM[3] = {655360, 458752, 327680};
 
 /* TeX's \scriptspace: 0.5 pt of padding on every script box. */
 #define TXC_SCRIPT_SPACE 32768
+
+/* TeX's \nulldelimiterspace: 1.2 pt on each side of a fraction, an
+ * absolute dimen parameter that never scales with the script sizes. */
+#define TXC_NULL_DELIMITER_SPACE 78643
 
 static txc_scaled txc_param(txc_parameter parameter, txc_mathsize size) {
     return txc_em(txc_parameter_value(parameter, size), TXC_MATHSIZE_EM[size]);
@@ -157,16 +168,44 @@ static tex_core_status txc_alloc_fail(tex_core_error *error) {
     return txc_fail(error, TEX_CORE_STATUS_ALLOCATION_FAILED, NULL, "allocation failed");
 }
 
-/* Builds the box for a script field, TeX's clean_box (tex.web sections
+static void txc_kern_init(txc_node *node, txc_scaled x, txc_scaled width, tex_core_range range) {
+    node->kind = TEX_CORE_NODE_KERN;
+    node->x = x;
+    node->y = 0;
+    node->codepoint = 0;
+    node->style = TEX_CORE_STYLE_UPRIGHT;
+    node->size = 0;
+    node->width = width;
+    node->ascent = 0;
+    node->descent = 0;
+    node->italic = 0;
+    node->range = range;
+    node->children = NULL;
+    node->child_count = 0;
+}
+
+static tex_core_status txc_fraction_box(
+    txc_arena *arena,
+    const txc_fraction *fraction,
+    int style,
+    tex_core_range range,
+    txc_node **out,
+    tex_core_error *error
+);
+
+/* Builds the box for a noad field, TeX's clean_box (tex.web sections
  * 720-721): a character field boxes one glyph and — like clean_box's
  * trivial-box simplification, which strips a lone italic-correction kern —
  * takes the glyph's width without its italic correction; a list field
- * lays out the sub-list at the script style and then applies the same
- * simplification when it produced exactly one glyph. Every script box
- * gains TeX's \scriptspace of width. */
+ * lays out the sub-list at `style` and then applies the same
+ * simplification when it produced exactly one glyph; a fraction field
+ * builds the fraction's own box. */
 static tex_core_status
-txc_script_box(txc_arena *arena, const txc_field *field, int style, txc_node **out, tex_core_error *error) {
+txc_clean_box(txc_arena *arena, const txc_field *field, int style, txc_node **out, tex_core_error *error) {
     txc_node *box;
+    if (field->kind == TXC_FIELD_FRACTION) {
+        return txc_fraction_box(arena, field->fraction, style, field->range, out, error);
+    }
     if (field->kind == TXC_FIELD_CHAR) {
         const txc_metric *metric = txc_metric_find(field->style, field->codepoint);
         if (metric == NULL) {
@@ -221,12 +260,144 @@ txc_script_box(txc_arena *arena, const txc_field *field, int style, txc_node **o
             box->width = box->children[0]->width;
         }
     }
+    *out = box;
+    return TEX_CORE_STATUS_OK;
+}
+
+/* Builds the box for a script field: TeX's clean_box plus \scriptspace of
+ * width. */
+static tex_core_status
+txc_script_box(txc_arena *arena, const txc_field *field, int style, txc_node **out, tex_core_error *error) {
+    txc_node *box;
+    tex_core_status status = txc_clean_box(arena, field, style, &box, error);
+    if (status != TEX_CORE_STATUS_OK) {
+        return status;
+    }
     box->width += TXC_SCRIPT_SPACE;
     *out = box;
     return TEX_CORE_STATUS_OK;
 }
 
 static txc_scaled txc_max(txc_scaled left, txc_scaled right) { return left > right ? left : right; }
+
+/* Builds a generalized fraction's box, TeXbook Appendix G rule 15
+ * (tex.web's make_fraction, sections 743-748): numerator and denominator
+ * are clean boxes one style step down (the denominator cramped), shifted
+ * apart until each gap to the bar reaches three rule thicknesses in
+ * display style, one otherwise; the bar is a rule of the current size's
+ * default thickness centered on the math axis; null delimiters flank the
+ * pair as \nulldelimiterspace kerns. Every parameter resolves at the
+ * fraction's own style size — \dfrac and \tfrac force display and text
+ * style exactly as \displaystyle/\textstyle, uncramped. */
+static tex_core_status txc_fraction_box(
+    txc_arena *arena,
+    const txc_fraction *fraction,
+    int style,
+    tex_core_range range,
+    txc_node **out,
+    tex_core_error *error
+) {
+    int fraction_style = style;
+    if (fraction->style == TXC_FRACTION_STYLE_DISPLAY) {
+        fraction_style = TXC_STYLE_DISPLAY;
+    } else if (fraction->style == TXC_FRACTION_STYLE_TEXT) {
+        fraction_style = TXC_STYLE_TEXT;
+    }
+    txc_mathsize size = txc_style_size(fraction_style);
+
+    txc_node *num;
+    tex_core_status status = txc_clean_box(arena, &fraction->num, txc_num_style(fraction_style), &num, error);
+    if (status != TEX_CORE_STATUS_OK) {
+        return status;
+    }
+    txc_node *den;
+    status = txc_clean_box(arena, &fraction->den, txc_denom_style(fraction_style), &den, error);
+    if (status != TEX_CORE_STATUS_OK) {
+        return status;
+    }
+
+    txc_scaled thickness = txc_param(TXC_PARAMETER_RULE_THICKNESS, size);
+    txc_scaled axis = txc_param(TXC_PARAMETER_AXIS_HEIGHT, size);
+    txc_scaled shift_up;
+    txc_scaled shift_down;
+    if (fraction_style < TXC_STYLE_TEXT) {
+        shift_up = txc_param(TXC_PARAMETER_NUM1, size);
+        shift_down = txc_param(TXC_PARAMETER_DENOM1, size);
+    } else {
+        shift_up = txc_param(TXC_PARAMETER_NUM2, size);
+        shift_down = txc_param(TXC_PARAMETER_DENOM2, size);
+    }
+    txc_scaled clearance = fraction_style < TXC_STYLE_TEXT ? 3 * thickness : thickness;
+    txc_scaled delta = txc_half(thickness);
+    txc_scaled gap_up = clearance - ((shift_up - num->descent) - (axis + delta));
+    if (gap_up > 0) {
+        shift_up += gap_up;
+    }
+    txc_scaled gap_down = clearance - ((axis - delta) - (den->ascent - shift_down));
+    if (gap_down > 0) {
+        shift_down += gap_down;
+    }
+
+    /* The parts share the wider width, the narrower centered — the
+     * resolved geometry of TeX's rebox fil glue. */
+    txc_scaled width = txc_max(num->width, den->width);
+    num->x = TXC_NULL_DELIMITER_SPACE + txc_half(width - num->width);
+    num->y = shift_up;
+    den->x = TXC_NULL_DELIMITER_SPACE + txc_half(width - den->width);
+    den->y = -shift_down;
+
+    txc_node *box = txc_arena_alloc(arena, sizeof(txc_node));
+    const txc_node **children = txc_arena_alloc(arena, 5 * sizeof(*children));
+    txc_node *left = txc_arena_alloc(arena, sizeof(txc_node));
+    txc_node *rule = txc_arena_alloc(arena, sizeof(txc_node));
+    txc_node *right = txc_arena_alloc(arena, sizeof(txc_node));
+    if (box == NULL || children == NULL || left == NULL || rule == NULL || right == NULL) {
+        return txc_alloc_fail(error);
+    }
+    tex_core_range left_edge = {fraction->command.begin, fraction->command.begin};
+    txc_kern_init(left, 0, TXC_NULL_DELIMITER_SPACE, left_edge);
+    tex_core_range right_edge = {range.end, range.end};
+    txc_kern_init(right, TXC_NULL_DELIMITER_SPACE + width, TXC_NULL_DELIMITER_SPACE, right_edge);
+
+    rule->kind = TEX_CORE_NODE_RULE;
+    rule->x = TXC_NULL_DELIMITER_SPACE;
+    rule->y = axis + delta - thickness;
+    rule->codepoint = 0;
+    rule->style = TEX_CORE_STYLE_UPRIGHT;
+    rule->size = 0;
+    rule->width = width;
+    rule->ascent = thickness;
+    rule->descent = 0;
+    rule->italic = 0;
+    rule->range = fraction->command;
+    rule->children = NULL;
+    rule->child_count = 0;
+
+    /* Child order is source order: the bar's source is the command token,
+     * which precedes both arguments. */
+    children[0] = left;
+    children[1] = rule;
+    children[2] = num;
+    children[3] = den;
+    children[4] = right;
+
+    box->kind = TEX_CORE_NODE_HBOX;
+    box->x = 0;
+    box->y = 0;
+    box->codepoint = 0;
+    box->style = TEX_CORE_STYLE_UPRIGHT;
+    box->size = 0;
+    box->width = width + 2 * TXC_NULL_DELIMITER_SPACE;
+    box->ascent = shift_up + num->ascent;
+    box->descent = shift_down + den->descent;
+    box->italic = 0;
+    box->range = range;
+    box->children = children;
+    box->child_count = 5;
+
+    *out = box;
+    return TEX_CORE_STATUS_OK;
+}
 
 /* Nodes one atom contributes to its list: the nucleus rendering plus one
  * box per script. Shared by the counting and building passes. */
@@ -293,9 +464,14 @@ static tex_core_status txc_atom(
         children[(*index)++] = glyph;
         nucleus_width = glyph->width;
         delta = glyph->italic;
-    } else if (item->nucleus.kind == TXC_FIELD_LIST) {
+    } else if (item->nucleus.kind == TXC_FIELD_LIST || item->nucleus.kind == TXC_FIELD_FRACTION) {
         txc_node *box;
-        tex_core_status status = txc_mlist(arena, &item->nucleus.list, style, true, item->nucleus.range, &box, error);
+        tex_core_status status;
+        if (item->nucleus.kind == TXC_FIELD_LIST) {
+            status = txc_mlist(arena, &item->nucleus.list, style, true, item->nucleus.range, &box, error);
+        } else {
+            status = txc_fraction_box(arena, item->nucleus.fraction, style, item->nucleus.range, &box, error);
+        }
         if (status != TEX_CORE_STATUS_OK) {
             return status;
         }
@@ -456,20 +632,8 @@ static tex_core_status txc_mlist(
                 if (space == NULL) {
                     return txc_alloc_fail(error);
                 }
-                space->kind = TEX_CORE_NODE_KERN;
-                space->x = cursor;
-                space->y = 0;
-                space->codepoint = 0;
-                space->style = TEX_CORE_STYLE_UPRIGHT;
-                space->size = 0;
-                space->width = width;
-                space->ascent = 0;
-                space->descent = 0;
-                space->italic = 0;
-                space->range.begin = previous_atom->range.end;
-                space->range.end = item->range.begin;
-                space->children = NULL;
-                space->child_count = 0;
+                tex_core_range gap = {previous_atom->range.end, item->range.begin};
+                txc_kern_init(space, cursor, width, gap);
                 cursor += width;
                 children[index++] = space;
             }
@@ -486,19 +650,7 @@ static tex_core_status txc_mlist(
             if (node == NULL) {
                 return txc_alloc_fail(error);
             }
-            node->kind = TEX_CORE_NODE_KERN;
-            node->x = cursor;
-            node->y = 0;
-            node->codepoint = 0;
-            node->style = TEX_CORE_STYLE_UPRIGHT;
-            node->size = 0;
-            node->width = txc_space_width(item->space, txc_style_size(style));
-            node->ascent = 0;
-            node->descent = 0;
-            node->italic = 0;
-            node->range = item->range;
-            node->children = NULL;
-            node->child_count = 0;
+            txc_kern_init(node, cursor, txc_space_width(item->space, txc_style_size(style)), item->range);
             cursor += node->width;
             children[index++] = node;
         }

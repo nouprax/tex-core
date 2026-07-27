@@ -1,4 +1,4 @@
-import type { Glyph, HBox, Kern, RenderTree } from "./model.js";
+import type { Glyph, HBox, Kern, RenderTree, Rule } from "./model.js";
 import type { RenderVisitor } from "./visitor.js";
 import { accept } from "./visitor.js";
 
@@ -17,7 +17,7 @@ export const RenderDumper = {
 };
 
 class DumpVisitor implements RenderVisitor<void> {
-    output = "render-tree 2\n";
+    output = "render-tree 3\n";
     private depth = 0;
 
     visitHBox(node: HBox): void {
@@ -43,6 +43,13 @@ class DumpVisitor implements RenderVisitor<void> {
     visitKern(node: Kern): void {
         this.indent();
         this.output += `kern x=${measure(node.x)} width=${measure(node.width)} src=${range(node.src)}\n`;
+    }
+
+    visitRule(node: Rule): void {
+        this.indent();
+        this.output +=
+            `rule x=${measure(node.x)} y=${measure(node.y)} width=${measure(node.width)}` +
+            ` ascent=${measure(node.ascent)} descent=${measure(node.descent)} src=${range(node.src)}\n`;
     }
 
     private indent(): void {

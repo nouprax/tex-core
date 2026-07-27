@@ -13,7 +13,7 @@ import { Document } from "@nouprax/es-tex-core";
 
 const tree = Document.compile("E = mc^2", { mode: "mathInline" });
 for (const node of tree.root.children) {
-    // node.kind is "hbox" | "glyph" | "kern" — an exhaustive union.
+    // node.kind is "hbox" | "glyph" | "kern" | "rule" — an exhaustive union.
 }
 ```
 

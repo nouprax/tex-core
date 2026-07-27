@@ -85,46 +85,61 @@ extension RenderNode {
         let src = SourceRange(begin: range.begin, end: range.end)
         switch tex_core_node_get_kind(node) {
         case TEX_CORE_NODE_GLYPH:
-            let native = tex_core_node_glyph(node)
-            self = .glyph(
-                Glyph(
+            self = .glyph(RenderNode.copyGlyph(node, frame, src))
+        case TEX_CORE_NODE_KERN:
+            self = .kern(Kern(x: frame.x, width: frame.width, src: src))
+        case TEX_CORE_NODE_RULE:
+            self = .rule(
+                Rule(
                     x: frame.x,
                     y: frame.y,
-                    codepoint: Unicode.Scalar(native.codepoint) ?? Unicode.Scalar(UInt8(0)),
-                    style: native.style == TEX_CORE_STYLE_ITALIC ? .italic : .upright,
-                    family: .main,
-                    size: native.size,
                     width: frame.width,
                     ascent: frame.ascent,
                     descent: frame.descent,
-                    italic: frame.italic,
                     src: src
                 )
             )
-        case TEX_CORE_NODE_KERN:
-            self = .kern(Kern(x: frame.x, width: frame.width, src: src))
         default:
             // TEX_CORE_NODE_HBOX; NONE is unreachable from a compiled tree.
-            var children: [RenderNode] = []
-            let count = tex_core_node_child_count(node)
-            children.reserveCapacity(count)
-            for index in 0..<count {
-                if let child = tex_core_node_child(node, index) {
-                    children.append(RenderNode(copying: child))
-                }
-            }
-            self = .hbox(
-                HBox(
-                    x: frame.x,
-                    y: frame.y,
-                    width: frame.width,
-                    ascent: frame.ascent,
-                    descent: frame.descent,
-                    src: src,
-                    children: children
-                )
-            )
+            self = .hbox(RenderNode.copyBox(node, frame, src))
         }
+    }
+
+    private static func copyGlyph(_ node: OpaquePointer, _ frame: tex_core_frame, _ src: SourceRange) -> Glyph {
+        let native = tex_core_node_glyph(node)
+        return Glyph(
+            x: frame.x,
+            y: frame.y,
+            codepoint: Unicode.Scalar(native.codepoint) ?? Unicode.Scalar(UInt8(0)),
+            style: native.style == TEX_CORE_STYLE_ITALIC ? .italic : .upright,
+            family: .main,
+            size: native.size,
+            width: frame.width,
+            ascent: frame.ascent,
+            descent: frame.descent,
+            italic: frame.italic,
+            src: src
+        )
+    }
+
+    private static func copyBox(_ node: OpaquePointer, _ frame: tex_core_frame, _ src: SourceRange) -> HBox {
+        var children: [RenderNode] = []
+        let count = tex_core_node_child_count(node)
+        children.reserveCapacity(count)
+        for index in 0..<count {
+            if let child = tex_core_node_child(node, index) {
+                children.append(RenderNode(copying: child))
+            }
+        }
+        return HBox(
+            x: frame.x,
+            y: frame.y,
+            width: frame.width,
+            ascent: frame.ascent,
+            descent: frame.descent,
+            src: src,
+            children: children
+        )
     }
 }
 
