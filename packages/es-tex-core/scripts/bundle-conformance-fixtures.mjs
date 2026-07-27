@@ -8,8 +8,8 @@ const specDirectory = path.join(repositoryRoot, "specs/render-tree");
 const output = path.join(packageDirectory, "build/generated/conformance/render-tree-fixtures.json");
 
 const manifest = JSON.parse(await readFile(path.join(specDirectory, "manifest.json"), "utf8"));
-if (manifest.schemaVersion !== 1 || !Array.isArray(manifest.cases) || manifest.cases.length === 0) {
-    throw new Error("shared render-tree manifest v1 must contain at least one case");
+if (manifest.schemaVersion !== 2 || !Array.isArray(manifest.cases) || manifest.cases.length === 0) {
+    throw new Error("shared render-tree manifest v2 must contain at least one case");
 }
 
 async function readFixture(relativePath) {

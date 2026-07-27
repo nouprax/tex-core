@@ -30,3 +30,11 @@ const txc_metric *txc_metric_find(tex_core_style style, uint32_t codepoint) {
     }
     return NULL;
 }
+
+int32_t txc_parameter_value(txc_parameter parameter, txc_mathsize size) {
+    _Static_assert(
+        sizeof(TXC_PARAMETERS) / sizeof(TXC_PARAMETERS[0]) == TXC_PARAMETER_COUNT,
+        "generated parameter table must match the txc_parameter enum"
+    );
+    return TXC_PARAMETERS[parameter][size];
+}

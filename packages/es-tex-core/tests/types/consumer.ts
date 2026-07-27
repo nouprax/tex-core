@@ -30,4 +30,4 @@ try {
 }
 
 const dumped: string = tree.dump();
-if (!dumped.startsWith("render-tree 1")) throw new Error("unexpected dump header");
+if (!dumped.startsWith("render-tree 2")) throw new Error("unexpected dump header");

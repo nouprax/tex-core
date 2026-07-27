@@ -114,6 +114,8 @@ private class WireReader(
 
             1 -> {
                 HBox(
+                    x = x,
+                    y = y,
                     width = width,
                     ascent = ascent,
                     descent = descent,

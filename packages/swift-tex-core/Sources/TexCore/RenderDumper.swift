@@ -4,12 +4,13 @@
 /// Swift dump of a tree equals the C dump of the same compile byte for
 /// byte.
 struct RenderDumper: RenderVisitor {
-    private(set) var output = "render-tree 1\n"
+    private(set) var output = "render-tree 2\n"
     private var depth = 0
 
     mutating func visit(_ node: HBox) {
         indent()
-        output += "hbox width=\(measure(node.width)) ascent=\(measure(node.ascent))"
+        output += "hbox x=\(measure(node.x)) y=\(measure(node.y))"
+        output += " width=\(measure(node.width)) ascent=\(measure(node.ascent))"
         output += " descent=\(measure(node.descent)) src=\(range(node.src))\n"
         depth += 1
         for child in node.children {

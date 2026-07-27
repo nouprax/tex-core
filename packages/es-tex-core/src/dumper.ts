@@ -17,13 +17,14 @@ export const RenderDumper = {
 };
 
 class DumpVisitor implements RenderVisitor<void> {
-    output = "render-tree 1\n";
+    output = "render-tree 2\n";
     private depth = 0;
 
     visitHBox(node: HBox): void {
         this.indent();
         this.output +=
-            `hbox width=${measure(node.width)} ascent=${measure(node.ascent)}` +
+            `hbox x=${measure(node.x)} y=${measure(node.y)}` +
+            ` width=${measure(node.width)} ascent=${measure(node.ascent)}` +
             ` descent=${measure(node.descent)} src=${range(node.src)}\n`;
         this.depth += 1;
         for (const child of node.children) accept(child, this);

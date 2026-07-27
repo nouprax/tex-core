@@ -1,5 +1,5 @@
-render-tree 1
-hbox width=244.42169pt ascent=6.94443pt descent=1.94443pt src=0..225
+render-tree 2
+hbox x=0.0pt y=0.0pt width=244.42169pt ascent=6.94443pt descent=1.94443pt src=0..225
   glyph x=0.0pt y=0.0pt cp=U+03B1 style=italic family=main size=10.0pt width=6.39694pt ascent=4.30557pt descent=0.0pt italic=0.03693pt src=0..6
   glyph x=6.43387pt y=0.0pt cp=U+03B2 style=italic family=main size=10.0pt width=5.65628pt ascent=6.94443pt descent=1.94443pt italic=0.5278pt src=6..11
   glyph x=12.61795pt y=0.0pt cp=U+03B3 style=italic family=main size=10.0pt width=5.1773pt ascent=4.30557pt descent=1.94443pt italic=0.55557pt src=11..17

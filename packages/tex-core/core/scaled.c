@@ -1,6 +1,6 @@
 #include "scaled.h"
 
-txc_scaled txc_em(int32_t fraction) { return (txc_scaled)(((int64_t)fraction * TXC_EM_SP) >> 16); }
+txc_scaled txc_em(int32_t fraction, txc_scaled em) { return (txc_scaled)(((int64_t)fraction * em) >> 16); }
 
 size_t txc_scaled_format(txc_scaled scaled, char *buffer) {
     size_t written = 0;
