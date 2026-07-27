@@ -766,7 +766,7 @@ Tasks:
 - [ ] Execute §11.1 registry table: Central token, PGP secrets, key-server
       re-verification, npm bootstrap publish + trusted publisher + session
       revocation (`npm whoami` → `ENEEDAUTH`).
-- [ ] `scripts/bootstrap-repository.sh` with `RULESET_ENFORCEMENT=active`;
+- [x] `scripts/bootstrap-repository.sh` with `RULESET_ENFORCEMENT=active`;
       confirm live policy with the template §12.4 queries; update checked-in
       recipe JSON to match.
 - [ ] Template §12.3 rehearsal: force-push/bypass/stale-branch probes, tag

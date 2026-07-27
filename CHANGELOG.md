@@ -6,6 +6,10 @@ not promised to remain compatible between releases.
 
 ## Unreleased
 
+- Activate the repository control plane: `main quality gates` and
+  `release tag protection` rulesets now enforce (previously evaluate),
+  the checked-in ruleset recipes and `audit:ci` require `active`, and
+  the live policy was re-verified with the template §12.4 queries.
 - Land release engineering: the secret-free release dry run (PR-triggered,
   disposable signing key, full artifact graph re-verified by staged
   consumers and the signed Maven audit) and the tag-driven formal release
