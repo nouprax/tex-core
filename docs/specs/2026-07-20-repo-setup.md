@@ -763,20 +763,47 @@ Acceptance:
 
 Tasks:
 
-- [ ] Execute §11.1 registry table: Central token, PGP secrets, key-server
-      re-verification, npm bootstrap publish + trusted publisher + session
-      revocation (`npm whoami` → `ENEEDAUTH`).
+- [x] Execute §11.1 registry table (2026-07-27): the four Maven secrets
+      live only in the `release` environment (repository-level list is
+      empty); the release key is retrievable from `keyserver.ubuntu.com`
+      with fingerprint, UID, and 2028-07-14 expiry intact;
+      `@nouprax/es-tex-core@0.1.0` is bootstrap-published per D8 and the
+      trusted publisher (`nouprax/tex-core`,
+      `.github/workflows/release.yml`, environment `release`) is
+      configured with publishing access requiring 2FA and disallowing
+      tokens. Corporate endpoint filtering blocks npm registry traffic
+      from the operator's machine and the npm account is passkey-only, so
+      the interactive CLI session D8 presumed was impossible: the publish
+      ran as a one-off branch-local workflow authenticated by a
+      short-lived bypass-2FA granular token. The token, its repository
+      secret, and both bootstrap branches were deleted after the run, so
+      the session-revocation intent holds by construction — no npm
+      credential or CLI session remains on any machine or in GitHub.
 - [x] `scripts/bootstrap-repository.sh` with `RULESET_ENFORCEMENT=active`;
       confirm live policy with the template §12.4 queries; update checked-in
       recipe JSON to match.
-- [ ] Template §12.3 rehearsal: force-push/bypass/stale-branch probes, tag
-      immutability, environment single-policy check, non-SemVer tag rejection.
+- [x] Template §12.3 rehearsal (2026-07-26/27): direct-push and
+      force-push to `main` both rejected pre-receive (`GH013` — the
+      pull-request requirement, the expected required status checks, and
+      "Cannot force-push to this branch"); merges blocked with required
+      checks pending (probe PR #15, `mergeStateStatus=BLOCKED`) and for a
+      stale branch (probe PRs #13/#16, `BEHIND`); bypass audit: the
+      `main quality gates` ruleset has an empty bypass list, the only
+      collaborator is the owner-operator, and no teams exist; the
+      `release` environment carries exactly one `v*.*.*` tag policy;
+      non-SemVer and version-mismatched tags are rejected by
+      `check-release-version.mjs --tag`, statically pinned by `audit:ci`.
+      Tag immutability is policy evidence only: creation, update, and
+      deletion are restricted with the release reviewer as the sole
+      bypass actor, and a blocking probe cannot be observed from the
+      single operator account that holds the bypass.
 
 Acceptance:
 
-- [ ] Every §12.3 checkbox recorded; secrets exist only in the `release`
-      environment; `gh secret list` shows the four Maven names and nothing
-      else.
+- [x] Every §12.3 checkbox recorded above; `gh secret list` for the
+      `release` environment shows exactly the four Maven names, and the
+      repository-level secret list is empty (re-verified after the
+      bootstrap teardown, 2026-07-27).
 
 ### Phase 11 — First coordinated release `v1.0.0`
 

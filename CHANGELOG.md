@@ -6,6 +6,12 @@ not promised to remain compatible between releases.
 
 ## Unreleased
 
+- Complete the Phase 10 registry setup: the four Maven secrets live in
+  the `release` environment, `@nouprax/es-tex-core@0.1.0` is
+  bootstrap-published with the npm trusted publisher configured for
+  OIDC-only releases, and the §12.3 enforcement-rehearsal evidence
+  (push, merge, and stale-branch probes, the bypass audit, and the tag
+  policy checks) is recorded in the setup plan.
 - Activate the repository control plane: `main quality gates` and
   `release tag protection` rulesets now enforce (previously evaluate),
   the checked-in ruleset recipes and `audit:ci` require `active`, and
