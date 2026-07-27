@@ -6,6 +6,7 @@ import com.nouprax.tex.core.model.GlyphStyle
 import com.nouprax.tex.core.model.HBox
 import com.nouprax.tex.core.model.Kern
 import com.nouprax.tex.core.model.RenderTree
+import com.nouprax.tex.core.model.Rule
 import com.nouprax.tex.core.model.SourceRange
 
 /**
@@ -23,7 +24,7 @@ internal object RenderDumper {
 }
 
 private class DumpVisitor : RenderVisitor<Unit> {
-    val output = StringBuilder("render-tree 2\n")
+    val output = StringBuilder("render-tree 3\n")
     private var depth = 0
 
     override fun visit(node: HBox) {
@@ -91,6 +92,24 @@ private class DumpVisitor : RenderVisitor<Unit> {
             .append(measure(node.x))
             .append(" width=")
             .append(measure(node.width))
+            .append(" src=")
+            .append(range(node.src))
+            .append('\n')
+    }
+
+    override fun visit(node: Rule) {
+        indent()
+        output
+            .append("rule x=")
+            .append(measure(node.x))
+            .append(" y=")
+            .append(measure(node.y))
+            .append(" width=")
+            .append(measure(node.width))
+            .append(" ascent=")
+            .append(measure(node.ascent))
+            .append(" descent=")
+            .append(measure(node.descent))
             .append(" src=")
             .append(range(node.src))
             .append('\n')

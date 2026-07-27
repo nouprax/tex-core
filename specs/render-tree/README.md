@@ -34,7 +34,7 @@ version in the dump's `render-tree` schema line.
   case with outcome `error` holds a canonical error record:
 
   ```text
-  render-error 1
+  render-error <schemaVersion>
   error status=<status> src=<begin>..<end> message=<message>
   ```
 

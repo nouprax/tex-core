@@ -112,6 +112,8 @@ const char *tex_core_node_kind_name(tex_core_node_kind kind) {
         return "glyph";
     case TEX_CORE_NODE_KERN:
         return "kern";
+    case TEX_CORE_NODE_RULE:
+        return "rule";
     }
     return "none";
 }

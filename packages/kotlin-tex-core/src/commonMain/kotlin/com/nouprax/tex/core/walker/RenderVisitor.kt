@@ -3,6 +3,7 @@ package com.nouprax.tex.core.walker
 import com.nouprax.tex.core.model.Glyph
 import com.nouprax.tex.core.model.HBox
 import com.nouprax.tex.core.model.Kern
+import com.nouprax.tex.core.model.Rule
 
 /**
  * An exhaustive typed visitor over render nodes: one `visit` overload per
@@ -18,4 +19,7 @@ public interface RenderVisitor<R> {
 
     /** Visits a kern. */
     public fun visit(node: Kern): R
+
+    /** Visits a rule. */
+    public fun visit(node: Rule): R
 }

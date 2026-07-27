@@ -9,6 +9,7 @@ import com.nouprax.tex.core.model.HBox
 import com.nouprax.tex.core.model.Kern
 import com.nouprax.tex.core.model.RenderNode
 import com.nouprax.tex.core.model.RenderTree
+import com.nouprax.tex.core.model.Rule
 import com.nouprax.tex.core.model.SourceRange
 
 /**
@@ -110,6 +111,10 @@ private class WireReader(
 
             3 -> {
                 Kern(x = x, width = width, src = src)
+            }
+
+            4 -> {
+                Rule(x = x, y = y, width = width, ascent = ascent, descent = descent, src = src)
             }
 
             1 -> {

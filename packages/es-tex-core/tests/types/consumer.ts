@@ -1,5 +1,5 @@
 import { CompileError, Document, RenderTree, accept } from "@nouprax/es-tex-core";
-import type { CompileOptions, Glyph, HBox, Kern, RenderNode, RenderVisitor } from "@nouprax/es-tex-core";
+import type { CompileOptions, Glyph, HBox, Kern, RenderNode, RenderVisitor, Rule } from "@nouprax/es-tex-core";
 
 const options: CompileOptions = { mode: "mathInline" };
 const tree: RenderTree = Document.compile("x", options);
@@ -15,6 +15,9 @@ const visitor: RenderVisitor<string> = {
     },
     visitKern(node: Kern): string {
         return `kern:${node.width}`;
+    },
+    visitRule(node: Rule): string {
+        return `rule:${node.width}`;
     }
 };
 const described: string = accept(first, visitor);
@@ -30,4 +33,4 @@ try {
 }
 
 const dumped: string = tree.dump();
-if (!dumped.startsWith("render-tree 2")) throw new Error("unexpected dump header");
+if (!dumped.startsWith("render-tree 3")) throw new Error("unexpected dump header");

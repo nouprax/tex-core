@@ -74,8 +74,8 @@ grep -q 'public func dump() -> String' packages/swift-tex-core/Sources/TexCore/R
 if grep -R -n 'defaultVisit' packages/swift-tex-core/Sources/TexCore; then
     fail "Swift RenderVisitor exposes a catch-all fallback"
 fi
-test "$(grep -c 'mutating func visit' packages/swift-tex-core/Sources/TexCore/RenderTree.swift)" -eq 3 \
-    || fail "Swift RenderVisitor is not exhaustive over all 3 node kinds"
+test "$(grep -c 'mutating func visit' packages/swift-tex-core/Sources/TexCore/RenderTree.swift)" -eq 4 \
+    || fail "Swift RenderVisitor is not exhaustive over all 4 node kinds"
 
 # Kotlin: explicit API, no mutation/native vocabulary, exhaustive visitor.
 grep -q 'explicitApi()' packages/kotlin-tex-core/build.gradle.kts \
@@ -92,8 +92,8 @@ if grep -R -n 'defaultVisit' packages/kotlin-tex-core/src/commonMain; then
     fail "Kotlin RenderVisitor exposes a catch-all fallback"
 fi
 test "$(grep -c 'public fun visit' \
-    packages/kotlin-tex-core/src/commonMain/kotlin/com/nouprax/tex/core/walker/RenderVisitor.kt)" -eq 3 \
-    || fail "Kotlin RenderVisitor is not exhaustive over all 3 node kinds"
+    packages/kotlin-tex-core/src/commonMain/kotlin/com/nouprax/tex/core/walker/RenderVisitor.kt)" -eq 4 \
+    || fail "Kotlin RenderVisitor is not exhaustive over all 4 node kinds"
 
 # ES: pinned exports map and runtime surface, exhaustive visitor, and a
 # types consumer that resolves only through the published exports.
@@ -121,8 +121,8 @@ if (runtimeExports.join("\n") !== expectedRuntime.join("\n")) {
     throw new Error(`Unexpected ES runtime exports: ${runtimeExports.join(", ")}`);
 }
 NODE
-test "$(grep -c '    visit[A-Z][A-Za-z]*(node:' packages/es-tex-core/src/visitor.ts)" -eq 3 \
-    || fail "ES RenderVisitor is not exhaustive over all 3 node kinds"
+test "$(grep -c '    visit[A-Z][A-Za-z]*(node:' packages/es-tex-core/src/visitor.ts)" -eq 4 \
+    || fail "ES RenderVisitor is not exhaustive over all 4 node kinds"
 if grep -R -E -n 'defaultVisit|visit[A-Z][A-Za-z]+\?' packages/es-tex-core/src; then
     fail "ES RenderVisitor exposes a catch-all or optional typed handlers"
 fi

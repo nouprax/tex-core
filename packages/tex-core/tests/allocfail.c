@@ -101,6 +101,9 @@ int main(void) {
      * allocate in parse and layout; sweep both math modes over them. */
     txc_sweep(&test, "\\alpha+(\\beta-1)=\\gamma, x", TEX_CORE_MODE_MATH_DISPLAY);
     txc_sweep(&test, "a\\,+b\\;=c", TEX_CORE_MODE_MATH_INLINE);
+    /* Scripts allocate their boxes; fractions allocate the construct, its
+     * part boxes, the bar, and the null-delimiter kerns. */
+    txc_sweep(&test, "x_1^\\frac{a+b}{2}+\\tfrac12", TEX_CORE_MODE_MATH_DISPLAY);
     txc_allocation_limit(-1);
     return txc_test_finish(&test, "allocfail");
 }
