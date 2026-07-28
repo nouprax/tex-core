@@ -245,6 +245,15 @@ static tex_core_status txc_radical_box(
     tex_core_error *error
 );
 
+static tex_core_status txc_accent_box(
+    txc_arena *arena,
+    const txc_accent *accent,
+    int style,
+    tex_core_range range,
+    txc_node **out,
+    tex_core_error *error
+);
+
 /* The rule-19 target of one \big size step. */
 static txc_scaled txc_big_target(int size) {
     return txc_delimiter_target(TXC_BIG_HEIGHTS[size - 1] - txc_param(TXC_PARAMETER_AXIS_HEIGHT, TXC_MATHSIZE_TEXT));
@@ -268,6 +277,9 @@ txc_clean_box(txc_arena *arena, const txc_field *field, int style, txc_node **ou
     }
     if (field->kind == TXC_FIELD_RADICAL) {
         return txc_radical_box(arena, field->radical, style, field->range, out, error);
+    }
+    if (field->kind == TXC_FIELD_ACCENT) {
+        return txc_accent_box(arena, field->accent, style, field->range, out, error);
     }
     if (field->kind == TXC_FIELD_DELIMITER) {
         return txc_delimiter_boxed(
@@ -1057,6 +1069,97 @@ static tex_core_status txc_radical_box(
     return TEX_CORE_STATUS_OK;
 }
 
+/* Builds a math accent's box, TeXbook Appendix G rule 12 (tex.web's
+ * make_math_accent, section 738): the nucleus is a clean box in the
+ * cramped style; the accent glyph — main family at the current size, or
+ * for the wide pair the first width step at least as wide as the
+ * nucleus, capped at size4 — rises with any nucleus taller than the
+ * x-height and shifts right by the nucleus character's skew. The box
+ * keeps the nucleus width. */
+static tex_core_status txc_accent_box(
+    txc_arena *arena,
+    const txc_accent *accent,
+    int style,
+    tex_core_range range,
+    txc_node **out,
+    tex_core_error *error
+) {
+    txc_node *nucleus;
+    tex_core_status status = txc_clean_box(arena, &accent->argument, txc_cramped_style(style), &nucleus, error);
+    if (status != TEX_CORE_STATUS_OK) {
+        return status;
+    }
+
+    txc_mathsize size = txc_style_size(style);
+    txc_scaled em = TXC_MATHSIZE_EM[size];
+    txc_scaled skew = 0;
+    if (accent->argument.kind == TXC_FIELD_CHAR) {
+        const txc_metric *metric =
+            txc_metric_find(TEX_CORE_FAMILY_MAIN, accent->argument.style, accent->argument.codepoint);
+        if (metric != NULL) {
+            skew = txc_em(metric->skew, em);
+        }
+    }
+
+    const txc_metric *chosen = txc_metric_find(TEX_CORE_FAMILY_MAIN, TEX_CORE_STYLE_UPRIGHT, accent->codepoint);
+    tex_core_family family = TEX_CORE_FAMILY_MAIN;
+    txc_scaled glyph_em = em;
+    if (chosen == NULL) {
+        return txc_fail(error, TEX_CORE_STATUS_UNSUPPORTED, &accent->command, "unsupported accent");
+    }
+    if (accent->wide) {
+        /* The width ladder: the text-size glyph, then the size faces,
+         * first fit at least as wide as the nucleus, else the widest. */
+        glyph_em = TXC_MATHSIZE_EM[TXC_MATHSIZE_TEXT];
+        for (tex_core_family step = TEX_CORE_FAMILY_SIZE1; step <= TEX_CORE_FAMILY_SIZE4; step++) {
+            if (txc_em(chosen->width, glyph_em) >= nucleus->width) {
+                break;
+            }
+            const txc_metric *metric = txc_metric_find(step, TEX_CORE_STYLE_UPRIGHT, accent->codepoint);
+            if (metric == NULL) {
+                break;
+            }
+            chosen = metric;
+            family = step;
+        }
+    }
+
+    txc_node *glyph = txc_arena_alloc(arena, sizeof(txc_node));
+    txc_node *box = txc_arena_alloc(arena, sizeof(txc_node));
+    const txc_node **children = txc_arena_alloc(arena, 2 * sizeof(*children));
+    if (glyph == NULL || box == NULL || children == NULL) {
+        return txc_alloc_fail(error);
+    }
+    txc_glyph_init(glyph, accent->codepoint, family, chosen, glyph_em, accent->command);
+    txc_scaled drop = nucleus->ascent < txc_param(TXC_PARAMETER_X_HEIGHT, size)
+                          ? nucleus->ascent
+                          : txc_param(TXC_PARAMETER_X_HEIGHT, size);
+    glyph->y = nucleus->ascent - drop;
+    glyph->x = skew + txc_half(nucleus->width - glyph->width);
+    nucleus->x = 0;
+    nucleus->y = 0;
+
+    children[0] = glyph;
+    children[1] = nucleus;
+
+    box->kind = TEX_CORE_NODE_HBOX;
+    box->x = 0;
+    box->y = 0;
+    box->codepoint = 0;
+    box->style = TEX_CORE_STYLE_UPRIGHT;
+    box->family = TEX_CORE_FAMILY_MAIN;
+    box->size = 0;
+    box->width = nucleus->width;
+    box->ascent = txc_max(nucleus->ascent, glyph->y + glyph->ascent);
+    box->descent = nucleus->descent;
+    box->italic = 0;
+    box->range = range;
+    box->children = children;
+    box->child_count = 2;
+    *out = box;
+    return TEX_CORE_STATUS_OK;
+}
+
 /* Nodes one atom contributes to its list: the nucleus rendering plus one
  * box per script. Shared by the counting and building passes. */
 /* Whether an Op atom's scripts place as limits in `style` (TeXbook
@@ -1185,6 +1288,9 @@ static tex_core_status txc_atom(
             break;
         case TXC_FIELD_RADICAL:
             status = txc_radical_box(arena, item->nucleus.radical, style, item->nucleus.range, &box, error);
+            break;
+        case TXC_FIELD_ACCENT:
+            status = txc_accent_box(arena, item->nucleus.accent, style, item->nucleus.range, &box, error);
             break;
         case TXC_FIELD_DELIMITER:
             status = txc_delimiter_boxed(
