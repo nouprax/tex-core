@@ -1,6 +1,6 @@
 /* Internal render-tree representation. The public opaque types are completed
  * here; nodes live in the tree's arena and are immutable once compile
- * returns (plan decision D6). */
+ * returns (the frozen concurrency contract). */
 
 #ifndef TXC_TREE_H
 #define TXC_TREE_H

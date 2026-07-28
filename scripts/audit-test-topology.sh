@@ -50,12 +50,13 @@ else
     note "no network fetch in build/test plumbing"
 fi
 
-# 3. CTest topology: configure/build if needed, then cross-check labels and
-# selections against runner discovery.
+# 3. CTest topology: configure-only — `ctest -N` reads the generated test
+# graph without any product compilation, so the health check stays on the
+# critical path's cheap side (the dedicated build jobs compile the same
+# source exactly once, later and in parallel).
 BUILD_DIR=build/cmake
 if [ ! -f "$BUILD_DIR/CTestTestfile.cmake" ]; then
     cmake --preset default >/dev/null
-    cmake --build --preset default --parallel >/dev/null
 fi
 
 for label in api engine errors determinism allocfail threads cli conformance benchmark; do
@@ -106,16 +107,11 @@ else
     note "benchmark selection contains only benchmark workloads"
 fi
 
-# 4. Platform suite discovery must be non-empty when the toolchain is
-# present; CI additionally executes each on its platform row.
-if command -v swift >/dev/null 2>&1; then
-    if [ "$(CLANG_MODULE_CACHE_PATH="$BUILD_DIR/swift-module-cache" \
-        swift test --disable-sandbox list 2>/dev/null | wc -l)" -lt 1 ]; then
-        fail "swift test discovers no Swift Testing suites"
-    else
-        note "swift test discovers Swift Testing suites"
-    fi
-fi
+# 4. Platform suite discovery stays non-empty where it can be answered
+# statically. Swift discovery needs a test build, so its non-empty
+# guarantee lives in the runtime consumer instead
+# (run-swift-test-artifact.sh fails when zero tests execute), keeping this
+# health check compilation-free.
 if [ "$(node packages/es-tex-core/scripts/run-tests.mjs --list | wc -l)" -lt 1 ]; then
     fail "the ES runner discovers no correctness suites"
 else

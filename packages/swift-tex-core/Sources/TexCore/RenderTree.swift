@@ -145,8 +145,8 @@ public struct Glyph: Sendable, Hashable {
 
 /// A leaf rule: a solid rectangle. Its reference point sits at its left
 /// edge on the parent's baseline shifted by `y`; the ink extends `ascent`
-/// up, `descent` down, and `width` right. Today produced only as the
-/// fraction bar.
+/// up, `descent` down, and `width` right. Today produced as fraction bars
+/// and radical bars.
 public struct Rule: Sendable, Hashable {
     /// Horizontal offset of the reference point from the parent's, in points.
     public let x: Double

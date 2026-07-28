@@ -15,7 +15,8 @@ case "${1:-}" in
 esac
 
 if [ ! -f Package.swift ]; then
-    echo "note: no Swift sources yet; format:swift is a no-op until Phase 5 lands the Swift binding"
+    echo "format-swift.sh must run from the repository root (Package.swift not found)" >&2
+    exit 2
     exit 0
 fi
 

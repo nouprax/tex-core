@@ -3,7 +3,7 @@ package com.nouprax.tex.core.model
 import com.nouprax.tex.core.walker.RenderDumper
 
 /**
- * An immutable compiled document: the render tree of schema version 1.
+ * An immutable compiled document: the render tree of schema version 5.
  *
  * Trees are plain values — safely shareable across threads, structurally
  * equatable, and detached from the native engine the moment

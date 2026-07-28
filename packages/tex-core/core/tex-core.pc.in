@@ -1,10 +1,13 @@
-prefix=@CMAKE_INSTALL_PREFIX@
+# Relocatable: the prefix derives from this file's own location
+# (<prefix>/lib/pkgconfig), so the installed tree keeps working after the
+# archive is extracted anywhere.
+prefix=${pcfiledir}/../..
 exec_prefix=${prefix}
 libdir=${prefix}/@CMAKE_INSTALL_LIBDIR@
 includedir=${prefix}/@CMAKE_INSTALL_INCLUDEDIR@
 
 Name: tex-core
 Description: Self-contained LaTeX to platform-neutral render-tree compiler
-Version: @PROJECT_VERSION@
+Version: @TEX_CORE_VERSION@
 Libs: -L${libdir} -ltex-core
 Cflags: -I${includedir}

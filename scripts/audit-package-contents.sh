@@ -58,7 +58,8 @@ find "$temp_dir/cmake-prefix" \( -type f -o -type l \) | while IFS= read -r arti
             lib/cmake/tex-core/tex-core-targets.cmake | \
             lib/cmake/tex-core/tex-core-targets-release.cmake | \
             lib/libtex-core* | \
-            lib/pkgconfig/tex-core.pc) ;;
+            lib/pkgconfig/tex-core.pc | \
+            lib/pkgconfig/tex-core-static.pc) ;;
         *)
             echo "Unexpected C install artifact: $relative_path" >&2
             exit 1
@@ -78,7 +79,8 @@ find "$temp_dir/cmake-prefix-static" \( -type f -o -type l \) | while IFS= read 
             lib/cmake/tex-core/tex-core-targets.cmake | \
             lib/cmake/tex-core/tex-core-targets-release.cmake | \
             lib/libtex-core.a | \
-            lib/pkgconfig/tex-core.pc) ;;
+            lib/pkgconfig/tex-core.pc | \
+            lib/pkgconfig/tex-core-static.pc) ;;
         *)
             echo "Unexpected static C install artifact: $relative_path" >&2
             exit 1
@@ -207,14 +209,14 @@ while IFS= read -r archive; do
                     print name
                 }
             }' | sed 's/^_//' \
-            | grep -v -E '^(txc_allocation_countdown|ltmp[0-9]+)$' \
+            | grep -v -E '^(txc_allocation_countdown|txc_allocation_live|ltmp[0-9]+)$' \
             | sort -u || true)
         ;;
     *)
         writable_symbols=$("$nm_tool" "$archive" 2>/dev/null \
             | awk '$2 ~ /^[dDbBC]$/ { print $NF }' \
             | sed 's/^_//' \
-            | grep -v -E '^(txc_allocation_countdown|ltmp[0-9]+)$' \
+            | grep -v -E '^(txc_allocation_countdown|txc_allocation_live|ltmp[0-9]+)$' \
             | sort -u || true)
         ;;
     esac

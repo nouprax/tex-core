@@ -28,11 +28,13 @@ export const Document = {
             if (payload === 0) throw new Error("native render-tree copy failed");
             const data = native.es_payload_data(payload);
             const length = native.es_payload_length(payload);
-            // Copy out before free: the decoded tree must never alias wasm
-            // memory.
-            const copy = new Uint8Array(length);
-            copy.set(new Uint8Array(native.memory.buffer, data, length));
-            return decodePayload(copy);
+            // Decode straight out of linear memory: the synchronous decoder
+            // produces only detached numbers, strings, and frozen objects,
+            // retains no view into the payload, and makes no native call
+            // that could grow (and so detach) the memory mid-decode. The
+            // payload is freed in `finally` either way, so a large document
+            // never pays an extra O(payload) copy.
+            return decodePayload(new Uint8Array(native.memory.buffer, data, length));
         } finally {
             if (payload !== 0) native.es_payload_free(payload);
             if (pointer !== 0) native.free(pointer);

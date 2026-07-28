@@ -13,6 +13,7 @@ import com.nouprax.tex.core.wire.WireDecoder
  */
 public object Document {
     /** Compiles a Kotlin string (always valid UTF-8). */
+    @kotlin.jvm.JvmStatic
     @kotlin.jvm.JvmOverloads
     public fun compile(
         source: String,
@@ -25,6 +26,7 @@ public object Document {
      * [com.nouprax.tex.core.model.CompileException], never a silent
      * replacement, so byte inputs round-trip the full error contract.
      */
+    @kotlin.jvm.JvmStatic
     @kotlin.jvm.JvmOverloads
     public fun compile(
         source: ByteArray,

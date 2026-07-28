@@ -14,12 +14,12 @@
  * is thread-safe, and trees are immutable and safely shareable across
  * threads once compile returns.
  *
- * Errors are fail-fast (plan decision D4): unsupported or invalid input
+ * Errors are fail-fast: unsupported or invalid input
  * yields a structured error naming the offending token and its source byte
  * range — never partial output. The error struct is caller-allocated plain
  * data so that allocation-failure reports themselves allocate nothing.
  *
- * The supported surface (milestone M1 in progress): document mode compiles
+ * The supported surface (milestone M1, complete): document mode compiles
  * ordinary text atoms (ASCII letters, digits, period, comma) and explicit
  * spacing commands; the math modes add the classed math characters
  * (+ - * / = < > ( ) [ ] , ; : ! ? |), the M1 symbol commands (Greek

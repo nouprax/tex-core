@@ -8,7 +8,12 @@
 #include <stddef.h>
 #include <stdint.h>
 
-typedef int32_t txc_scaled;
+/* 64-bit so unbounded accumulation over a whole document cannot overflow:
+ * every leaf measure is under 2^24 sp (a few ems) and every accumulated
+ * term costs at least one parsed item (hundreds of arena bytes), so a sum
+ * would need petabytes of input to approach 2^63. 32 bits overflowed on a
+ * 64 KiB single-line document. */
+typedef int64_t txc_scaled;
 
 /* The text-size em: 10 pt. The script and scriptscript sizes (7 pt and
  * 5 pt) are the layout module's TXC_MATHSIZE ems. */

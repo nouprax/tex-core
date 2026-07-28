@@ -1,0 +1,16 @@
+# The static-archive contract: consumers of libtex-core.a must compile
+# with TEX_CORE_STATIC_DEFINE so the public header declares plain symbols
+# instead of the shared library's import/export attributes (on
+# Windows/Cygwin the difference is dllimport vs direct linkage). The
+# prefix derives from this file's own location, so the installed tree
+# keeps working after the archive is extracted anywhere.
+prefix=${pcfiledir}/../..
+exec_prefix=${prefix}
+libdir=${prefix}/@CMAKE_INSTALL_LIBDIR@
+includedir=${prefix}/@CMAKE_INSTALL_INCLUDEDIR@
+
+Name: tex-core-static
+Description: Self-contained LaTeX to platform-neutral render-tree compiler (static archive)
+Version: @TEX_CORE_VERSION@
+Libs: -L${libdir} -ltex-core
+Cflags: -I${includedir} -DTEX_CORE_STATIC_DEFINE

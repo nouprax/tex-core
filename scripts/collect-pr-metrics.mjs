@@ -20,7 +20,7 @@ if (!platform || !logsDirectory || !output) {
     throw new Error("--platform, --logs, and --output are required");
 }
 
-const allowedRuntimes = new Set(["swift", "kotlin-jvm", "es-node"]);
+const allowedRuntimes = new Set(["c", "swift", "kotlin-jvm", "es-node"]);
 const allowedWorkloads = new Set(["large_document", "math_spacing"]);
 
 async function filesBelow(root) {
@@ -118,6 +118,14 @@ for (const definition of sizeDefinitions) {
 const uniqueBenchmarks = [
     ...new Map(benchmarks.map((benchmark) => [`${benchmark.runtime}:${benchmark.workload}`, benchmark])).values()
 ].sort((left, right) => `${left.runtime}:${left.workload}`.localeCompare(`${right.runtime}:${right.workload}`));
+
+// An empty collection means the emitter or this parser drifted (renamed
+// workloads, a changed line shape): fail loudly instead of uploading a
+// silently empty metrics document.
+if (uniqueBenchmarks.length === 0) {
+    console.error(`no benchmark lines matched under ${logsDirectory}`);
+    process.exit(1);
+}
 
 await mkdir(path.dirname(output), { recursive: true });
 await writeFile(

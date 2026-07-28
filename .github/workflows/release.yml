@@ -24,7 +24,10 @@ permissions:
     contents: read
 
 concurrency:
-    group: release-${{ github.ref }}
+    # One lane per release tag: a push-triggered run and a workflow_dispatch
+    # resume of the same tag must serialize, so the tag is the key (dispatch
+    # runs otherwise group under their branch ref and overlap the original).
+    group: release-${{ inputs.release-tag || github.ref_name }}
     cancel-in-progress: false
 
 jobs:
@@ -33,8 +36,8 @@ jobs:
         if: github.event_name == 'push'
         runs-on: ubuntu-latest
         steps:
-            - uses: actions/checkout@v7
-            - uses: actions/setup-node@v7
+            - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+            - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
               with:
                   node-version: 26.5.0
             - name: Validate exact SemVer tag and coordinated versions
@@ -68,10 +71,10 @@ jobs:
                       artifact-label: macos-26
         runs-on: ${{ matrix.os }}
         steps:
-            - uses: actions/checkout@v7
+            - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
             - name: Build and audit C release artifact
               run: scripts/stage-c-release.sh build/release-c
-            - uses: actions/upload-artifact@v7
+            - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
               with:
                   name: release-c-${{ matrix.artifact-label }}
                   path: build/release-c/*.tar.gz
@@ -82,15 +85,15 @@ jobs:
         needs: quality
         runs-on: macos-26
         steps:
-            - uses: actions/checkout@v7
-            - uses: maxim-lobanov/setup-xcode@v1
+            - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+            - uses: maxim-lobanov/setup-xcode@ed7a3b1fda3918c0306d1b724322adc0b8cc0a90 # v1.7.0
               with:
                   xcode-version: "26.6"
             - name: Check prepared Swift release environment
               run: scripts/init-environment.sh --check wrappers swift
             - name: Validate Swift source archive and product consumer
               run: scripts/check-swift-source-archive.sh build/release-swift
-            - uses: actions/upload-artifact@v7
+            - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
               with:
                   name: release-swift-source
                   path: build/release-swift/*.zip
@@ -101,15 +104,15 @@ jobs:
         needs: quality
         runs-on: ubuntu-latest
         steps:
-            - uses: actions/checkout@v7
-            - uses: actions/setup-node@v7
+            - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+            - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
               with:
                   node-version: 26.5.0
-            - uses: pnpm/action-setup@v6
+            - uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6.0.9
               with:
                   run_install: false
                   version: 11.7.0
-            - uses: emscripten-core/setup-emsdk@v16
+            - uses: emscripten-core/setup-emsdk@4528d102f7230f0e7b276855c01ea1159be0e984 # v16
               with:
                   version: 4.0.23
             - run: pnpm install --frozen-lockfile
@@ -117,7 +120,7 @@ jobs:
               run: scripts/init-environment.sh --check node emscripten dependencies
             - name: Build, pack, and run the npm artifact consumer
               run: scripts/stage-npm-release.sh build/release-npm
-            - uses: actions/upload-artifact@v7
+            - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
               with:
                   name: release-npm-package
                   path: build/release-npm/*.tgz
@@ -130,18 +133,18 @@ jobs:
         env:
             GRADLE_USER_HOME: ${{ github.workspace }}/.gradle-user-home
         steps:
-            - uses: actions/checkout@v7
-            - uses: actions/setup-java@v5
+            - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+            - uses: actions/setup-java@03ad4de0992f5dab5e18fcb136590ce7c4a0ac95 # v5.6.0
               with:
                   distribution: temurin
                   java-version: 26
-            - uses: android-actions/setup-android@v4
+            - uses: android-actions/setup-android@40fd30fb8d7440372e1316f5d1809ec01dcd3699 # v4.0.1
             - run: sdkmanager "platforms;android-36" "cmake;3.22.1" "ndk;28.2.13676358"
             - name: Check prepared Android release environment
               run: scripts/init-environment.sh --check java wrappers android
             - name: Build Linux, root, JVM, and Android Maven publications
               run: scripts/stage-maven-publications.sh build/release-maven-linux linux-release
-            - uses: actions/upload-artifact@v7
+            - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
               with:
                   name: release-maven-linux
                   path: build/release-maven-linux
@@ -154,8 +157,8 @@ jobs:
         env:
             GRADLE_USER_HOME: ${{ github.workspace }}/.gradle-user-home
         steps:
-            - uses: actions/checkout@v7
-            - uses: actions/setup-java@v5
+            - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+            - uses: actions/setup-java@03ad4de0992f5dab5e18fcb136590ce7c4a0ac95 # v5.6.0
               with:
                   distribution: temurin
                   java-version: 26
@@ -163,13 +166,14 @@ jobs:
               run: scripts/init-environment.sh --check java wrappers
             - name: Build macOS Native publication and JVM payload
               run: scripts/stage-maven-publications.sh build/release-maven-macos macos-native
-            - uses: actions/upload-artifact@v7
+            - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
               with:
                   name: release-maven-macos
                   path: build/release-maven-macos
                   if-no-files-found: error
 
     maven-assemble:
+        timeout-minutes: 60
         name: Assemble Release - Maven Central
         needs: [maven-linux, maven-macos]
         runs-on: ubuntu-latest
@@ -179,23 +183,23 @@ jobs:
         env:
             GRADLE_USER_HOME: ${{ github.workspace }}/.gradle-user-home
         steps:
-            - uses: actions/checkout@v7
-            - uses: actions/setup-node@v7
+            - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+            - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
               with:
                   node-version: 26.5.0
-            - uses: actions/setup-java@v5
+            - uses: actions/setup-java@03ad4de0992f5dab5e18fcb136590ce7c4a0ac95 # v5.6.0
               with:
                   distribution: temurin
                   java-version: 26
-            - uses: android-actions/setup-android@v4
+            - uses: android-actions/setup-android@40fd30fb8d7440372e1316f5d1809ec01dcd3699 # v4.0.1
             - run: sdkmanager "platforms;android-36" "cmake;3.22.1" "ndk;28.2.13676358"
             - name: Check prepared staged-consumer environment
               run: scripts/init-environment.sh --check java wrappers android
-            - uses: actions/download-artifact@v8
+            - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
               with:
                   name: release-maven-linux
                   path: build/release-maven-linux
-            - uses: actions/download-artifact@v8
+            - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
               with:
                   name: release-maven-macos
                   path: build/release-maven-macos
@@ -216,7 +220,7 @@ jobs:
                   node scripts/audit-maven-publications.mjs \
                       build/release-maven-central --full --signed
                   (cd build/release-maven-central && zip -qr ../tex-core-maven-central.zip com/nouprax)
-            - uses: actions/upload-artifact@v7
+            - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
               with:
                   name: release-maven-central
                   path: build/tex-core-maven-central.zip
@@ -240,6 +244,7 @@ jobs:
                   done
 
     maven-stage:
+        timeout-minutes: 30
         name: Publish Release - Maven Central / Stage
         needs: release-artifacts-ready
         runs-on: ubuntu-latest
@@ -249,8 +254,8 @@ jobs:
         outputs:
             deployment-id: ${{ steps.central.outputs['deployment-id'] }}
         steps:
-            - uses: actions/checkout@v7
-            - uses: actions/download-artifact@v8
+            - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+            - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
               with:
                   name: release-maven-central
                   path: build
@@ -265,6 +270,7 @@ jobs:
                   scripts/wait-central-deployment.sh "$deployment" VALIDATED
 
     npm-publish:
+        timeout-minutes: 15
         name: Publish Release - ES / npm
         needs: [release-artifacts-ready, maven-stage]
         runs-on: ubuntu-latest
@@ -273,11 +279,11 @@ jobs:
             contents: read
             id-token: write
         steps:
-            - uses: actions/setup-node@v7
+            - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
               with:
                   node-version: 26.5.0
                   registry-url: https://registry.npmjs.org
-            - uses: actions/download-artifact@v8
+            - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
               with:
                   name: release-npm-package
                   path: release-npm
@@ -285,6 +291,7 @@ jobs:
               run: npm publish ./release-npm/*.tgz --access public
 
     maven-publish:
+        timeout-minutes: 30
         name: Publish Release - Maven Central / Commit
         needs: [maven-stage, npm-publish]
         runs-on: ubuntu-latest
@@ -292,7 +299,7 @@ jobs:
         permissions:
             contents: read
         steps:
-            - uses: actions/checkout@v7
+            - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
             - name: Publish the validated Central deployment
               env:
                   DEPLOYMENT_ID: ${{ needs['maven-stage'].outputs['deployment-id'] }}
@@ -303,6 +310,7 @@ jobs:
                   scripts/wait-central-deployment.sh "$DEPLOYMENT_ID" PUBLISHED
 
     github-release:
+        timeout-minutes: 20
         name: Publish Release - GitHub
         needs: [c-artifacts, swift-source, npm-publish, maven-publish]
         runs-on: ubuntu-latest
@@ -312,28 +320,28 @@ jobs:
             id-token: write
             attestations: write
         steps:
-            - uses: actions/checkout@v7
-            - uses: actions/download-artifact@v8
+            - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+            - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
               with:
                   pattern: release-c-*
                   path: release-files
                   merge-multiple: true
-            - uses: actions/download-artifact@v8
+            - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
               with:
                   name: release-swift-source
                   path: release-files
-            - uses: actions/download-artifact@v8
+            - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
               with:
                   name: release-npm-package
                   path: release-files
-            - uses: actions/download-artifact@v8
+            - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
               with:
                   name: release-maven-central
                   path: release-files
             - name: Create release checksums
               run: scripts/create-release-checksums.sh release-files
             - name: Attest release artifact provenance
-              uses: actions/attest-build-provenance@v3
+              uses: actions/attest-build-provenance@977bb373ede98d70efdf65b84cb5f73e068dcc2a # v3.0.0
               with:
                   subject-path: release-files/*
             - name: Create the GitHub Release from the protected tag
@@ -347,6 +355,7 @@ jobs:
                       release-files/*
 
     resume-publish:
+        timeout-minutes: 45
         name: Resume Release - Published Artifacts
         if: github.event_name == 'workflow_dispatch'
         runs-on: ubuntu-latest
@@ -361,10 +370,10 @@ jobs:
             RELEASE_TAG: ${{ inputs.release-tag }}
             SOURCE_RUN_ID: ${{ inputs.source-run-id }}
         steps:
-            - uses: actions/checkout@v7
+            - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
               with:
                   ref: ${{ inputs.release-tag }}
-            - uses: actions/setup-node@v7
+            - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
               with:
                   node-version: 26.5.0
                   registry-url: https://registry.npmjs.org
@@ -415,7 +424,13 @@ jobs:
                   MAVEN_CENTRAL_USERNAME: ${{ secrets.MAVEN_CENTRAL_USERNAME }}
                   MAVEN_CENTRAL_PASSWORD: ${{ secrets.MAVEN_CENTRAL_PASSWORD }}
               run: |
-                  state=$(scripts/central-portal.sh status "$DEPLOYMENT_ID" | jq -r '.deploymentState')
+                  status=$(scripts/central-portal.sh status "$DEPLOYMENT_ID")
+                  # Bind the deployment to this release: the upload named the
+                  # deployment after the exact version, so a mistyped or
+                  # unrelated deployment id cannot be committed under this tag.
+                  deployment_name=$(jq -r '.deploymentName' <<<"$status")
+                  test "$deployment_name" = "tex-core-$(cat VERSION)"
+                  state=$(jq -r '.deploymentState' <<<"$status")
                   case "$state" in
                       PUBLISHED)
                           echo "Central deployment $DEPLOYMENT_ID is already published" ;;
@@ -429,7 +444,7 @@ jobs:
             - name: Create release checksums
               run: scripts/create-release-checksums.sh release-files
             - name: Attest release artifact provenance
-              uses: actions/attest-build-provenance@v3
+              uses: actions/attest-build-provenance@977bb373ede98d70efdf65b84cb5f73e068dcc2a # v3.0.0
               with:
                   subject-path: release-files/*
             - name: Create the GitHub Release from the protected tag

@@ -1,7 +1,15 @@
 /* Benchmark executable (CTest label `benchmark`, serial): reports
  * informational numbers and never gates on them — regressions surface
- * through CI trend review, not flaky wall-clock asserts. */
+ * through the PR metrics trend (scripts/collect-pr-metrics.mjs picks up
+ * the `runtime=c` lines), not flaky wall-clock asserts.
+ *
+ * Methodology: a monotonic clock, warmup iterations, and the median of
+ * repeated runs; compile (parse+layout+free) and canonical dump are timed
+ * as separate boundaries so a regression is attributable. The two
+ * workloads mirror the Swift/Kotlin/ES benchmark corpus so the trend
+ * report compares like with like. */
 
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -9,94 +17,111 @@
 
 #include "tex_core.h"
 
-static const char TXC_BENCH_PHRASE[] = "The quick brown fox \\quad jumps over the lazy dog 0123456789. \\, ";
-/* A command-heavy math phrase: every command class goes through the
- * parser dispatch, and the constructs exercise the layout builders. */
-static const char TXC_BENCH_MATH_PHRASE[] =
-    "\\alpha+\\beta\\frac{1}{2}\\sqrt{x}\\sum_{i}^{n}\\hat{y}\\mathbf{z}\\left(\\gamma\\right)\\leq\\infty ";
-#define TXC_BENCH_TARGET_BYTES 65536
-#define TXC_BENCH_ITERATIONS 64
+#define TXC_BENCH_WARMUP 3
+#define TXC_BENCH_REPEATS 10
 
-/* Standard C11 wall clock: POSIX monotonic clocks do not exist on MSVC,
- * and these informational numbers do not warrant a per-platform timer. */
-static double txc_now(void) {
+/* Monotonic on POSIX; MSVC has no CLOCK_MONOTONIC, so it falls back to the
+ * C11 wall clock there (informational numbers on the one platform without
+ * a portable monotonic timespec source). */
+static uint64_t txc_now_ns(void) {
     struct timespec now;
+#if defined(_WIN32)
     timespec_get(&now, TIME_UTC);
-    return (double)now.tv_sec + (double)now.tv_nsec / 1e9;
+#else
+    clock_gettime(CLOCK_MONOTONIC, &now);
+#endif
+    return (uint64_t)now.tv_sec * 1000000000u + (uint64_t)now.tv_nsec;
 }
 
-static int txc_bench(const char *name, const char *source, size_t length, tex_core_mode mode) {
+static int txc_compare_u64(const void *left, const void *right) {
+    uint64_t a = *(const uint64_t *)left;
+    uint64_t b = *(const uint64_t *)right;
+    return a < b ? -1 : (a > b ? 1 : 0);
+}
+
+static uint64_t txc_median(uint64_t *samples, size_t count) {
+    qsort(samples, count, sizeof(*samples), txc_compare_u64);
+    return samples[count / 2];
+}
+
+static int txc_bench(const char *workload, const char *source, tex_core_mode mode) {
+    size_t length = strlen(source);
     tex_core_options options;
     tex_core_options_init(&options);
     options.mode = mode;
 
-    double start = txc_now();
-    size_t dump_bytes = 0;
-    for (int iteration = 0; iteration < TXC_BENCH_ITERATIONS; iteration++) {
+    uint64_t compile_ns[TXC_BENCH_REPEATS];
+    uint64_t dump_ns[TXC_BENCH_REPEATS];
+    for (int iteration = 0; iteration < TXC_BENCH_WARMUP + TXC_BENCH_REPEATS; iteration++) {
         tex_core_render_tree *tree = NULL;
         tex_core_error error;
+        uint64_t start = txc_now_ns();
         if (tex_core_document_compile((const uint8_t *)source, length, &options, &tree, &error) != TEX_CORE_STATUS_OK) {
-            fprintf(stderr, "benchmark %s: compile failed: %s\n", name, error.message);
+            fprintf(stderr, "benchmark %s: compile failed: %s\n", workload, error.message);
             return 1;
         }
+        uint64_t compiled = txc_now_ns();
         char *dump = NULL;
         size_t dump_length = 0;
         if (tex_core_render_tree_dump(tree, &dump, &dump_length) != TEX_CORE_STATUS_OK) {
             tex_core_render_tree_free(tree);
-            fprintf(stderr, "benchmark %s: dump failed\n", name);
+            fprintf(stderr, "benchmark %s: dump failed\n", workload);
             return 1;
         }
-        dump_bytes = dump_length;
+        uint64_t dumped = txc_now_ns();
         tex_core_dump_free(dump);
         tex_core_render_tree_free(tree);
+        if (iteration >= TXC_BENCH_WARMUP) {
+            compile_ns[iteration - TXC_BENCH_WARMUP] = compiled - start;
+            dump_ns[iteration - TXC_BENCH_WARMUP] = dumped - compiled;
+        }
     }
-    double elapsed = txc_now() - start;
 
+    /* One collector-visible line per workload (`median_ns` is the compile
+     * boundary, comparable with the other runtimes' compile numbers); the
+     * dump boundary rides along under its own key so the collector never
+     * confuses the two. */
     printf(
-        "benchmark %s source_bytes=%zu dump_bytes=%zu iterations=%d total_seconds=%.3f ms_per_iteration=%.3f\n",
-        name,
+        "benchmark runtime=c boundary=native_compile workload=%s bytes=%zu warmup=%d repeats=%d "
+        "median_ns=%llu dump_median_ns=%llu\n",
+        workload,
         length,
-        dump_bytes,
-        TXC_BENCH_ITERATIONS,
-        elapsed,
-        elapsed * 1000.0 / TXC_BENCH_ITERATIONS
+        TXC_BENCH_WARMUP,
+        TXC_BENCH_REPEATS,
+        (unsigned long long)txc_median(compile_ns, TXC_BENCH_REPEATS),
+        (unsigned long long)txc_median(dump_ns, TXC_BENCH_REPEATS)
     );
     return 0;
 }
 
-int main(void) {
-    size_t phrase = strlen(TXC_BENCH_PHRASE);
-    size_t repeats = TXC_BENCH_TARGET_BYTES / phrase;
-    char *document = malloc(repeats * phrase + 1);
-    if (document == NULL) {
-        fputs("benchmark: workload allocation failed\n", stderr);
-        return 1;
+static char *txc_repeat(const char *phrase, size_t repeats) {
+    size_t phrase_length = strlen(phrase);
+    char *source = malloc(phrase_length * repeats + 1);
+    if (source == NULL) {
+        return NULL;
     }
     for (size_t index = 0; index < repeats; index++) {
-        memcpy(document + index * phrase, TXC_BENCH_PHRASE, phrase);
+        memcpy(source + index * phrase_length, phrase, phrase_length);
     }
-    document[repeats * phrase] = '\0';
+    source[phrase_length * repeats] = '\0';
+    return source;
+}
 
-    int failures = 0;
-    failures += txc_bench("compile-document", document, repeats * phrase, TEX_CORE_MODE_DOCUMENT);
-    failures += txc_bench("compile-math-inline", document, repeats * phrase, TEX_CORE_MODE_MATH_INLINE);
-
-    size_t math_phrase = strlen(TXC_BENCH_MATH_PHRASE);
-    size_t math_repeats = TXC_BENCH_TARGET_BYTES / math_phrase;
-    char *math = malloc(math_repeats * math_phrase + 1);
-    if (math == NULL) {
+int main(void) {
+    /* The shared benchmark corpus (see the ES/Swift/Kotlin benchmarks). */
+    char *document = txc_repeat("The 42 rows total 3.14 units, and the galley keeps flowing.\n", 2000);
+    char *math = txc_repeat("a\\,b\\:c\\;d\\!e\\quad f\\qquad g\\ h", 200);
+    if (document == NULL || math == NULL) {
         free(document);
+        free(math);
         fputs("benchmark: workload allocation failed\n", stderr);
         return 1;
     }
-    for (size_t index = 0; index < math_repeats; index++) {
-        memcpy(math + index * math_phrase, TXC_BENCH_MATH_PHRASE, math_phrase);
-    }
-    math[math_repeats * math_phrase] = '\0';
-    failures += txc_bench("compile-math-commands", math, math_repeats * math_phrase, TEX_CORE_MODE_MATH_INLINE);
-    free(math);
 
-    failures += txc_bench("compile-trivial", "x", 1, TEX_CORE_MODE_MATH_INLINE);
+    int failures = 0;
+    failures += txc_bench("large_document", document, TEX_CORE_MODE_DOCUMENT);
+    failures += txc_bench("math_spacing", math, TEX_CORE_MODE_MATH_DISPLAY);
     free(document);
+    free(math);
     return failures == 0 ? 0 : 1;
 }

@@ -24,6 +24,10 @@ static int txc_cli_read(FILE *stream, uint8_t **source, size_t *length) {
     size_t capacity = 0;
     for (;;) {
         if (capacity - used < 4096) {
+            if (capacity > SIZE_MAX / 2) {
+                free(data);
+                return -1;
+            }
             capacity = capacity > 0 ? capacity * 2 : 8192;
             uint8_t *grown = realloc(data, capacity);
             if (grown == NULL) {
@@ -138,8 +142,15 @@ int main(int argc, char *argv[]) {
         fputs("tex-core: error: allocation failed\n", stderr);
         return 1;
     }
-    fwrite(dump, 1, dump_length, stdout);
+    size_t written = fwrite(dump, 1, dump_length, stdout);
     tex_core_dump_free(dump);
     tex_core_render_tree_free(tree);
+    /* A truncated dump must not exit 0: scripts treat the CLI's status as
+     * the compile verdict, so short writes, closed pipes, and deferred
+     * flush errors all have to surface here. */
+    if (written != dump_length || fflush(stdout) != 0 || ferror(stdout)) {
+        fputs("tex-core: writing output failed\n", stderr);
+        return 1;
+    }
     return 0;
 }

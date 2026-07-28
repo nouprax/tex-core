@@ -3,10 +3,13 @@
  * views against independently derived scaled-point values. */
 
 #include <stdint.h>
+#include <stdlib.h>
 #include <string.h>
 
 #include "harness.h"
+#include "memory.h"
 #include "parse.h"
+#include "scaled.h"
 #include "tex_core.h"
 
 /* Expected geometry is derived here exactly as the generator derives the
@@ -854,8 +857,98 @@ static void txc_test_styles(txc_test *test) {
 }
 
 static void txc_test_command_table(txc_test *test) {
-    /* The dispatch binary search is only correct over a sorted table. */
-    txc_check(test, txc_command_table_sorted(), "the command table is strictly sorted");
+    /* Sorted for the binary search, and every row's class index must land
+     * on the payload row carrying the same command name. */
+    txc_check(test, txc_command_table_sorted(), "the command table is sorted and name-consistent");
+}
+
+static void txc_test_nested_styles(txc_test *test) {
+    /* The innermost math alphabet wins: an outer style switch must never
+     * overwrite an explicit inner one. */
+    tex_core_render_tree *tree =
+        txc_compile(test, "\\mathbf{a\\mathit{b}c}", TEX_CORE_MODE_MATH_INLINE, "nested styles");
+    const tex_core_node *root = tex_core_render_tree_root(tree);
+    const tex_core_node *group = tex_core_node_child(root, 0);
+    txc_check_int(
+        test,
+        tex_core_node_glyph(tex_core_node_child(group, 0)).family,
+        TEX_CORE_FAMILY_BOLD,
+        "outer letter takes the outer face"
+    );
+    const tex_core_node *inner = tex_core_node_child(group, 1);
+    txc_check_int(
+        test,
+        tex_core_node_glyph(tex_core_node_child(inner, 0)).family,
+        TEX_CORE_FAMILY_TEXTIT,
+        "inner letter keeps the inner face"
+    );
+    txc_check_int(
+        test,
+        tex_core_node_glyph(tex_core_node_child(group, 2)).family,
+        TEX_CORE_FAMILY_BOLD,
+        "trailing letter returns to the outer face"
+    );
+    tex_core_render_tree_free(tree);
+}
+
+static void txc_test_scaled_rounding(txc_test *test) {
+    /* txc_em floors toward negative infinity — the arithmetic-shift result
+     * — for negative metric fractions on every platform. */
+    txc_check_int(test, txc_em(-65536, 655360), -655360, "negative whole em");
+    txc_check_int(test, txc_em(-1, 655360), -10, "negative fraction floors");
+    txc_check_int(test, txc_em(-3, 7), -1, "negative sub-unit floors to -1");
+    txc_check_int(test, txc_em(1, -655360), -10, "negative em floors");
+    txc_check_int(test, txc_em(3, 65536), 3, "positive fraction truncates");
+}
+
+/* A single 64 KiB line: geometry must stay finite, non-negative, and
+ * monotonic — the 32-bit representation overflowed here — and the returned
+ * tree must retain memory proportional to the render tree, not to the
+ * transient parse (the parser IR is released before compile returns). */
+static void txc_test_long_input(txc_test *test) {
+    static const char phrase[] = "The quick brown fox \\quad jumps over the lazy dog 0123456789. \\, ";
+    size_t phrase_length = sizeof(phrase) - 1;
+    size_t repeats = 65536 / phrase_length;
+    size_t length = repeats * phrase_length;
+    char *source = malloc(length + 1);
+    txc_check(test, source != NULL, "long input allocates");
+    if (source == NULL) {
+        return;
+    }
+    for (size_t index = 0; index < repeats; index++) {
+        memcpy(source + index * phrase_length, phrase, phrase_length);
+    }
+    source[length] = '\0';
+
+    long before = txc_allocation_outstanding();
+    for (int mode = 0; mode < 2; mode++) {
+        tex_core_render_tree *tree =
+            txc_compile(test, source, mode == 0 ? TEX_CORE_MODE_DOCUMENT : TEX_CORE_MODE_MATH_INLINE, "long document");
+        if (tree == NULL) {
+            continue;
+        }
+        const tex_core_node *root = tex_core_render_tree_root(tree);
+        tex_core_frame frame = tex_core_node_frame(root);
+        txc_check(test, frame.width > 0.0, "long root width is positive");
+        double cursor = -1.0;
+        bool monotonic = true;
+        for (size_t child = 0; child < tex_core_node_child_count(root); child++) {
+            double x = tex_core_node_frame(tex_core_node_child(root, child)).x;
+            if (x < cursor) {
+                monotonic = false;
+            }
+            cursor = x;
+        }
+        txc_check(test, monotonic, "long line advances monotonically");
+        /* Geometric arena chunks: the live tree needs tens of blocks, not
+         * the thousands the fixed 4 KiB refill produced, and none of the
+         * parser's scratch blocks may survive compile. */
+        long retained = txc_allocation_outstanding() - before;
+        txc_check(test, retained > 0 && retained < 64, "long tree retains %ld blocks", retained);
+        tex_core_render_tree_free(tree);
+        txc_check_int(test, txc_allocation_outstanding() - before, 0, "long tree frees completely");
+    }
+    free(source);
 }
 
 static void txc_test_text_face_protection(txc_test *test) {
@@ -890,6 +983,9 @@ int main(void) {
     txc_test_accents(&test);
     txc_test_styles(&test);
     txc_test_text_face_protection(&test);
+    txc_test_nested_styles(&test);
     txc_test_command_table(&test);
+    txc_test_scaled_rounding(&test);
+    txc_test_long_input(&test);
     return txc_test_finish(&test, "engine");
 }
