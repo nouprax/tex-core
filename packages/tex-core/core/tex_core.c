@@ -150,6 +150,7 @@ tex_core_glyph tex_core_node_glyph(const tex_core_node *node) {
     if (node != NULL && node->kind == TEX_CORE_NODE_GLYPH) {
         glyph.codepoint = node->codepoint;
         glyph.style = node->style;
+        glyph.family = node->family;
         glyph.size = txc_points(node->size);
     }
     return glyph;

@@ -16,7 +16,7 @@ export interface SourceRange {
 export type GlyphStyle = "upright" | "italic";
 
 /** The font family a glyph belongs to (schema `family`). */
-export type GlyphFamily = "main";
+export type GlyphFamily = "main" | "size1" | "size2" | "size3" | "size4";
 
 /**
  * A horizontal box: the compile root. Measures are absolute points and
@@ -111,7 +111,7 @@ export interface Kern {
 export type RenderNode = HBox | Glyph | Kern | Rule;
 
 /**
- * An immutable compiled document: the render tree of schema version 3.
+ * An immutable compiled document: the render tree of schema version 4.
  *
  * Trees are plain frozen values — structurally comparable and detached from
  * the WASM engine the moment `Document.compile` returns.

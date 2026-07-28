@@ -44,12 +44,16 @@ typedef enum txc_parameter {
     TXC_PARAMETER_DENOM1 = 12,
     TXC_PARAMETER_DENOM2 = 13,
     TXC_PARAMETER_AXIS_HEIGHT = 14,
-    TXC_PARAMETER_COUNT = 15
+    TXC_PARAMETER_DELIM1 = 15,
+    TXC_PARAMETER_DELIM2 = 16,
+    TXC_PARAMETER_NUM3 = 17,
+    TXC_PARAMETER_COUNT = 18
 } txc_parameter;
 
-/* Returns the metrics for a codepoint in a face style, or NULL when the
- * embedded tables do not cover it. */
-const txc_metric *txc_metric_find(tex_core_style style, uint32_t codepoint);
+/* Returns the metrics for a codepoint in a face, or NULL when the
+ * embedded tables do not cover it. The main family splits by style; the
+ * size families carry upright delimiter variants only. */
+const txc_metric *txc_metric_find(tex_core_family family, tex_core_style style, uint32_t codepoint);
 
 /* Returns a style parameter as a 16.16 em fraction of `size`'s own em. */
 int32_t txc_parameter_value(txc_parameter parameter, txc_mathsize size);

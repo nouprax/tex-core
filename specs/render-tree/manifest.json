@@ -1,5 +1,5 @@
 {
-    "schemaVersion": 3,
+    "schemaVersion": 4,
     "contract": "docs/specs/render-tree.md",
     "dumpGrammar": "docs/specs/render-tree-dump.md",
     "format": {
@@ -118,7 +118,17 @@
             "fraction.script",
             "kern.nullDelimiter",
             "error.missingNumerator",
-            "error.missingDenominator"
+            "error.missingDenominator",
+            "delim.fence",
+            "delim.sizeFace",
+            "delim.assembly",
+            "delim.null",
+            "delim.explicit",
+            "delim.binom",
+            "delim.punctClose",
+            "error.missingRight",
+            "error.unmatchedRight",
+            "error.missingDelimiter"
         ],
         "orders": [
             "root.hbox",
@@ -1491,6 +1501,282 @@
                     "mode.mathInline",
                     "outcome.error",
                     "error.missingDenominator"
+                ],
+                "orders": []
+            }
+        },
+        {
+            "name": "math-left-right",
+            "input": "math-left-right.tex",
+            "expected": "math-left-right.tree",
+            "compileOptions": {
+                "mode": "mathInline"
+            },
+            "outcome": "tree",
+            "coverage": {
+                "kinds": [
+                    "hbox",
+                    "glyph",
+                    "kern"
+                ],
+                "states": [
+                    "mode.mathInline",
+                    "outcome.tree",
+                    "children.populated",
+                    "atom.lower",
+                    "atom.bin",
+                    "atom.rel",
+                    "atom.punct",
+                    "glyph.style.upright",
+                    "glyph.style.italic",
+                    "glyph.italic.zero",
+                    "glyph.descent.positive",
+                    "bin.kept",
+                    "space.interAtom.medium",
+                    "space.interAtom.thick",
+                    "kern.boundaryRange",
+                    "delim.fence",
+                    "delim.punctClose",
+                    "measure.zero",
+                    "measure.negative"
+                ],
+                "orders": [
+                    "root.hbox",
+                    "children.sourceOrder"
+                ]
+            }
+        },
+        {
+            "name": "math-left-right-tall",
+            "input": "math-left-right-tall.tex",
+            "expected": "math-left-right-tall.tree",
+            "compileOptions": {
+                "mode": "mathDisplay"
+            },
+            "outcome": "tree",
+            "coverage": {
+                "kinds": [
+                    "hbox",
+                    "glyph",
+                    "kern",
+                    "rule"
+                ],
+                "states": [
+                    "mode.mathDisplay",
+                    "outcome.tree",
+                    "children.populated",
+                    "atom.digit",
+                    "glyph.style.upright",
+                    "glyph.italic.zero",
+                    "fraction.dfrac",
+                    "fraction.nested",
+                    "fraction.display",
+                    "kern.nullDelimiter",
+                    "delim.fence",
+                    "delim.sizeFace",
+                    "delim.assembly",
+                    "measure.zero",
+                    "measure.negative"
+                ],
+                "orders": [
+                    "root.hbox"
+                ]
+            }
+        },
+        {
+            "name": "math-left-right-size",
+            "input": "math-left-right-size.tex",
+            "expected": "math-left-right-size.tree",
+            "compileOptions": {
+                "mode": "mathInline"
+            },
+            "outcome": "tree",
+            "coverage": {
+                "kinds": [
+                    "hbox",
+                    "glyph",
+                    "kern",
+                    "rule"
+                ],
+                "states": [
+                    "mode.mathInline",
+                    "outcome.tree",
+                    "children.populated",
+                    "atom.digit",
+                    "glyph.style.upright",
+                    "glyph.italic.zero",
+                    "fraction.frac",
+                    "fraction.groupArgument",
+                    "fraction.text",
+                    "kern.nullDelimiter",
+                    "delim.fence",
+                    "delim.sizeFace",
+                    "script.sup",
+                    "size.script",
+                    "measure.zero",
+                    "measure.negative"
+                ],
+                "orders": [
+                    "root.hbox",
+                    "children.sourceOrder"
+                ]
+            }
+        },
+        {
+            "name": "math-big",
+            "input": "math-big.tex",
+            "expected": "math-big.tree",
+            "compileOptions": {
+                "mode": "mathInline"
+            },
+            "outcome": "tree",
+            "coverage": {
+                "kinds": [
+                    "hbox",
+                    "glyph",
+                    "kern"
+                ],
+                "states": [
+                    "mode.mathInline",
+                    "outcome.tree",
+                    "children.populated",
+                    "atom.lower",
+                    "atom.bin",
+                    "glyph.style.upright",
+                    "glyph.style.italic",
+                    "glyph.italic.zero",
+                    "bin.kept",
+                    "space.interAtom.medium",
+                    "kern.boundaryRange",
+                    "delim.explicit",
+                    "delim.sizeFace",
+                    "measure.zero"
+                ],
+                "orders": [
+                    "root.hbox",
+                    "children.sourceOrder"
+                ]
+            }
+        },
+        {
+            "name": "math-null-delim",
+            "input": "math-null-delim.tex",
+            "expected": "math-null-delim.tree",
+            "compileOptions": {
+                "mode": "mathInline"
+            },
+            "outcome": "tree",
+            "coverage": {
+                "kinds": [
+                    "hbox",
+                    "glyph",
+                    "kern"
+                ],
+                "states": [
+                    "mode.mathInline",
+                    "outcome.tree",
+                    "children.populated",
+                    "atom.lower",
+                    "glyph.style.upright",
+                    "glyph.style.italic",
+                    "glyph.italic.zero",
+                    "delim.fence",
+                    "delim.null",
+                    "measure.zero"
+                ],
+                "orders": [
+                    "root.hbox"
+                ]
+            }
+        },
+        {
+            "name": "math-binom",
+            "input": "math-binom.tex",
+            "expected": "math-binom.tree",
+            "compileOptions": {
+                "mode": "mathInline"
+            },
+            "outcome": "tree",
+            "coverage": {
+                "kinds": [
+                    "hbox",
+                    "glyph",
+                    "kern"
+                ],
+                "states": [
+                    "mode.mathInline",
+                    "outcome.tree",
+                    "children.populated",
+                    "atom.lower",
+                    "atom.bin",
+                    "glyph.style.upright",
+                    "glyph.style.italic",
+                    "glyph.italic.positive",
+                    "bin.kept",
+                    "space.interAtom.medium",
+                    "kern.boundaryRange",
+                    "delim.binom",
+                    "delim.sizeFace",
+                    "size.script",
+                    "measure.zero",
+                    "measure.negative"
+                ],
+                "orders": [
+                    "root.hbox",
+                    "children.sourceOrder"
+                ]
+            }
+        },
+        {
+            "name": "error-missing-right",
+            "input": "error-missing-right.tex",
+            "expected": "error-missing-right.tree",
+            "compileOptions": {
+                "mode": "mathInline"
+            },
+            "outcome": "error",
+            "coverage": {
+                "kinds": [],
+                "states": [
+                    "mode.mathInline",
+                    "outcome.error",
+                    "error.missingRight"
+                ],
+                "orders": []
+            }
+        },
+        {
+            "name": "error-unmatched-right",
+            "input": "error-unmatched-right.tex",
+            "expected": "error-unmatched-right.tree",
+            "compileOptions": {
+                "mode": "mathInline"
+            },
+            "outcome": "error",
+            "coverage": {
+                "kinds": [],
+                "states": [
+                    "mode.mathInline",
+                    "outcome.error",
+                    "error.unmatchedRight"
+                ],
+                "orders": []
+            }
+        },
+        {
+            "name": "error-missing-delimiter",
+            "input": "error-missing-delimiter.tex",
+            "expected": "error-missing-delimiter.tree",
+            "compileOptions": {
+                "mode": "mathInline"
+            },
+            "outcome": "error",
+            "coverage": {
+                "kinds": [],
+                "states": [
+                    "mode.mathInline",
+                    "outcome.error",
+                    "error.missingDelimiter"
                 ],
                 "orders": []
             }

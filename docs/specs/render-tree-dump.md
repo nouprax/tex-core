@@ -1,8 +1,8 @@
 # Canonical render-tree dump
 
-Status: schemaVersion 3 (milestone M1 fractions change-set); schemaVersion
-2 landed 2026-07-27; schemaVersion 1 was frozen with Phase 3 on
-2026-07-20.
+Status: schemaVersion 4 (milestone M1 delimiters change-set);
+schemaVersion 3 and 2 landed 2026-07-27; schemaVersion 1 was frozen with
+Phase 3 on 2026-07-20.
 
 The dump is the deterministic public diagnostic representation of the render
 tree and the reviewed expected representation used by conformance tests. It
@@ -26,7 +26,7 @@ and has no trailing whitespace.
 The first line is the schema line:
 
 ```text
-render-tree 3
+render-tree 4
 ```
 
 The integer is the render-tree `schemaVersion` and moves only with a
@@ -55,7 +55,7 @@ hbox x=<m> y=<m> width=<m> ascent=<m> descent=<m> src=<b>..<e>
 - `cp`: `U+` followed by the codepoint in uppercase hexadecimal, at least
   four digits, no padding beyond four (`U+0061`, `U+1D453`).
 - `style`, `family`: the lowercase contract spelling, unquoted (`upright`,
-  `italic`, `main`).
+  `italic`, `main`, `size1`, `size2`, `size3`, `size4`).
 - `src`: `<begin>..<end>` — the node's half-open byte range as base-10
   ASCII with no leading zeros except zero itself. Ranges printed by the
   dump are absolute for the dumped compile call.

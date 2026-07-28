@@ -104,6 +104,9 @@ int main(void) {
     /* Scripts allocate their boxes; fractions allocate the construct, its
      * part boxes, the bar, and the null-delimiter kerns. */
     txc_sweep(&test, "x_1^\\frac{a+b}{2}+\\tfrac12", TEX_CORE_MODE_MATH_DISPLAY);
+    /* Fences allocate the construct, both delimiter nodes or assemblies,
+     * and the spliced box; \binom adds the sized parentheses. */
+    txc_sweep(&test, "\\left[\\binom{n}{k}\\right]+\\bigl(x\\bigr)", TEX_CORE_MODE_MATH_DISPLAY);
     txc_allocation_limit(-1);
     return txc_test_finish(&test, "allocfail");
 }

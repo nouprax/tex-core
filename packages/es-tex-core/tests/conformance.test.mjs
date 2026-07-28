@@ -9,7 +9,7 @@ const packageDirectory = path.resolve(fileURLToPath(new URL("..", import.meta.ur
 const bundle = JSON.parse(
     await readFile(path.join(packageDirectory, "build/generated/conformance/render-tree-fixtures.json"), "utf8")
 );
-assert.equal(bundle.schemaVersion, 3);
+assert.equal(bundle.schemaVersion, 4);
 assert.ok(bundle.cases.length > 0);
 
 function errorRecord(error) {
@@ -20,7 +20,7 @@ function errorRecord(error) {
         allocationFailed: "allocation-failed"
     }[error.status];
     const src = error.range ? `${error.range.begin}..${error.range.end}` : "none";
-    return `render-error 3\nerror status=${status} src=${src} message=${error.errorMessage}\n`;
+    return `render-error 4\nerror status=${status} src=${src} message=${error.errorMessage}\n`;
 }
 
 test("conformance: every manifest case matches the shared render-tree spec", () => {

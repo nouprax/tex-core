@@ -89,6 +89,7 @@ private class WireReader(
         val italic = f64()
         val codepoint = u32()
         val style = u32()
+        val family = u32()
         val size = f64()
         val src = SourceRange(u64(), u64())
         val childCount = u32()
@@ -99,7 +100,14 @@ private class WireReader(
                     y = y,
                     codepoint = codepoint,
                     style = if (style == 1) GlyphStyle.ITALIC else GlyphStyle.UPRIGHT,
-                    family = GlyphFamily.MAIN,
+                    family =
+                        when (family) {
+                            1 -> GlyphFamily.SIZE1
+                            2 -> GlyphFamily.SIZE2
+                            3 -> GlyphFamily.SIZE3
+                            4 -> GlyphFamily.SIZE4
+                            else -> GlyphFamily.MAIN
+                        },
                     size = size,
                     width = width,
                     ascent = ascent,

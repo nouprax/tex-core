@@ -1,8 +1,9 @@
 # Render-tree contract
 
-Status: schemaVersion 3 (milestone M1 fractions change-set: the `rule`
-node kind and generalized fractions); schemaVersion 2 (scripts change-set)
-landed 2026-07-27; schemaVersion 1 was frozen with Phase 3 on 2026-07-20.
+Status: schemaVersion 4 (milestone M1 delimiters change-set: the size
+families, `\left`/`\right`, explicit delimiter sizes, and `\binom`);
+schemaVersion 3 (fractions) and 2 (scripts) landed 2026-07-27;
+schemaVersion 1 was frozen with Phase 3 on 2026-07-20.
 
 This document is the language-neutral public render-tree contract implemented
 by the C engine and, as they land, the Swift, Kotlin, and ES bindings
@@ -58,7 +59,7 @@ in the source-range section.
 
 | Kind | Fields in canonical order | Semantics and invariants |
 | --- | --- | --- |
-| `hbox` | `x: measure`, `y: measure`, `width: measure`, `ascent: measure`, `descent: measure`, `src: range`, `children: [node]` | horizontal box: the compile root, a braced group's nucleus, a script box, a fraction atom's box, or a numerator/denominator box; `x`/`y` place its reference point in its parent (the root sits at the origin), a script, numerator, or denominator box's `y` is its baseline shift; `width` is the advance of its content — plus TeX's `\scriptspace` (0.5 pt) on a script box — `ascent`/`descent` the maxima over children floored at zero; the root box spans the whole input |
+| `hbox` | `x: measure`, `y: measure`, `width: measure`, `ascent: measure`, `descent: measure`, `src: range`, `children: [node]` | horizontal box: the compile root, a braced group's nucleus, a script box, a fraction atom's box, a numerator/denominator box, a `\left`/`\right` box, or a delimiter piece assembly; `x`/`y` place its reference point in its parent (the root sits at the origin), a script, numerator, or denominator box's `y` is its baseline shift; `width` is the advance of its content — plus TeX's `\scriptspace` (0.5 pt) on a script box — `ascent`/`descent` the maxima over children floored at zero; the root box spans the whole input |
 | `glyph` | `x: measure`, `y: measure`, `cp: codepoint`, `style: style`, `family: family`, `size: measure`, `width: measure`, `ascent: measure`, `descent: measure`, `italic: measure`, `src: range` | leaf; one glyph named by Unicode codepoint + style + family + size, never a private glyph ID; `italic` is the italic correction, included in the advance of a math Ord glyph unless its atom carries a subscript — the correction then offsets the superscript box instead, exactly as TeX |
 | `kern` | `x: measure`, `width: measure`, `src: range` | leaf; fixed horizontal advance; `width` may be negative; the engine resolves interword spacing, explicit spacing commands, math inter-atom spacing, and the null-delimiter spaces flanking a fraction to kerns (glue arrives with stretch/shrink later, as a schema change) |
 | `rule` | `x: measure`, `y: measure`, `width: measure`, `ascent: measure`, `descent: measure`, `src: range` | leaf; a solid rectangle: its reference point sits at its left edge on the parent's baseline shifted by `y`, and the ink extends `ascent` up, `descent` down, and `width` right from there; today produced only as the fraction bar (`ascent` is the rule thickness, `descent` is zero, and `src` is the fraction command's own token) |
@@ -70,7 +71,11 @@ Field types:
 - `codepoint` — Unicode scalar value.
 - `style` — `upright | italic`. Bold and the remaining faces arrive with
   the 1.0.0 milestones as schema changes.
-- `family` — `main`. Additional families arrive as schema changes.
+- `family` — `main | size1 | size2 | size3 | size4`. The size families
+  are the delimiter size-variant faces (Computer Modern cmex, vendored
+  as KaTeX Size1–Size4): their glyphs are always upright, and their
+  `size` is always the 10 pt text em — TeX's extension fonts do not
+  shrink inside scripts. Additional families arrive as schema changes.
 
 Math inter-atom spacing: in the math modes every atom carries one of TeX's
 classes (Ord, Op, Bin, Rel, Open, Close, Punct, Inner — TeXbook chapter
@@ -159,6 +164,70 @@ kerns; its `ascent`/`descent` are the shifted numerator top and
 denominator bottom. Child order is source order: left kern, `rule` (its
 `src` is the command token), numerator box, denominator box, right kern.
 
+`\binom` is the generalized fraction with no bar (TeX's `\atopwithdelims`
+over parentheses): the shifts start at `num1`/`num3` (display/other) and
+`denom1`/`denom2`, and when the gap between the parts falls short of
+seven rule thicknesses in display style (three otherwise) both parts move
+apart by half the shortfall, `half()` rounding up. No `rule` appears; the
+null-delimiter kerns are replaced by real parenthesis delimiters sized to
+`delim1` (display) or `delim2` (other styles) of the fraction's size.
+Both delimiters carry the command token's source, which precedes the
+arguments — so child order is: left delimiter, right delimiter,
+numerator box, denominator box, with the right delimiter placed after
+the parts by `x` alone.
+
+## Delimiters
+
+`\left`/`\right` enclose a math sub-list between two variable-size
+delimiters. A delimiter is one of the characters `( ) [ ] < > / |` or
+`.`, the control symbols `\{ \} \| \\`, or the commands `\lbrace \rbrace
+\lbrack \rbrack \langle \rangle \lfloor \rfloor \lceil \rceil \vert
+\Vert \backslash \uparrow \downarrow \updownarrow \Uparrow \Downarrow
+\Updownarrow`; `<`, `>`, and `\\` map to the angle brackets and the
+backslash exactly as plain TeX's delimiter codes, and `.` is the null
+delimiter — an empty slot published as one `\nulldelimiterspace` kern.
+Every `\left` needs its `\right` inside the same group (`missing
+\right`), a stray `\right` is `unmatched \right`, and a token that is not
+a delimiter where one is required is `missing delimiter`. `\left`
+subformulas nest inside braces and other `\left` pairs; the 255-group
+bound counts both.
+
+The construct is one Inner atom (TeXbook chapter 17): outside, it spaces
+as Inner; inside its box the left delimiter spaces as an Open atom, the
+right as a Close atom, and the enclosed atoms keep their normal
+inter-atom spacing. The published box's children are, in source order:
+the left delimiter node, the enclosed nodes spliced directly (never
+re-boxed), and the right delimiter node.
+
+Delimiter sizing is TeXbook Appendix G rule 19 (tex.web's
+`make_left_right` and `var_delimiter`): with `h`/`d` the maxima of the
+enclosed material above and below the axis, the target is
+`max((delta div 500) * 901, 2*delta - 5pt)` where
+`delta = max(h - axisHeight, d + axisHeight)` — TeX's
+`\delimiterfactor` 901 and `\delimitershortfall` 5 pt, integer `div`.
+The variant ladder tries the main-family glyph at the current style's
+size and every larger script size, then the size1–size4 faces at the
+text em, and finally — for delimiters TeX extends — a piece assembly;
+the first candidate at least as tall as the target wins. Angle brackets,
+the slashes, and the arrows-without-pieces stop at their largest glyph,
+exactly as their Computer Modern successor chains do. A chosen glyph is
+published as one `glyph` (family `main` or `size1`…`size4`); an
+assembly is an `hbox` of piece glyphs (family `size1` or `size4`)
+stacked by `y` — top piece, enough repeaters to reach the target, a
+middle piece for braces, bottom piece — with no overlap. Either form is
+vertically centered on the math axis: the node's center sits at
+`axisHeight`, `half()` rounding up. A delimiter node's `src` is its own
+delimiter token; the surrounding box spans `\left` through `\right`.
+
+The explicit-size commands `\bigl \bigm \bigr \big` and their `\Big`,
+`\bigg`, `\Bigg` families take one delimiter argument and run the same
+ladder against the fixed plain TeX targets — rule 19 over empty boxes
+8.5 pt, 11.5 pt, 14.5 pt, and 17.5 pt tall at the 10 pt text axis,
+whatever the surrounding style. The atom class is Open for `l`, Close
+for `r`, Rel for `m`, and Ord for the bare forms; the published node is
+the same centered glyph or assembly, and scripts attach to it like to
+any atom.
+
 ## Source ranges
 
 Every node records the byte range of the source it came from, for caret
@@ -192,10 +261,11 @@ and is pinned by the corpus error cases in the corpus error-record form
 
 ## Versioning and change protocol
 
-The schema carries `schemaVersion` 3, printed in the dump schema line and
-frozen in the manifest; version 3 added the `rule` node kind and
-fractions, version 2 added `x`/`y` to `hbox`, nested boxes, and per-glyph
-script sizes. Any intentional change to grammar, layout, metrics,
+The schema carries `schemaVersion` 4, printed in the dump schema line and
+frozen in the manifest; version 4 widened `family` to the size faces and
+added delimiters, version 3 added the `rule` node kind and fractions,
+version 2 added `x`/`y` to `hbox`, nested boxes, and per-glyph script
+sizes. Any intentional change to grammar, layout, metrics,
 schema, or dump — including widening `style`/`family`, adding node kinds or
 fields, or resolving glue — is a public behavior change under plan §5.5:
 one reviewed commit updates this contract, the engine, all shipped
