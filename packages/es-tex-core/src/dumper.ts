@@ -17,7 +17,7 @@ export const RenderDumper = {
 };
 
 class DumpVisitor implements RenderVisitor<void> {
-    output = "render-tree 3\n";
+    output = "render-tree 4\n";
     private depth = 0;
 
     visitHBox(node: HBox): void {

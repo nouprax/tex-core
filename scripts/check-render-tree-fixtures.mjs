@@ -65,7 +65,7 @@ const valueChecks = {
     size: measure,
     cp: /^U\+[0-9A-F]{4,6}$/,
     style: /^(upright|italic)$/,
-    family: /^main$/,
+    family: /^(main|size[1-4])$/,
     src: rangeValue
 };
 
@@ -129,6 +129,7 @@ const nodes = (tree) =>
             depth: pad.length / 2,
             kind,
             cp: field("cp") === undefined ? undefined : Number.parseInt(field("cp").slice(2), 16),
+            family: field("family"),
             x: pt("x"),
             y: pt("y"),
             width: pt("width"),
@@ -465,7 +466,56 @@ const stateValidators = {
     "error.missingNumerator": ({ outcome, tree }) =>
         outcome === "error" && / message=missing numerator argument\n$/.test(tree),
     "error.missingDenominator": ({ outcome, tree }) =>
-        outcome === "error" && / message=missing denominator argument\n$/.test(tree)
+        outcome === "error" && / message=missing denominator argument\n$/.test(tree),
+    "delim.fence": treeStates(
+        (all, { source }) => /\\left/.test(source ?? "") && /\\right/.test(source ?? "") && all.length > 1
+    ),
+    "delim.sizeFace": ({ outcome, tree }) => outcome === "tree" && / family=size[1-4] /.test(tree),
+    "delim.assembly": treeStates((all) =>
+        all.some((node, index) => {
+            if (node.kind !== "hbox") return false;
+            const children = childrenOf(all, index);
+            return (
+                children.length >= 3 &&
+                children.every((child) => child.kind === "glyph" && (child.family ?? "").startsWith("size"))
+            );
+        })
+    ),
+    // The \left./\right. kern keeps its dot token's non-empty range —
+    // unlike the fraction null delimiters, whose ranges are empty.
+    "delim.null": ({ outcome, tree }) =>
+        outcome === "tree" &&
+        [...tree.matchAll(/^ +kern .*width=1\.2pt src=(\d+)\.\.(\d+)$/gm)].some((match) => match[1] !== match[2]),
+    "delim.explicit": ({ outcome, source, tree }) =>
+        outcome === "tree" && /\\[bB]igg?[lmr]?/.test(source ?? "") && / family=size[1-4] /.test(tree),
+    "delim.binom": treeStates(
+        (all, { source }) =>
+            /\\[dt]?binom/.test(source ?? "") &&
+            all.some((node, index) => {
+                if (node.kind !== "hbox") return false;
+                const children = childrenOf(all, index);
+                return (
+                    children.some((child) => child.kind === "hbox" && child.y > 0) &&
+                    children.some((child) => child.kind === "hbox" && child.y < 0) &&
+                    !children.some((child) => child.kind === "rule") &&
+                    children.some((child) => child.kind === "glyph")
+                );
+            })
+    ),
+    "delim.punctClose": treeStates((all) =>
+        all.some((node, index) => {
+            if (node.kind !== "hbox") return false;
+            const children = childrenOf(all, index);
+            return (
+                children.length >= 3 &&
+                children[children.length - 2]?.kind === "kern" &&
+                children[children.length - 1]?.kind === "glyph"
+            );
+        })
+    ),
+    "error.missingRight": ({ outcome, tree }) => outcome === "error" && / message=missing \\right\n$/.test(tree),
+    "error.unmatchedRight": ({ outcome, tree }) => outcome === "error" && / message=unmatched \\right\n$/.test(tree),
+    "error.missingDelimiter": ({ outcome, tree }) => outcome === "error" && / message=missing delimiter\n$/.test(tree)
 };
 const orderValidators = {
     "root.hbox": ({ outcome, tree }) =>
@@ -477,7 +527,7 @@ const orderValidators = {
     }
 };
 
-if (manifest.schemaVersion !== 3) failures.push("manifest schemaVersion must be 3");
+if (manifest.schemaVersion !== 4) failures.push("manifest schemaVersion must be 4");
 if (manifest.contract !== "docs/specs/render-tree.md" || manifest.dumpGrammar !== "docs/specs/render-tree-dump.md") {
     failures.push("manifest contract paths drifted from the repository specifications");
 }

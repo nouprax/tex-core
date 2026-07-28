@@ -28,6 +28,14 @@ public enum GlyphStyle: String, Sendable, CaseIterable {
 public enum GlyphFamily: String, Sendable, CaseIterable {
     /// The default face pair embedded in the engine.
     case main
+    /// The first delimiter size-variant face.
+    case size1
+    /// The second delimiter size-variant face.
+    case size2
+    /// The third delimiter size-variant face.
+    case size3
+    /// The fourth delimiter size-variant face.
+    case size4
 }
 
 /// A horizontal box: the compile root, a braced group's nucleus, or a
@@ -218,7 +226,7 @@ public protocol RenderVisitor {
     mutating func visit(_ node: Rule) -> Result
 }
 
-/// An immutable compiled document: the render tree of schema version 3.
+/// An immutable compiled document: the render tree of schema version 4.
 ///
 /// Trees are plain `Sendable` values — safely shareable across threads,
 /// structurally equatable, and detached from the native engine the moment

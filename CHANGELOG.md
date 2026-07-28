@@ -6,6 +6,27 @@ not promised to remain compatible between releases.
 
 ## Unreleased
 
+- Continue milestone M1 (math core) with variable-size delimiters, moving
+  the render-tree contract to schemaVersion 4: `\left`/`\right` fences,
+  the explicit-size family (`\bigl` through `\Biggr`, plain TeX's fixed
+  rule-19 targets), and the `\binom`/`\dbinom`/`\tbinom` binomials
+  (barless fractions per tex.web section 745 wrapped in
+  delim1/delim2-sized parentheses). The glyph `family` widens to the
+  cmex size faces `size1`-`size4` (vendored as KaTeX Size1-Size4, always
+  upright at the 10 pt text em), and delimiters grow exactly as TeX's
+  var_delimiter: the main-family glyph at the current and larger script
+  sizes, the size faces, then an extensible piece assembly (corner,
+  repeater, and brace-waist glyphs stacked without overlap in an hbox),
+  every choice centered on the math axis and sized by Appendix G rule 19
+  (delimiterfactor 901, delimitershortfall 5 pt, integer div). A fence is
+  one Inner atom whose children are the left delimiter, the enclosed
+  nodes spliced directly, and the right delimiter — Open/Close spacing
+  inside, Inner outside; `.` is the null delimiter kern. New structured
+  errors are pinned: `missing \right`, `unmatched \right`, and
+  `missing delimiter`. The TXC1 wire record gains the glyph family; the
+  corpus grows to 56 cases (six delimiter trees, three error records)
+  with delimiter validators, and all four bindings widen `GlyphFamily`
+  and replay the corpus byte-exactly.
 - Continue milestone M1 (math core) with generalized fractions, moving the
   render-tree contract to schemaVersion 3: the math modes gain `\frac`,
   `\dfrac`, and `\tfrac` — two mandatory arguments each (a character, a

@@ -1,6 +1,6 @@
 import { CompileError } from "./compile-error.js";
 import type { CompileStatus } from "./compile-error.js";
-import type { GlyphStyle, HBox, RenderNode, Rule, SourceRange } from "./model.js";
+import type { GlyphFamily, GlyphStyle, HBox, RenderNode, Rule, SourceRange } from "./model.js";
 import { RenderTree } from "./model.js";
 
 /**
@@ -24,6 +24,21 @@ export function decodePayload(payload: Uint8Array): RenderTree {
     if (root.kind !== "hbox") throw new Error("wire payload root must be an hbox");
     if (!reader.exhausted()) throw new Error("wire payload has trailing bytes");
     return new RenderTree(root);
+}
+
+function decodeFamily(family: number): GlyphFamily {
+    switch (family) {
+        case 1:
+            return "size1";
+        case 2:
+            return "size2";
+        case 3:
+            return "size3";
+        case 4:
+            return "size4";
+        default:
+            return "main";
+    }
 }
 
 function decodeStatus(status: number): CompileStatus {
@@ -88,6 +103,7 @@ class WireReader {
         const italic = this.f64();
         const codepoint = this.u32();
         const style: GlyphStyle = this.u32() === 1 ? "italic" : "upright";
+        const family = decodeFamily(this.u32());
         const size = this.f64();
         const src: SourceRange = Object.freeze({ begin: this.u53(), end: this.u53() });
         const childCount = this.u32();
@@ -99,7 +115,7 @@ class WireReader {
                     y,
                     codepoint,
                     style,
-                    family: "main",
+                    family,
                     size,
                     width,
                     ascent,

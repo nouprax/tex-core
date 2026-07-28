@@ -564,6 +564,63 @@ static void txc_test_fractions(txc_test *test) {
     tex_core_render_tree_free(tree);
 }
 
+static void txc_test_delimiters(txc_test *test) {
+    /* A short operand keeps the text-size paren: rule 19 over x's reach
+     * (delta1 = 2.5pt) targets 4.49564pt, under the 10pt small glyph. */
+    tex_core_render_tree *tree = txc_compile(test, "\\left(x\\right)", TEX_CORE_MODE_MATH_INLINE, "small fence");
+    const tex_core_node *box = tex_core_node_child(tex_core_render_tree_root(tree), 0);
+    txc_check_size(test, tex_core_node_child_count(box), 3, "small fence children");
+    const tex_core_node *left = tex_core_node_child(box, 0);
+    txc_check_int(test, tex_core_node_glyph(left).family, TEX_CORE_FAMILY_MAIN, "small fence keeps the main paren");
+    txc_check(test, tex_core_node_frame(left).y == 0.0, "the main paren sits axis-centered already");
+    tex_core_render_tree_free(tree);
+
+    /* A fraction operand overflows the small paren: Size1 at the text em. */
+    tree = txc_compile(test, "\\left(\\frac{1}{2}\\right)", TEX_CORE_MODE_MATH_INLINE, "size1 fence");
+    box = tex_core_node_child(tex_core_render_tree_root(tree), 0);
+    left = tex_core_node_child(box, 0);
+    txc_check_int(test, tex_core_node_glyph(left).family, TEX_CORE_FAMILY_SIZE1, "size1 paren");
+    txc_check(test, tex_core_node_glyph(left).size == 10.0, "size faces stay at the text em");
+    tex_core_render_tree_free(tree);
+
+    /* Very tall content assembles bracket pieces from Size4. */
+    tree = txc_compile(test, "\\left[\\dfrac{1}{\\dfrac{1}{2}}\\right]", TEX_CORE_MODE_MATH_DISPLAY, "assembly");
+    box = tex_core_node_child(tex_core_render_tree_root(tree), 0);
+    left = tex_core_node_child(box, 0);
+    txc_check_int(test, tex_core_node_get_kind(left), TEX_CORE_NODE_HBOX, "assembly is a box");
+    txc_check(test, tex_core_node_child_count(left) >= 3, "assembly has top, pieces, bottom");
+    txc_check_int(
+        test,
+        tex_core_node_glyph(tex_core_node_child(left, 0)).family,
+        TEX_CORE_FAMILY_SIZE4,
+        "bracket pieces come from Size4"
+    );
+    tex_core_render_tree_free(tree);
+
+    /* The explicit sizes force fixed targets whatever the content. */
+    tree = txc_compile(test, "\\bigl(x\\bigr)", TEX_CORE_MODE_MATH_INLINE, "bigl");
+    const tex_core_node *root = tex_core_render_tree_root(tree);
+    txc_check_size(test, tex_core_node_child_count(root), 3, "bigl children");
+    const tex_core_node *nucleus = tex_core_node_child(tex_core_node_child(root, 0), 0);
+    txc_check_int(test, tex_core_node_glyph(nucleus).family, TEX_CORE_FAMILY_SIZE1, "big reaches Size1");
+    tex_core_render_tree_free(tree);
+
+    /* The null delimiter is a \nulldelimiterspace kern. */
+    tree = txc_compile(test, "\\left.x\\right|", TEX_CORE_MODE_MATH_INLINE, "null delimiter");
+    box = tex_core_node_child(tex_core_render_tree_root(tree), 0);
+    txc_check_int(test, tex_core_node_get_kind(tex_core_node_child(box, 0)), TEX_CORE_NODE_KERN, "null left is a kern");
+    txc_check(test, tex_core_node_frame(tex_core_node_child(box, 0)).width == 78643.0 / 65536.0, "null kern width");
+    tex_core_render_tree_free(tree);
+
+    /* \binom: barless shifts (num3 in text style) inside real parens. */
+    tree = txc_compile(test, "\\binom{n}{k}", TEX_CORE_MODE_MATH_INLINE, "binom");
+    box = tex_core_node_child(tex_core_render_tree_root(tree), 0);
+    txc_check_size(test, tex_core_node_child_count(box), 4, "binom children");
+    txc_check_int(test, tex_core_node_glyph(tex_core_node_child(box, 0)).family, TEX_CORE_FAMILY_SIZE1, "binom paren");
+    txc_check(test, tex_core_node_frame(tex_core_node_child(box, 1)).y == txc_expected_points(0.444), "binom num3");
+    tex_core_render_tree_free(tree);
+}
+
 int main(void) {
     txc_test test = {0, 0};
     txc_test_math_glyph(&test);
@@ -576,5 +633,6 @@ int main(void) {
     txc_test_bin_context(&test);
     txc_test_symbol_commands(&test);
     txc_test_fractions(&test);
+    txc_test_delimiters(&test);
     return txc_test_finish(&test, "engine");
 }

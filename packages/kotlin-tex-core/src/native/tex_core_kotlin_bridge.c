@@ -10,7 +10,7 @@
  *     per node:
  *       u32 kind                        1 hbox, 2 glyph, 3 kern, 4 rule
  *       f64 x, y, width, ascent, descent, italic
- *       u32 codepoint; u32 style        zero outside glyphs
+ *       u32 codepoint; u32 style; u32 family   zero outside glyphs
  *       f64 size                        zero outside glyphs
  *       u64 src_begin; u64 src_end
  *       u32 child_count
@@ -94,7 +94,8 @@ static bool txc_kotlin_node(txc_kotlin_buffer *buffer, const tex_core_node *node
         !txc_kotlin_f64(buffer, frame.y) || !txc_kotlin_f64(buffer, frame.width) ||
         !txc_kotlin_f64(buffer, frame.ascent) || !txc_kotlin_f64(buffer, frame.descent) ||
         !txc_kotlin_f64(buffer, frame.italic) || !txc_kotlin_u32(buffer, glyph.codepoint) ||
-        !txc_kotlin_u32(buffer, (uint32_t)glyph.style) || !txc_kotlin_f64(buffer, glyph.size) ||
+        !txc_kotlin_u32(buffer, (uint32_t)glyph.style) || !txc_kotlin_u32(buffer, (uint32_t)glyph.family) ||
+        !txc_kotlin_f64(buffer, glyph.size) ||
         !txc_kotlin_u64(buffer, range.begin) || !txc_kotlin_u64(buffer, range.end) ||
         !txc_kotlin_u32(buffer, (uint32_t)children)) {
         return false;

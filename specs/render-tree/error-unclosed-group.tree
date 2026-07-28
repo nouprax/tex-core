@@ -1,2 +1,2 @@
-render-error 3
+render-error 4
 error status=unsupported src=0..1 message=unclosed group

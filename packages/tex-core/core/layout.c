@@ -38,6 +38,27 @@ static const txc_scaled TXC_MATHSIZE_EM[3] = {655360, 458752, 327680};
  * absolute dimen parameter that never scales with the script sizes. */
 #define TXC_NULL_DELIMITER_SPACE 78643
 
+/* Plain TeX's \delimitershortfall (5 pt) and \delimiterfactor (901),
+ * both absolute at every size. */
+#define TXC_DELIMITER_SHORTFALL 327680
+#define TXC_DELIMITER_FACTOR 901
+
+/* Appendix G rule 19: a delimiter must cover `delta1` — the enclosed
+ * material's reach above or below the axis, whichever is larger — to at
+ * least 901/1000ths of full coverage, and may fall short of full
+ * coverage by at most \delimitershortfall (integer div exactly as
+ * tex.web's make_left_right). */
+static txc_scaled txc_delimiter_target(txc_scaled delta1) {
+    txc_scaled factored = (delta1 / 500) * TXC_DELIMITER_FACTOR;
+    txc_scaled shortfall = 2 * delta1 - TXC_DELIMITER_SHORTFALL;
+    return factored > shortfall ? factored : shortfall;
+}
+
+/* The plain TeX \big family targets: rule 19 over empty boxes 8.5 pt,
+ * 11.5 pt, 14.5 pt, and 17.5 pt tall on the 10 pt text axis, whatever
+ * the surrounding style. */
+static const txc_scaled TXC_BIG_HEIGHTS[4] = {557056, 753664, 950272, 1146880};
+
 static txc_scaled txc_param(txc_parameter parameter, txc_mathsize size) {
     return txc_em(txc_parameter_value(parameter, size), TXC_MATHSIZE_EM[size]);
 }
@@ -174,6 +195,7 @@ static void txc_kern_init(txc_node *node, txc_scaled x, txc_scaled width, tex_co
     node->y = 0;
     node->codepoint = 0;
     node->style = TEX_CORE_STYLE_UPRIGHT;
+    node->family = TEX_CORE_FAMILY_MAIN;
     node->size = 0;
     node->width = width;
     node->ascent = 0;
@@ -193,6 +215,30 @@ static tex_core_status txc_fraction_box(
     tex_core_error *error
 );
 
+static tex_core_status txc_delimiter_boxed(
+    txc_arena *arena,
+    const txc_delimiter *delimiter,
+    int style,
+    txc_scaled target,
+    tex_core_range range,
+    txc_node **out,
+    tex_core_error *error
+);
+
+static tex_core_status txc_fenced_box(
+    txc_arena *arena,
+    const txc_fenced *fenced,
+    int style,
+    tex_core_range range,
+    txc_node **out,
+    tex_core_error *error
+);
+
+/* The rule-19 target of one \big size step. */
+static txc_scaled txc_big_target(int size) {
+    return txc_delimiter_target(TXC_BIG_HEIGHTS[size - 1] - txc_param(TXC_PARAMETER_AXIS_HEIGHT, TXC_MATHSIZE_TEXT));
+}
+
 /* Builds the box for a noad field, TeX's clean_box (tex.web sections
  * 720-721): a character field boxes one glyph and — like clean_box's
  * trivial-box simplification, which strips a lone italic-correction kern —
@@ -206,8 +252,22 @@ txc_clean_box(txc_arena *arena, const txc_field *field, int style, txc_node **ou
     if (field->kind == TXC_FIELD_FRACTION) {
         return txc_fraction_box(arena, field->fraction, style, field->range, out, error);
     }
+    if (field->kind == TXC_FIELD_FENCED) {
+        return txc_fenced_box(arena, field->fenced, style, field->range, out, error);
+    }
+    if (field->kind == TXC_FIELD_DELIMITER) {
+        return txc_delimiter_boxed(
+            arena,
+            &field->sized.delimiter,
+            style,
+            txc_big_target(field->sized.size),
+            field->range,
+            out,
+            error
+        );
+    }
     if (field->kind == TXC_FIELD_CHAR) {
-        const txc_metric *metric = txc_metric_find(field->style, field->codepoint);
+        const txc_metric *metric = txc_metric_find(TEX_CORE_FAMILY_MAIN, field->style, field->codepoint);
         if (metric == NULL) {
             return txc_fail(
                 error,
@@ -229,6 +289,7 @@ txc_clean_box(txc_arena *arena, const txc_field *field, int style, txc_node **ou
         glyph->y = 0;
         glyph->codepoint = field->codepoint;
         glyph->style = field->style;
+        glyph->family = TEX_CORE_FAMILY_MAIN;
         glyph->size = em;
         glyph->width = txc_em(metric->width, em);
         glyph->ascent = txc_em(metric->height, em);
@@ -243,6 +304,7 @@ txc_clean_box(txc_arena *arena, const txc_field *field, int style, txc_node **ou
         box->y = 0;
         box->codepoint = 0;
         box->style = TEX_CORE_STYLE_UPRIGHT;
+        box->family = TEX_CORE_FAMILY_MAIN;
         box->size = 0;
         box->width = glyph->width;
         box->ascent = glyph->ascent > 0 ? glyph->ascent : 0;
@@ -280,6 +342,259 @@ txc_script_box(txc_arena *arena, const txc_field *field, int style, txc_node **o
 
 static txc_scaled txc_max(txc_scaled left, txc_scaled right) { return left > right ? left : right; }
 
+static void txc_glyph_init(
+    txc_node *node,
+    uint32_t codepoint,
+    tex_core_family family,
+    const txc_metric *metric,
+    txc_scaled em,
+    tex_core_range range
+) {
+    node->kind = TEX_CORE_NODE_GLYPH;
+    node->x = 0;
+    node->y = 0;
+    node->codepoint = codepoint;
+    node->style = TEX_CORE_STYLE_UPRIGHT;
+    node->family = family;
+    node->size = em;
+    node->width = txc_em(metric->width, em);
+    node->ascent = txc_em(metric->height, em);
+    node->descent = txc_em(metric->depth, em);
+    node->italic = txc_em(metric->italic, em);
+    node->range = range;
+    node->children = NULL;
+    node->child_count = 0;
+}
+
+/* Builds one piece assembly at least `target` tall: top piece, enough
+ * repeaters, a middle piece for braces (repeaters then balance above and
+ * below), bottom piece — stacked with no overlap into an hbox whose
+ * baseline sits at its bottom. */
+static tex_core_status txc_delimiter_assembly(
+    txc_arena *arena,
+    const txc_delimiter *delimiter,
+    txc_scaled target,
+    tex_core_range range,
+    txc_node **out,
+    tex_core_error *error
+) {
+    txc_scaled em = TXC_MATHSIZE_EM[TXC_MATHSIZE_TEXT];
+    const txc_metric *top = txc_metric_find(delimiter->piece_family, TEX_CORE_STYLE_UPRIGHT, delimiter->top);
+    const txc_metric *repeat = txc_metric_find(delimiter->piece_family, TEX_CORE_STYLE_UPRIGHT, delimiter->repeat);
+    const txc_metric *bottom = txc_metric_find(delimiter->piece_family, TEX_CORE_STYLE_UPRIGHT, delimiter->bottom);
+    const txc_metric *middle = delimiter->middle != 0
+                                   ? txc_metric_find(delimiter->piece_family, TEX_CORE_STYLE_UPRIGHT, delimiter->middle)
+                                   : NULL;
+    if (top == NULL || repeat == NULL || bottom == NULL || (delimiter->middle != 0 && middle == NULL)) {
+        return txc_fail(error, TEX_CORE_STATUS_UNSUPPORTED, &range, "unsupported delimiter");
+    }
+
+    txc_scaled top_size = txc_em(top->height, em) + txc_em(top->depth, em);
+    txc_scaled repeat_size = txc_em(repeat->height, em) + txc_em(repeat->depth, em);
+    txc_scaled bottom_size = txc_em(bottom->height, em) + txc_em(bottom->depth, em);
+    txc_scaled middle_size = middle != NULL ? txc_em(middle->height, em) + txc_em(middle->depth, em) : 0;
+    txc_scaled fixed = top_size + bottom_size + middle_size;
+    txc_scaled step = middle != NULL ? 2 * repeat_size : repeat_size;
+    size_t count = 0;
+    if (fixed < target && step > 0) {
+        count = (size_t)((target - fixed + step - 1) / step);
+    }
+    txc_scaled total = fixed + (txc_scaled)count * step;
+    size_t pieces = 2 + (middle != NULL ? 1 : 0) + (middle != NULL ? 2 * count : count);
+
+    txc_node *box = txc_arena_alloc(arena, sizeof(txc_node));
+    const txc_node **children = txc_arena_alloc(arena, pieces * sizeof(*children));
+    if (box == NULL || children == NULL) {
+        return txc_alloc_fail(error);
+    }
+
+    txc_scaled width = txc_max(txc_em(top->width, em), txc_max(txc_em(repeat->width, em), txc_em(bottom->width, em)));
+    if (middle != NULL) {
+        width = txc_max(width, txc_em(middle->width, em));
+    }
+
+    /* Emit top-down: each piece's ink abuts the previous one. */
+    txc_scaled cursor = total;
+    size_t index = 0;
+    const txc_metric *plan[3] = {top, middle, bottom};
+    uint32_t plan_cp[3] = {delimiter->top, delimiter->middle, delimiter->bottom};
+    for (size_t part = 0; part < 3; part++) {
+        if (plan[part] == NULL || (part == 1 && middle == NULL)) {
+            continue;
+        }
+        if (part > 0) {
+            for (size_t copy = 0; copy < count; copy++) {
+                txc_node *piece = txc_arena_alloc(arena, sizeof(txc_node));
+                if (piece == NULL) {
+                    return txc_alloc_fail(error);
+                }
+                txc_glyph_init(piece, delimiter->repeat, delimiter->piece_family, repeat, em, range);
+                piece->y = cursor - piece->ascent;
+                cursor -= piece->ascent + piece->descent;
+                children[index++] = piece;
+            }
+            if (part == 1 && middle == NULL) {
+                continue;
+            }
+        }
+        txc_node *piece = txc_arena_alloc(arena, sizeof(txc_node));
+        if (piece == NULL) {
+            return txc_alloc_fail(error);
+        }
+        txc_glyph_init(piece, plan_cp[part], delimiter->piece_family, plan[part], em, range);
+        piece->y = cursor - piece->ascent;
+        cursor -= piece->ascent + piece->descent;
+        children[index++] = piece;
+    }
+
+    box->kind = TEX_CORE_NODE_HBOX;
+    box->x = 0;
+    box->y = 0;
+    box->codepoint = 0;
+    box->style = TEX_CORE_STYLE_UPRIGHT;
+    box->family = TEX_CORE_FAMILY_MAIN;
+    box->size = 0;
+    box->width = width;
+    box->ascent = total;
+    box->descent = 0;
+    box->italic = 0;
+    box->range = range;
+    box->children = children;
+    box->child_count = index;
+    *out = box;
+    return TEX_CORE_STATUS_OK;
+}
+
+/* TeX's var_delimiter (tex.web sections 706-714): the first ladder
+ * candidate at least `target` tall wins — the main-family glyph at the
+ * current and every larger script size, the size faces at the text em,
+ * then the piece assembly. Ladders without pieces fall back to their
+ * largest size-face glyph; the null delimiter is a \nulldelimiterspace
+ * kern. The chosen node is centered on the math axis of `style`'s size. */
+static tex_core_status txc_delimiter_node(
+    txc_arena *arena,
+    const txc_delimiter *delimiter,
+    int style,
+    txc_scaled target,
+    tex_core_range range,
+    txc_node **out,
+    tex_core_error *error
+) {
+    if (delimiter->small == 0) {
+        txc_node *kern = txc_arena_alloc(arena, sizeof(txc_node));
+        if (kern == NULL) {
+            return txc_alloc_fail(error);
+        }
+        txc_kern_init(kern, 0, TXC_NULL_DELIMITER_SPACE, range);
+        *out = kern;
+        return TEX_CORE_STATUS_OK;
+    }
+
+    txc_scaled axis = txc_param(TXC_PARAMETER_AXIS_HEIGHT, txc_style_size(style));
+    const txc_metric *chosen = NULL;
+    tex_core_family chosen_family = TEX_CORE_FAMILY_MAIN;
+    txc_scaled chosen_em = 0;
+
+    /* Small candidates: the current size's glyph, then each larger one. */
+    for (int size = (int)txc_style_size(style); size >= (int)TXC_MATHSIZE_TEXT; size--) {
+        const txc_metric *metric = txc_metric_find(TEX_CORE_FAMILY_MAIN, TEX_CORE_STYLE_UPRIGHT, delimiter->small);
+        if (metric == NULL) {
+            break;
+        }
+        txc_scaled em = TXC_MATHSIZE_EM[size];
+        if (txc_em(metric->height, em) + txc_em(metric->depth, em) >= target) {
+            chosen = metric;
+            chosen_family = TEX_CORE_FAMILY_MAIN;
+            chosen_em = em;
+            break;
+        }
+    }
+
+    /* Size-face candidates at the text em; NEVER ladders keep the last
+     * one that exists as their fallback. */
+    if (chosen == NULL && delimiter->ladder != TXC_LADDER_ALWAYS) {
+        const txc_metric *largest = NULL;
+        tex_core_family largest_family = TEX_CORE_FAMILY_MAIN;
+        for (tex_core_family family = TEX_CORE_FAMILY_SIZE1; family <= TEX_CORE_FAMILY_SIZE4; family++) {
+            const txc_metric *metric = txc_metric_find(family, TEX_CORE_STYLE_UPRIGHT, delimiter->small);
+            if (metric == NULL) {
+                continue;
+            }
+            largest = metric;
+            largest_family = family;
+            txc_scaled em = TXC_MATHSIZE_EM[TXC_MATHSIZE_TEXT];
+            if (txc_em(metric->height, em) + txc_em(metric->depth, em) >= target) {
+                chosen = metric;
+                chosen_family = family;
+                chosen_em = TXC_MATHSIZE_EM[TXC_MATHSIZE_TEXT];
+                break;
+            }
+        }
+        if (chosen == NULL && delimiter->ladder == TXC_LADDER_NEVER && largest != NULL) {
+            chosen = largest;
+            chosen_family = largest_family;
+            chosen_em = TXC_MATHSIZE_EM[TXC_MATHSIZE_TEXT];
+        }
+    }
+
+    txc_node *node;
+    if (chosen != NULL) {
+        node = txc_arena_alloc(arena, sizeof(txc_node));
+        if (node == NULL) {
+            return txc_alloc_fail(error);
+        }
+        txc_glyph_init(node, delimiter->small, chosen_family, chosen, chosen_em, range);
+    } else {
+        tex_core_status status = txc_delimiter_assembly(arena, delimiter, target, range, &node, error);
+        if (status != TEX_CORE_STATUS_OK) {
+            return status;
+        }
+    }
+    node->y = axis - txc_half(node->ascent - node->descent);
+    *out = node;
+    return TEX_CORE_STATUS_OK;
+}
+
+/* Wraps a delimiter node in a plain box on the surrounding baseline, so
+ * a sized delimiter can be an atom nucleus or a clean-box field. */
+static tex_core_status txc_delimiter_boxed(
+    txc_arena *arena,
+    const txc_delimiter *delimiter,
+    int style,
+    txc_scaled target,
+    tex_core_range range,
+    txc_node **out,
+    tex_core_error *error
+) {
+    txc_node *node;
+    tex_core_status status = txc_delimiter_node(arena, delimiter, style, target, range, &node, error);
+    if (status != TEX_CORE_STATUS_OK) {
+        return status;
+    }
+    txc_node *box = txc_arena_alloc(arena, sizeof(txc_node));
+    const txc_node **children = txc_arena_alloc(arena, sizeof(*children));
+    if (box == NULL || children == NULL) {
+        return txc_alloc_fail(error);
+    }
+    children[0] = node;
+    box->kind = TEX_CORE_NODE_HBOX;
+    box->x = 0;
+    box->y = 0;
+    box->codepoint = 0;
+    box->style = TEX_CORE_STYLE_UPRIGHT;
+    box->family = TEX_CORE_FAMILY_MAIN;
+    box->size = 0;
+    box->width = node->width;
+    box->ascent = txc_max(node->y + node->ascent, 0);
+    box->descent = txc_max(node->descent - node->y, 0);
+    box->italic = 0;
+    box->range = range;
+    box->children = children;
+    box->child_count = 1;
+    *out = box;
+    return TEX_CORE_STATUS_OK;
+}
+
 /* Builds a generalized fraction's box, TeXbook Appendix G rule 15
  * (tex.web's make_fraction, sections 743-748): numerator and denominator
  * are clean boxes one style step down (the denominator cramped), shifted
@@ -316,7 +631,8 @@ static tex_core_status txc_fraction_box(
         return status;
     }
 
-    txc_scaled thickness = txc_param(TXC_PARAMETER_RULE_THICKNESS, size);
+    txc_scaled default_thickness = txc_param(TXC_PARAMETER_RULE_THICKNESS, size);
+    txc_scaled thickness = fraction->binom ? 0 : default_thickness;
     txc_scaled axis = txc_param(TXC_PARAMETER_AXIS_HEIGHT, size);
     txc_scaled shift_up;
     txc_scaled shift_down;
@@ -324,76 +640,243 @@ static tex_core_status txc_fraction_box(
         shift_up = txc_param(TXC_PARAMETER_NUM1, size);
         shift_down = txc_param(TXC_PARAMETER_DENOM1, size);
     } else {
-        shift_up = txc_param(TXC_PARAMETER_NUM2, size);
+        shift_up = txc_param(thickness != 0 ? TXC_PARAMETER_NUM2 : TXC_PARAMETER_NUM3, size);
         shift_down = txc_param(TXC_PARAMETER_DENOM2, size);
     }
-    txc_scaled clearance = fraction_style < TXC_STYLE_TEXT ? 3 * thickness : thickness;
     txc_scaled delta = txc_half(thickness);
-    txc_scaled gap_up = clearance - ((shift_up - num->descent) - (axis + delta));
-    if (gap_up > 0) {
-        shift_up += gap_up;
+    if (thickness == 0) {
+        /* No bar (tex.web section 745): keep seven default thicknesses of
+         * clearance in display style, three otherwise, pushing both parts
+         * apart by half any shortfall. */
+        txc_scaled clearance = fraction_style < TXC_STYLE_TEXT ? 7 * default_thickness : 3 * default_thickness;
+        txc_scaled gap = (shift_up - num->descent) - (den->ascent - shift_down);
+        txc_scaled push = txc_half(clearance - gap);
+        if (push > 0) {
+            shift_up += push;
+            shift_down += push;
+        }
+    } else {
+        txc_scaled clearance = fraction_style < TXC_STYLE_TEXT ? 3 * thickness : thickness;
+        txc_scaled gap_up = clearance - ((shift_up - num->descent) - (axis + delta));
+        if (gap_up > 0) {
+            shift_up += gap_up;
+        }
+        txc_scaled gap_down = clearance - ((axis - delta) - (den->ascent - shift_down));
+        if (gap_down > 0) {
+            shift_down += gap_down;
+        }
     }
-    txc_scaled gap_down = clearance - ((axis - delta) - (den->ascent - shift_down));
-    if (gap_down > 0) {
-        shift_down += gap_down;
+
+    txc_node *left;
+    txc_node *right;
+    txc_node *rule = NULL;
+    if (fraction->binom) {
+        /* Parentheses sized to delim1/delim2 replace the null delimiters
+         * (tex.web section 748). */
+        static const txc_delimiter paren_left =
+            {0x0028, TXC_LADDER_LARGE, 0x239B, 0x239C, 0x239D, 0, TEX_CORE_FAMILY_SIZE4};
+        static const txc_delimiter paren_right =
+            {0x0029, TXC_LADDER_LARGE, 0x239E, 0x239F, 0x23A0, 0, TEX_CORE_FAMILY_SIZE4};
+        txc_scaled target =
+            txc_param(fraction_style < TXC_STYLE_TEXT ? TXC_PARAMETER_DELIM1 : TXC_PARAMETER_DELIM2, size);
+        status = txc_delimiter_node(arena, &paren_left, fraction_style, target, fraction->command, &left, error);
+        if (status != TEX_CORE_STATUS_OK) {
+            return status;
+        }
+        status = txc_delimiter_node(arena, &paren_right, fraction_style, target, fraction->command, &right, error);
+        if (status != TEX_CORE_STATUS_OK) {
+            return status;
+        }
+    } else {
+        left = txc_arena_alloc(arena, sizeof(txc_node));
+        right = txc_arena_alloc(arena, sizeof(txc_node));
+        rule = txc_arena_alloc(arena, sizeof(txc_node));
+        if (left == NULL || right == NULL || rule == NULL) {
+            return txc_alloc_fail(error);
+        }
+        tex_core_range left_edge = {fraction->command.begin, fraction->command.begin};
+        txc_kern_init(left, 0, TXC_NULL_DELIMITER_SPACE, left_edge);
+        tex_core_range right_edge = {range.end, range.end};
+        txc_kern_init(right, 0, TXC_NULL_DELIMITER_SPACE, right_edge);
+
+        rule->kind = TEX_CORE_NODE_RULE;
+        rule->y = axis + delta - thickness;
+        rule->codepoint = 0;
+        rule->style = TEX_CORE_STYLE_UPRIGHT;
+        rule->family = TEX_CORE_FAMILY_MAIN;
+        rule->size = 0;
+        rule->ascent = thickness;
+        rule->descent = 0;
+        rule->italic = 0;
+        rule->range = fraction->command;
+        rule->children = NULL;
+        rule->child_count = 0;
     }
 
     /* The parts share the wider width, the narrower centered — the
      * resolved geometry of TeX's rebox fil glue. */
     txc_scaled width = txc_max(num->width, den->width);
-    num->x = TXC_NULL_DELIMITER_SPACE + txc_half(width - num->width);
+    num->x = left->width + txc_half(width - num->width);
     num->y = shift_up;
-    den->x = TXC_NULL_DELIMITER_SPACE + txc_half(width - den->width);
+    den->x = left->width + txc_half(width - den->width);
     den->y = -shift_down;
+    right->x = left->width + width;
+    if (rule != NULL) {
+        rule->x = left->width;
+        rule->width = width;
+    }
 
+    size_t child_count = rule != NULL ? 5 : 4;
     txc_node *box = txc_arena_alloc(arena, sizeof(txc_node));
-    const txc_node **children = txc_arena_alloc(arena, 5 * sizeof(*children));
-    txc_node *left = txc_arena_alloc(arena, sizeof(txc_node));
-    txc_node *rule = txc_arena_alloc(arena, sizeof(txc_node));
-    txc_node *right = txc_arena_alloc(arena, sizeof(txc_node));
-    if (box == NULL || children == NULL || left == NULL || rule == NULL || right == NULL) {
+    const txc_node **children = txc_arena_alloc(arena, child_count * sizeof(*children));
+    if (box == NULL || children == NULL) {
         return txc_alloc_fail(error);
     }
-    tex_core_range left_edge = {fraction->command.begin, fraction->command.begin};
-    txc_kern_init(left, 0, TXC_NULL_DELIMITER_SPACE, left_edge);
-    tex_core_range right_edge = {range.end, range.end};
-    txc_kern_init(right, TXC_NULL_DELIMITER_SPACE + width, TXC_NULL_DELIMITER_SPACE, right_edge);
 
-    rule->kind = TEX_CORE_NODE_RULE;
-    rule->x = TXC_NULL_DELIMITER_SPACE;
-    rule->y = axis + delta - thickness;
-    rule->codepoint = 0;
-    rule->style = TEX_CORE_STYLE_UPRIGHT;
-    rule->size = 0;
-    rule->width = width;
-    rule->ascent = thickness;
-    rule->descent = 0;
-    rule->italic = 0;
-    rule->range = fraction->command;
-    rule->children = NULL;
-    rule->child_count = 0;
+    /* Child order is source order: the bar's and the binomial
+     * delimiters' source is the command token, which precedes both
+     * arguments. */
+    size_t index = 0;
+    children[index++] = left;
+    if (rule != NULL) {
+        children[index++] = rule;
+    }
+    children[index++] = num;
+    children[index++] = den;
+    children[index++] = right;
 
-    /* Child order is source order: the bar's source is the command token,
-     * which precedes both arguments. */
-    children[0] = left;
-    children[1] = rule;
-    children[2] = num;
-    children[3] = den;
-    children[4] = right;
+    txc_scaled ascent = shift_up + num->ascent;
+    txc_scaled descent = shift_down + den->descent;
+    if (fraction->binom) {
+        ascent = txc_max(ascent, txc_max(left->y + left->ascent, right->y + right->ascent));
+        descent = txc_max(descent, txc_max(left->descent - left->y, right->descent - right->y));
+    }
 
     box->kind = TEX_CORE_NODE_HBOX;
     box->x = 0;
     box->y = 0;
     box->codepoint = 0;
     box->style = TEX_CORE_STYLE_UPRIGHT;
+    box->family = TEX_CORE_FAMILY_MAIN;
     box->size = 0;
-    box->width = width + 2 * TXC_NULL_DELIMITER_SPACE;
-    box->ascent = shift_up + num->ascent;
-    box->descent = shift_down + den->descent;
+    box->width = left->width + width + right->width;
+    box->ascent = ascent;
+    box->descent = descent;
     box->italic = 0;
     box->range = range;
     box->children = children;
-    box->child_count = 5;
+    box->child_count = child_count;
+
+    *out = box;
+    return TEX_CORE_STATUS_OK;
+}
+
+/* Builds a \left/\right box (tex.web sections 762 and 1191-1192): the
+ * enclosed list is laid out in the surrounding style, both delimiters
+ * grow to the rule-19 target of its reach around the axis, and the box's
+ * children are the left delimiter, the enclosed nodes spliced directly,
+ * and the right delimiter. Inside the box the delimiters space as Open
+ * and Close atoms; the box itself is one Inner atom outside. */
+static tex_core_status txc_fenced_box(
+    txc_arena *arena,
+    const txc_fenced *fenced,
+    int style,
+    tex_core_range range,
+    txc_node **out,
+    tex_core_error *error
+) {
+    tex_core_range inner_range = {fenced->left_range.end, fenced->right_range.begin};
+    txc_node *inner;
+    tex_core_status status = txc_mlist(arena, &fenced->list, style, true, inner_range, &inner, error);
+    if (status != TEX_CORE_STATUS_OK) {
+        return status;
+    }
+
+    txc_scaled axis = txc_param(TXC_PARAMETER_AXIS_HEIGHT, txc_style_size(style));
+    txc_scaled delta1 = txc_max(inner->ascent - axis, inner->descent + axis);
+    txc_scaled target = txc_delimiter_target(delta1);
+
+    txc_node *left;
+    status = txc_delimiter_node(arena, &fenced->left, style, target, fenced->left_range, &left, error);
+    if (status != TEX_CORE_STATUS_OK) {
+        return status;
+    }
+    txc_node *right;
+    status = txc_delimiter_node(arena, &fenced->right, style, target, fenced->right_range, &right, error);
+    if (status != TEX_CORE_STATUS_OK) {
+        return status;
+    }
+
+    /* The Close-side pair space: the pair table row of the last enclosed
+     * atom against Close (the Open row is all zeros, so the left side
+     * never spaces). */
+    const txc_item *last_atom = NULL;
+    for (const txc_item *item = fenced->list.head; item != NULL; item = item->next) {
+        if (item->kind == TXC_ITEM_ATOM) {
+            last_atom = item;
+        }
+    }
+    txc_scaled close_space = 0;
+    if (last_atom != NULL) {
+        close_space = txc_inter_atom_width(TXC_MATH_SPACING[last_atom->atom_class][TXC_ATOM_CLOSE], style);
+    }
+
+    size_t child_count = 2 + inner->child_count + (close_space != 0 ? 1 : 0);
+    txc_node *box = txc_arena_alloc(arena, sizeof(txc_node));
+    const txc_node **children = txc_arena_alloc(arena, child_count * sizeof(*children));
+    if (box == NULL || children == NULL) {
+        return txc_alloc_fail(error);
+    }
+
+    size_t index = 0;
+    txc_scaled cursor = 0;
+    children[index++] = left;
+    cursor += left->width;
+    for (size_t child = 0; child < inner->child_count; child++) {
+        txc_node *node = (txc_node *)inner->children[child];
+        node->x += cursor;
+        children[index++] = node;
+    }
+    cursor += inner->width;
+    if (close_space != 0) {
+        txc_node *space = txc_arena_alloc(arena, sizeof(txc_node));
+        if (space == NULL) {
+            return txc_alloc_fail(error);
+        }
+        tex_core_range gap = {last_atom->range.end, fenced->right_range.begin};
+        txc_kern_init(space, cursor, close_space, gap);
+        cursor += close_space;
+        children[index++] = space;
+    }
+    right->x = cursor;
+    children[index++] = right;
+    cursor += right->width;
+
+    txc_scaled ascent = 0;
+    txc_scaled descent = 0;
+    for (size_t child = 0; child < index; child++) {
+        const txc_node *node = children[child];
+        if (node->kind == TEX_CORE_NODE_KERN) {
+            continue;
+        }
+        ascent = txc_max(ascent, node->ascent + node->y);
+        descent = txc_max(descent, node->descent - node->y);
+    }
+
+    box->kind = TEX_CORE_NODE_HBOX;
+    box->x = 0;
+    box->y = 0;
+    box->codepoint = 0;
+    box->style = TEX_CORE_STYLE_UPRIGHT;
+    box->family = TEX_CORE_FAMILY_MAIN;
+    box->size = 0;
+    box->width = cursor;
+    box->ascent = ascent;
+    box->descent = descent;
+    box->italic = 0;
+    box->range = range;
+    box->children = children;
+    box->child_count = index;
 
     *out = box;
     return TEX_CORE_STATUS_OK;
@@ -434,7 +917,7 @@ static tex_core_status txc_atom(
     txc_scaled shift_down = 0;
 
     if (item->nucleus.kind == TXC_FIELD_CHAR) {
-        const txc_metric *metric = txc_metric_find(item->nucleus.style, item->nucleus.codepoint);
+        const txc_metric *metric = txc_metric_find(TEX_CORE_FAMILY_MAIN, item->nucleus.style, item->nucleus.codepoint);
         if (metric == NULL) {
             return txc_fail(
                 error,
@@ -453,6 +936,7 @@ static tex_core_status txc_atom(
         glyph->y = 0;
         glyph->codepoint = item->nucleus.codepoint;
         glyph->style = item->nucleus.style;
+        glyph->family = TEX_CORE_FAMILY_MAIN;
         glyph->size = em;
         glyph->width = txc_em(metric->width, em);
         glyph->ascent = txc_em(metric->height, em);
@@ -464,13 +948,31 @@ static tex_core_status txc_atom(
         children[(*index)++] = glyph;
         nucleus_width = glyph->width;
         delta = glyph->italic;
-    } else if (item->nucleus.kind == TXC_FIELD_LIST || item->nucleus.kind == TXC_FIELD_FRACTION) {
+    } else if (item->nucleus.kind != TXC_FIELD_EMPTY) {
         txc_node *box;
         tex_core_status status;
-        if (item->nucleus.kind == TXC_FIELD_LIST) {
-            status = txc_mlist(arena, &item->nucleus.list, style, true, item->nucleus.range, &box, error);
-        } else {
+        switch (item->nucleus.kind) {
+        case TXC_FIELD_FRACTION:
             status = txc_fraction_box(arena, item->nucleus.fraction, style, item->nucleus.range, &box, error);
+            break;
+        case TXC_FIELD_FENCED:
+            status = txc_fenced_box(arena, item->nucleus.fenced, style, item->nucleus.range, &box, error);
+            break;
+        case TXC_FIELD_DELIMITER:
+            status = txc_delimiter_boxed(
+                arena,
+                &item->nucleus.sized.delimiter,
+                style,
+                txc_big_target(item->nucleus.sized.size),
+                item->nucleus.range,
+                &box,
+                error
+            );
+            break;
+        case TXC_FIELD_LIST:
+        default:
+            status = txc_mlist(arena, &item->nucleus.list, style, true, item->nucleus.range, &box, error);
+            break;
         }
         if (status != TEX_CORE_STATUS_OK) {
             return status;
@@ -672,6 +1174,7 @@ static tex_core_status txc_mlist(
     hbox->y = 0;
     hbox->codepoint = 0;
     hbox->style = TEX_CORE_STYLE_UPRIGHT;
+    hbox->family = TEX_CORE_FAMILY_MAIN;
     hbox->size = 0;
     hbox->width = cursor;
     hbox->ascent = ascent;

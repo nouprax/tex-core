@@ -8,7 +8,7 @@ const specDirectory = path.join(repositoryRoot, "specs/render-tree");
 const output = path.join(packageDirectory, "build/generated/conformance/render-tree-fixtures.json");
 
 const manifest = JSON.parse(await readFile(path.join(specDirectory, "manifest.json"), "utf8"));
-if (manifest.schemaVersion !== 3 || !Array.isArray(manifest.cases) || manifest.cases.length === 0) {
+if (manifest.schemaVersion !== 4 || !Array.isArray(manifest.cases) || manifest.cases.length === 0) {
     throw new Error("shared render-tree manifest v2 must contain at least one case");
 }
 

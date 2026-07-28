@@ -1,0 +1,19 @@
+render-tree 4
+hbox x=0.0pt y=0.0pt width=46.3156pt ascent=14.50012pt descent=9.50012pt src=0..27
+  hbox x=0.0pt y=0.0pt width=13.36852pt ascent=8.50006pt descent=3.50006pt src=0..12
+    glyph x=0.0pt y=0.0pt cp=U+0028 style=upright family=size1 size=10.0pt width=4.58344pt ascent=8.50006pt descent=3.50006pt italic=0.0pt src=0..6
+    hbox x=4.58344pt y=4.44pt width=4.20164pt ascent=3.0139pt descent=0.0pt src=6..9
+      glyph x=0.0pt y=0.0pt cp=U+006E style=italic family=main size=7.0pt width=4.20164pt ascent=3.0139pt descent=0.0pt italic=0.0pt src=7..8
+    hbox x=4.86217pt y=-3.45001pt width=3.6442pt ascent=4.8611pt descent=0.0pt src=9..12
+      glyph x=0.0pt y=0.0pt cp=U+006B style=italic family=main size=7.0pt width=3.6442pt ascent=4.8611pt descent=0.0pt italic=0.22035pt src=10..11
+    glyph x=8.78508pt y=0.0pt cp=U+0029 style=upright family=size1 size=10.0pt width=4.58344pt ascent=8.50006pt descent=3.50006pt italic=0.0pt src=0..6
+  kern x=13.36852pt width=2.22229pt src=12..12
+  glyph x=15.5908pt y=0.0pt cp=U+002B style=upright family=main size=10.0pt width=7.77786pt ascent=5.83328pt descent=0.83328pt italic=0.0pt src=12..13
+  kern x=23.36867pt width=2.22229pt src=13..13
+  hbox x=25.59096pt y=0.0pt width=20.72464pt ascent=14.50012pt descent=9.50012pt src=13..26
+    glyph x=0.0pt y=0.00015pt cp=U+0028 style=upright family=size3 size=10.0pt width=7.36115pt ascent=14.49997pt descent=9.50027pt italic=0.0pt src=13..20
+    hbox x=7.36115pt y=6.77002pt width=6.00235pt ascent=4.30557pt descent=0.0pt src=20..23
+      glyph x=0.0pt y=0.0pt cp=U+006E style=italic family=main size=10.0pt width=6.00235pt ascent=4.30557pt descent=0.0pt italic=0.0pt src=21..22
+    hbox x=7.75932pt y=-6.86005pt width=5.206pt ascent=6.94443pt descent=0.0pt src=23..26
+      glyph x=0.0pt y=0.0pt cp=U+006B style=italic family=main size=10.0pt width=5.206pt ascent=6.94443pt descent=0.0pt italic=0.31479pt src=24..25
+    glyph x=13.3635pt y=0.00015pt cp=U+0029 style=upright family=size3 size=10.0pt width=7.36115pt ascent=14.49997pt descent=9.50027pt italic=0.0pt src=13..20
