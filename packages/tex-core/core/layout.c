@@ -733,17 +733,23 @@ static tex_core_status txc_fraction_box(
         return txc_alloc_fail(error);
     }
 
-    /* Child order is source order: the bar's and the binomial
-     * delimiters' source is the command token, which precedes both
-     * arguments. */
+    /* Child order is source order: the bar and both binomial
+     * delimiters come from the command token, which precedes both
+     * arguments — so a binomial's right parenthesis is emitted before
+     * the parts and placed by `x` alone. The barred fraction's right
+     * kern carries the construct-end range and stays last. */
     size_t index = 0;
     children[index++] = left;
     if (rule != NULL) {
         children[index++] = rule;
+    } else {
+        children[index++] = right;
     }
     children[index++] = num;
     children[index++] = den;
-    children[index++] = right;
+    if (rule != NULL) {
+        children[index++] = right;
+    }
 
     txc_scaled ascent = shift_up + num->ascent;
     txc_scaled descent = shift_down + den->descent;
