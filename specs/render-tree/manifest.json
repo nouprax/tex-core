@@ -137,7 +137,11 @@
             "op.limits",
             "op.scripts",
             "op.functionName",
-            "error.misplacedLimits"
+            "error.misplacedLimits",
+            "accent.over",
+            "accent.wide",
+            "accent.raised",
+            "error.missingAccent"
         ],
         "orders": [
             "root.hbox",
@@ -2224,6 +2228,133 @@
                     "mode.mathInline",
                     "outcome.error",
                     "error.misplacedLimits"
+                ],
+                "orders": []
+            }
+        },
+        {
+            "name": "math-accents",
+            "input": "math-accents.tex",
+            "expected": "math-accents.tree",
+            "compileOptions": {
+                "mode": "mathInline"
+            },
+            "outcome": "tree",
+            "coverage": {
+                "kinds": [
+                    "hbox",
+                    "glyph",
+                    "kern"
+                ],
+                "states": [
+                    "mode.mathInline",
+                    "outcome.tree",
+                    "children.populated",
+                    "atom.lower",
+                    "atom.bin",
+                    "glyph.style.upright",
+                    "glyph.style.italic",
+                    "glyph.italic.zero",
+                    "glyph.italic.positive",
+                    "glyph.descent.positive",
+                    "bin.kept",
+                    "space.interAtom.medium",
+                    "kern.boundaryRange",
+                    "accent.over",
+                    "accent.raised",
+                    "measure.zero"
+                ],
+                "orders": [
+                    "root.hbox",
+                    "children.sourceOrder"
+                ]
+            }
+        },
+        {
+            "name": "math-accents-wide",
+            "input": "math-accents-wide.tex",
+            "expected": "math-accents-wide.tree",
+            "compileOptions": {
+                "mode": "mathInline"
+            },
+            "outcome": "tree",
+            "coverage": {
+                "kinds": [
+                    "hbox",
+                    "glyph",
+                    "kern"
+                ],
+                "states": [
+                    "mode.mathInline",
+                    "outcome.tree",
+                    "children.populated",
+                    "atom.lower",
+                    "atom.bin",
+                    "glyph.style.upright",
+                    "glyph.style.italic",
+                    "glyph.italic.zero",
+                    "bin.kept",
+                    "space.interAtom.medium",
+                    "kern.boundaryRange",
+                    "accent.wide",
+                    "measure.zero",
+                    "measure.negative"
+                ],
+                "orders": [
+                    "root.hbox",
+                    "children.sourceOrder"
+                ]
+            }
+        },
+        {
+            "name": "math-accent-script",
+            "input": "math-accent-script.tex",
+            "expected": "math-accent-script.tree",
+            "compileOptions": {
+                "mode": "mathInline"
+            },
+            "outcome": "tree",
+            "coverage": {
+                "kinds": [
+                    "hbox",
+                    "glyph"
+                ],
+                "states": [
+                    "mode.mathInline",
+                    "outcome.tree",
+                    "children.populated",
+                    "atom.digit",
+                    "glyph.style.upright",
+                    "glyph.style.italic",
+                    "glyph.italic.zero",
+                    "accent.over",
+                    "accent.raised",
+                    "script.sup",
+                    "script.sub",
+                    "script.both",
+                    "size.script",
+                    "measure.zero"
+                ],
+                "orders": [
+                    "root.hbox",
+                    "children.sourceOrder"
+                ]
+            }
+        },
+        {
+            "name": "error-missing-accent",
+            "input": "error-missing-accent.tex",
+            "expected": "error-missing-accent.tree",
+            "compileOptions": {
+                "mode": "mathInline"
+            },
+            "outcome": "error",
+            "coverage": {
+                "kinds": [],
+                "states": [
+                    "mode.mathInline",
+                    "outcome.error",
+                    "error.missingAccent"
                 ],
                 "orders": []
             }

@@ -8,13 +8,15 @@
 
 #include "tex_core.h"
 
-/* One glyph row in 16.16 fixed-point em units. */
+/* One glyph row in 16.16 fixed-point em units. `skew` is the accent
+ * attachment offset TeX reads from the skewchar kerning. */
 typedef struct txc_metric {
     uint32_t codepoint;
     int32_t width;
     int32_t height;
     int32_t depth;
     int32_t italic;
+    int32_t skew;
 } txc_metric;
 
 /* The three font sizes of math typesetting. Math styles map onto them:
