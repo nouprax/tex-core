@@ -622,6 +622,7 @@ static void txc_field_reset(txc_field *field, size_t at) {
     field->codepoint = 0;
     field->style = TEX_CORE_STYLE_UPRIGHT;
     field->family = TEX_CORE_FAMILY_MAIN;
+    field->text_face = false;
     field->list.head = NULL;
     field->list.tail = NULL;
     field->list.count = 0;
@@ -993,6 +994,9 @@ static void txc_face_list(const txc_list *list, tex_core_family family) {
 static void txc_face_field(txc_field *field, tex_core_family family) {
     switch (field->kind) {
     case TXC_FIELD_CHAR:
+        if (field->text_face) {
+            break;
+        }
         if (txc_letter_codepoint(field->codepoint) || txc_digit_codepoint(field->codepoint)) {
             field->family = family;
             field->style = TEX_CORE_STYLE_UPRIGHT;
@@ -1073,6 +1077,7 @@ static tex_core_status txc_deliver(
             } else if (staged.kind == TXC_FIELD_CHAR) {
                 staged.style = TEX_CORE_STYLE_UPRIGHT;
                 staged.family = TEX_CORE_FAMILY_MAIN;
+                staged.text_face = true;
             }
         } else {
             txc_face_field(&staged, TXC_FACE_FAMILIES[frame->styled_face]);

@@ -852,6 +852,20 @@ static void txc_test_styles(txc_test *test) {
     tex_core_render_tree_free(tree);
 }
 
+static void txc_test_text_face_protection(txc_test *test) {
+    /* A bare \text character keeps upright main under an outer style
+     * switch, like braced \text content. */
+    tex_core_render_tree *tree = txc_compile(test, "\\mathbf{\\text a}", TEX_CORE_MODE_MATH_INLINE, "bf text");
+    const tex_core_node *box = tex_core_node_child(tex_core_render_tree_root(tree), 0);
+    txc_check_int(
+        test,
+        tex_core_node_glyph(tex_core_node_child(box, 0)).family,
+        TEX_CORE_FAMILY_MAIN,
+        "bare text stays main under \\mathbf"
+    );
+    tex_core_render_tree_free(tree);
+}
+
 int main(void) {
     txc_test test = {0, 0};
     txc_test_math_glyph(&test);
@@ -869,5 +883,6 @@ int main(void) {
     txc_test_operators(&test);
     txc_test_accents(&test);
     txc_test_styles(&test);
+    txc_test_text_face_protection(&test);
     return txc_test_finish(&test, "engine");
 }

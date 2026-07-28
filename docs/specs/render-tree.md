@@ -323,8 +323,8 @@ argument is document-rule content at the current size — letters,
 digits, period, comma, explicit spacing commands, and blanks as
 interword spaces, everything else a structured error until the M3 text
 surface — published as the group's box with no atom classes inside. A
-bare character argument is upright main, exactly `\mathrm`. `\text`
-content inside a style switch keeps its own faces.
+bare character argument is upright main, exactly `\mathrm` — and it
+keeps that face under an outer style switch, like all `\text` content.
 
 ## Source ranges
 
