@@ -1,2 +1,2 @@
-render-error 4
+render-error 5
 error status=unsupported src=5..6 message=unclosed radical index

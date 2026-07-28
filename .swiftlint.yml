@@ -37,11 +37,12 @@ opt_in_rules:
 reporter: xcode
 
 identifier_name:
-    # x and y are render-tree schema field names (docs/specs/render-tree.md);
+    # x, y, and bb are render-tree schema names (docs/specs/render-tree.md);
     # bindings must not respell schema names.
     excluded:
         - x
         - y
+        - bb
 
 file_length:
     warning: 400

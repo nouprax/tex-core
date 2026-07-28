@@ -29,8 +29,9 @@
  * family), variable-size delimiters (\left/\right, \bigl through
  * \Biggr), radicals (\sqrt with the optional index), big operators
  * with display limits (\sum, \int, \limits/\nolimits), and function
- * names (\sin through \Pr), and math accents (\hat through \vec,
- * \widehat/\widetilde), laid out with TeX's inter-atom spacing. The full self-contained
+ * names (\sin through \Pr), math accents (\hat through \vec,
+ * \widehat/\widetilde), the style switches (\mathrm through \mathtt),
+ * and \text, laid out with TeX's inter-atom spacing. The full self-contained
  * LaTeX surface arrives with the 1.0.0 milestones; every extension of the
  * surface is a reviewed public-behavior change.
  */
@@ -130,7 +131,13 @@ typedef enum tex_core_family {
     TEX_CORE_FAMILY_SIZE1 = 1,
     TEX_CORE_FAMILY_SIZE2 = 2,
     TEX_CORE_FAMILY_SIZE3 = 3,
-    TEX_CORE_FAMILY_SIZE4 = 4
+    TEX_CORE_FAMILY_SIZE4 = 4,
+    TEX_CORE_FAMILY_BOLD = 5,
+    TEX_CORE_FAMILY_TEXTIT = 6,
+    TEX_CORE_FAMILY_CAL = 7,
+    TEX_CORE_FAMILY_BB = 8,
+    TEX_CORE_FAMILY_SANS = 9,
+    TEX_CORE_FAMILY_MONO = 10
 } tex_core_family;
 
 /* Resolved geometry in points, relative to the parent's reference point on

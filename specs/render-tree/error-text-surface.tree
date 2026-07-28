@@ -1,0 +1,2 @@
+render-error 5
+error status=unsupported src=7..8 message=unsupported character U+002B

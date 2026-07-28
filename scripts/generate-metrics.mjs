@@ -117,6 +117,32 @@ static const txc_metric TXC_METRICS_ITALIC[] = {
 ${table("Math-Italic")}
 };
 
+/* The style faces: bold, text italic, calligraphic, double-struck,
+ * sans-serif, and typewriter letter/digit runs. */
+static const txc_metric TXC_METRICS_BOLD[] = {
+${table("Main-Bold")}
+};
+
+static const txc_metric TXC_METRICS_TEXTIT[] = {
+${table("Main-Italic")}
+};
+
+static const txc_metric TXC_METRICS_CAL[] = {
+${table("Caligraphic-Regular")}
+};
+
+static const txc_metric TXC_METRICS_BB[] = {
+${table("AMS-Regular")}
+};
+
+static const txc_metric TXC_METRICS_SANS[] = {
+${table("SansSerif-Regular")}
+};
+
+static const txc_metric TXC_METRICS_MONO[] = {
+${table("Typewriter-Regular")}
+};
+
 /* Size1-Size4: the delimiter size-variant faces and the extensible
  * assembly pieces. */
 static const txc_metric TXC_METRICS_SIZE1[] = {

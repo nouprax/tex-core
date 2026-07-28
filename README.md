@@ -27,7 +27,7 @@ two projects remain independently consumable.
 
 **Pre-release; the infrastructure phases (1–10) of the setup plan are
 complete and the engine is climbing milestone M1 (math core).** The C
-engine, its render-tree contract (schemaVersion 4), the Swift, Kotlin
+engine, its render-tree contract (schemaVersion 5), the Swift, Kotlin
 Multiplatform, and ES/WASM bindings, the fail-closed CI quality gates, and
 the release workflows are all in place. `Document.compile` covers ordinary
 text atoms with explicit spacing in document mode and, in the math modes,
@@ -41,11 +41,14 @@ through the Computer Modern size faces into piece assemblies per rule 19,
 radicals (`\sqrt` with the optional LaTeX index) per rule 11, and big
 operators and function names (`\sum`/`\int`/`\sin`/`\lim` with
 display limits per rule 13a and `\limits`/`\nolimits`), and math
-accents (`\hat` through `\vec`, wide variants) per rule 12, laid out
+accents (`\hat` through `\vec`, wide variants) per rule 12, and the
+style switches and `\text` (`\mathrm` through `\mathtt` over the
+bold/italic/calligraphic/double-struck/sans/typewriter faces), laid out
 with TeX's inter-atom spacing over embedded Computer Modern metrics,
-with byte-identical canonical dumps on every platform. The rest of the
-M1–M4 surface (style switches, text galley, domain notations) lands
-before `1.0.0`. Nothing usable is published yet.
+with byte-identical canonical dumps on every platform. That completes
+the M1 math-core surface; the remaining M2–M4 surface (text galley,
+domain notations) lands before `1.0.0`. Nothing usable is published
+yet.
 
 Build and test the C core:
 

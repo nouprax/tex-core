@@ -91,7 +91,7 @@ static void txc_test_empty(txc_test *test) {
     txc_check_text(
         test,
         dump,
-        "render-tree 4\nhbox x=0.0pt y=0.0pt width=0.0pt ascent=0.0pt descent=0.0pt src=0..0\n",
+        "render-tree 5\nhbox x=0.0pt y=0.0pt width=0.0pt ascent=0.0pt descent=0.0pt src=0..0\n",
         "empty dump"
     );
     txc_check_size(test, length, strlen(dump), "dump length excludes the NUL");

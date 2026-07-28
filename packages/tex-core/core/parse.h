@@ -93,8 +93,22 @@ typedef enum txc_field_kind {
     TXC_FIELD_DELIMITER = 4,
     TXC_FIELD_FENCED = 5,
     TXC_FIELD_RADICAL = 6,
-    TXC_FIELD_ACCENT = 7
+    TXC_FIELD_ACCENT = 7,
+    TXC_FIELD_TEXT = 8
 } txc_field_kind;
+
+/* The face a style switch applies to its argument's letters and digits.
+ * TEXT is \text: document-rule content, not a face rewrite. */
+typedef enum txc_face {
+    TXC_FACE_RM = 0,
+    TXC_FACE_BF = 1,
+    TXC_FACE_IT = 2,
+    TXC_FACE_CAL = 3,
+    TXC_FACE_BB = 4,
+    TXC_FACE_SF = 5,
+    TXC_FACE_TT = 6,
+    TXC_FACE_TEXT = 7
+} txc_face;
 
 struct txc_fraction;
 struct txc_fenced;
@@ -110,10 +124,12 @@ typedef struct txc_sized_delimiter {
 
 typedef struct txc_field {
     txc_field_kind kind;
-    /* TXC_FIELD_CHAR only. */
+    /* TXC_FIELD_CHAR only. `family` is main except under a style
+     * switch, which rewrites letter and digit characters in place. */
     uint32_t codepoint;
     tex_core_style style;
-    /* TXC_FIELD_LIST only. */
+    tex_core_family family;
+    /* TXC_FIELD_LIST and TXC_FIELD_TEXT. */
     txc_list list;
     /* TXC_FIELD_FRACTION only. */
     struct txc_fraction *fraction;

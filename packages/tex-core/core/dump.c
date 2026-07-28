@@ -59,6 +59,18 @@ static const char *txc_family_label(tex_core_family family) {
         return " family=size3";
     case TEX_CORE_FAMILY_SIZE4:
         return " family=size4";
+    case TEX_CORE_FAMILY_BOLD:
+        return " family=bold";
+    case TEX_CORE_FAMILY_TEXTIT:
+        return " family=textit";
+    case TEX_CORE_FAMILY_CAL:
+        return " family=cal";
+    case TEX_CORE_FAMILY_BB:
+        return " family=bb";
+    case TEX_CORE_FAMILY_SANS:
+        return " family=sans";
+    case TEX_CORE_FAMILY_MONO:
+        return " family=mono";
     case TEX_CORE_FAMILY_MAIN:
         break;
     }
@@ -122,7 +134,7 @@ static bool txc_dump_node(txc_buffer *buffer, const txc_node *node, unsigned dep
 
 tex_core_status txc_dump(const txc_node *root, char **dump, size_t *length) {
     txc_buffer buffer = {NULL, 0, 0};
-    if (!txc_buffer_text(&buffer, "render-tree 4\n") || !txc_dump_node(&buffer, root, 0)) {
+    if (!txc_buffer_text(&buffer, "render-tree 5\n") || !txc_dump_node(&buffer, root, 0)) {
         txc_free(buffer.data);
         return TEX_CORE_STATUS_ALLOCATION_FAILED;
     }

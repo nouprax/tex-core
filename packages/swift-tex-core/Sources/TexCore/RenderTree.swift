@@ -36,6 +36,18 @@ public enum GlyphFamily: String, Sendable, CaseIterable {
     case size3
     /// The fourth delimiter size-variant face.
     case size4
+    /// The bold style face.
+    case bold
+    /// The text-italic style face.
+    case textit
+    /// The calligraphic style face.
+    case cal
+    /// The double-struck style face.
+    case bb
+    /// The sans-serif style face.
+    case sans
+    /// The typewriter style face.
+    case mono
 }
 
 /// A horizontal box: the compile root, a braced group's nucleus, or a
@@ -226,7 +238,7 @@ public protocol RenderVisitor {
     mutating func visit(_ node: Rule) -> Result
 }
 
-/// An immutable compiled document: the render tree of schema version 4.
+/// An immutable compiled document: the render tree of schema version 5.
 ///
 /// Trees are plain `Sendable` values — safely shareable across threads,
 /// structurally equatable, and detached from the native engine the moment
