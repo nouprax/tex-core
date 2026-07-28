@@ -298,6 +298,96 @@ static const txc_fraction_command TXC_FRACTION_COMMANDS[] = {
     {"tfrac", TXC_FRACTION_STYLE_TEXT, false},
 };
 
+/* Big operators (milestone M1): Op atoms whose glyph comes from the
+ * Size1 face (Size2 in display style). Sums place their limits above
+ * and below in display style; integrals never do unless \limits. */
+typedef struct txc_big_op {
+    const char *name;
+    uint32_t codepoint;
+    txc_op_limits limits;
+} txc_big_op;
+
+static const txc_big_op TXC_BIG_OPS[] = {
+    {"bigcap", 0x22C2, TXC_LIMITS_DISPLAY},
+    {"bigcup", 0x22C3, TXC_LIMITS_DISPLAY},
+    {"bigodot", 0x2A00, TXC_LIMITS_DISPLAY},
+    {"bigoplus", 0x2A01, TXC_LIMITS_DISPLAY},
+    {"bigotimes", 0x2A02, TXC_LIMITS_DISPLAY},
+    {"bigsqcup", 0x2A06, TXC_LIMITS_DISPLAY},
+    {"biguplus", 0x2A04, TXC_LIMITS_DISPLAY},
+    {"bigvee", 0x22C1, TXC_LIMITS_DISPLAY},
+    {"bigwedge", 0x22C0, TXC_LIMITS_DISPLAY},
+    {"coprod", 0x2210, TXC_LIMITS_DISPLAY},
+    {"int", 0x222B, TXC_LIMITS_NEVER},
+    {"oint", 0x222E, TXC_LIMITS_NEVER},
+    {"prod", 0x220F, TXC_LIMITS_DISPLAY},
+    {"sum", 0x2211, TXC_LIMITS_DISPLAY},
+};
+
+static const txc_big_op *txc_big_op_find(const uint8_t *name, size_t name_length) {
+    for (size_t index = 0; index < sizeof(TXC_BIG_OPS) / sizeof(TXC_BIG_OPS[0]); index++) {
+        const txc_big_op *op = &TXC_BIG_OPS[index];
+        if (strlen(op->name) == name_length && memcmp(op->name, name, name_length) == 0) {
+            return op;
+        }
+    }
+    return NULL;
+}
+
+/* Function names (milestone M1): Op atoms whose nucleus is the upright
+ * letter run; `spelling` may carry one '\'' for the thin space inside
+ * \limsup and \liminf. The \lim family takes display limits. */
+typedef struct txc_function_name {
+    const char *name;
+    const char *spelling;
+    txc_op_limits limits;
+} txc_function_name;
+
+static const txc_function_name TXC_FUNCTION_NAMES[] = {
+    {"Pr", "Pr", TXC_LIMITS_DISPLAY},
+    {"arccos", "arccos", TXC_LIMITS_NEVER},
+    {"arcsin", "arcsin", TXC_LIMITS_NEVER},
+    {"arctan", "arctan", TXC_LIMITS_NEVER},
+    {"arg", "arg", TXC_LIMITS_NEVER},
+    {"cos", "cos", TXC_LIMITS_NEVER},
+    {"cosh", "cosh", TXC_LIMITS_NEVER},
+    {"cot", "cot", TXC_LIMITS_NEVER},
+    {"coth", "coth", TXC_LIMITS_NEVER},
+    {"csc", "csc", TXC_LIMITS_NEVER},
+    {"deg", "deg", TXC_LIMITS_NEVER},
+    {"det", "det", TXC_LIMITS_DISPLAY},
+    {"dim", "dim", TXC_LIMITS_NEVER},
+    {"exp", "exp", TXC_LIMITS_NEVER},
+    {"gcd", "gcd", TXC_LIMITS_DISPLAY},
+    {"hom", "hom", TXC_LIMITS_NEVER},
+    {"inf", "inf", TXC_LIMITS_DISPLAY},
+    {"ker", "ker", TXC_LIMITS_NEVER},
+    {"lg", "lg", TXC_LIMITS_NEVER},
+    {"lim", "lim", TXC_LIMITS_DISPLAY},
+    {"liminf", "lim'inf", TXC_LIMITS_DISPLAY},
+    {"limsup", "lim'sup", TXC_LIMITS_DISPLAY},
+    {"ln", "ln", TXC_LIMITS_NEVER},
+    {"log", "log", TXC_LIMITS_NEVER},
+    {"max", "max", TXC_LIMITS_DISPLAY},
+    {"min", "min", TXC_LIMITS_DISPLAY},
+    {"sec", "sec", TXC_LIMITS_NEVER},
+    {"sin", "sin", TXC_LIMITS_NEVER},
+    {"sinh", "sinh", TXC_LIMITS_NEVER},
+    {"sup", "sup", TXC_LIMITS_DISPLAY},
+    {"tan", "tan", TXC_LIMITS_NEVER},
+    {"tanh", "tanh", TXC_LIMITS_NEVER},
+};
+
+static const txc_function_name *txc_function_find(const uint8_t *name, size_t name_length) {
+    for (size_t index = 0; index < sizeof(TXC_FUNCTION_NAMES) / sizeof(TXC_FUNCTION_NAMES[0]); index++) {
+        const txc_function_name *function = &TXC_FUNCTION_NAMES[index];
+        if (strlen(function->name) == name_length && memcmp(function->name, name, name_length) == 0) {
+            return function;
+        }
+    }
+    return NULL;
+}
+
 /* The plain TeX delimiter set (\delcode assignments plus the delimiter
  * control words): each row maps a source spelling to its main-family
  * text glyph, its growth ladder, and its extensible pieces. Piece data
@@ -489,6 +579,7 @@ static txc_item *txc_append_atom(
     txc_field_reset(&item->sup, range.end);
     txc_field_reset(&item->sub, range.end);
     item->sub_first = false;
+    item->op_limits = TXC_LIMITS_DISPLAY;
     item->range = range;
     return item;
 }
@@ -827,6 +918,7 @@ static tex_core_status txc_deliver(
     txc_field_reset(&item->sup, range.end);
     txc_field_reset(&item->sub, range.end);
     item->sub_first = false;
+    item->op_limits = TXC_LIMITS_DISPLAY;
     item->range = range;
     return TEX_CORE_STATUS_OK;
 }
@@ -1141,6 +1233,7 @@ tex_core_status txc_parse(
                         txc_field_reset(&target->sup, at.begin);
                         txc_field_reset(&target->sub, at.begin);
                         target->sub_first = false;
+                        target->op_limits = TXC_LIMITS_DISPLAY;
                         target->range = at;
                     }
                     if (txc_script_field(target, pending)->kind != TXC_FIELD_EMPTY) {
@@ -1286,6 +1379,9 @@ tex_core_status txc_parse(
                         txc_field_reset(&item->sup, token.range.end);
                         txc_field_reset(&item->sub, token.range.end);
                         item->sub_first = false;
+                        item->op_limits = TXC_LIMITS_DISPLAY;
+                        item->op_limits = TXC_LIMITS_DISPLAY;
+                        item->op_limits = TXC_LIMITS_DISPLAY;
                         item->range = token.range;
                         frame->fraction_item = item;
                         frame->fraction_target = NULL;
@@ -1341,6 +1437,123 @@ tex_core_status txc_parse(
                     frame->delim_command = token.range;
                     break;
                 }
+                {
+                    const txc_big_op *big_op = txc_big_op_find(token.name, token.name_length);
+                    const txc_function_name *function =
+                        big_op == NULL ? txc_function_find(token.name, token.name_length) : NULL;
+                    if (big_op != NULL || function != NULL) {
+                        /* Build the Op atom, then route it like a braced
+                         * group so it stays an atom inside script and
+                         * argument fields. */
+                        txc_item *op = txc_arena_alloc(arena, sizeof(txc_item));
+                        if (op == NULL) {
+                            return txc_fail(error, TEX_CORE_STATUS_ALLOCATION_FAILED, NULL, "allocation failed");
+                        }
+                        op->kind = TXC_ITEM_ATOM;
+                        op->atom_class = TXC_ATOM_OP;
+                        txc_field_reset(&op->nucleus, token.range.begin);
+                        txc_field_reset(&op->sup, token.range.end);
+                        txc_field_reset(&op->sub, token.range.end);
+                        op->sub_first = false;
+                        op->range = token.range;
+                        op->next = NULL;
+                        if (big_op != NULL) {
+                            op->op_limits = big_op->limits;
+                            op->nucleus.kind = TXC_FIELD_CHAR;
+                            op->nucleus.codepoint = big_op->codepoint;
+                            op->nucleus.style = TEX_CORE_STYLE_UPRIGHT;
+                            op->nucleus.range = token.range;
+                        } else {
+                            op->op_limits = function->limits;
+                            op->nucleus.kind = TXC_FIELD_LIST;
+                            op->nucleus.range = token.range;
+                            for (const char *letter = function->spelling; *letter != '\0'; letter++) {
+                                if (*letter == '\'') {
+                                    txc_item *space = txc_append(arena, &op->nucleus.list);
+                                    if (space == NULL) {
+                                        return txc_fail(
+                                            error,
+                                            TEX_CORE_STATUS_ALLOCATION_FAILED,
+                                            NULL,
+                                            "allocation failed"
+                                        );
+                                    }
+                                    space->kind = TXC_ITEM_SPACE;
+                                    space->space = TXC_SPACE_THIN;
+                                    space->range = token.range;
+                                    continue;
+                                }
+                                if (txc_append_atom(
+                                        arena,
+                                        &op->nucleus.list,
+                                        TXC_ATOM_ORD,
+                                        (uint32_t)(unsigned char)*letter,
+                                        TEX_CORE_STYLE_UPRIGHT,
+                                        token.range
+                                    ) == NULL) {
+                                    return txc_fail(
+                                        error,
+                                        TEX_CORE_STATUS_ALLOCATION_FAILED,
+                                        NULL,
+                                        "allocation failed"
+                                    );
+                                }
+                            }
+                        }
+                        if (frame->radical != NULL || frame->fraction != NULL || frame->pending != TXC_PENDING_NONE) {
+                            txc_list wrapped = {op, op, 1};
+                            txc_construct construct = {NULL, &wrapped, NULL, NULL, NULL, NULL};
+                            status = txc_deliver(arena, frame, &construct, TXC_ATOM_ORD, token.range, error);
+                            if (status != TEX_CORE_STATUS_OK) {
+                                return status;
+                            }
+                        } else {
+                            if (frame->list.tail != NULL) {
+                                frame->list.tail->next = op;
+                            } else {
+                                frame->list.head = op;
+                            }
+                            frame->list.tail = op;
+                            frame->list.count += 1;
+                        }
+                        break;
+                    }
+                }
+                if ((token.name_length == 6 && memcmp(token.name, "limits", 6) == 0) ||
+                    (token.name_length == 8 && memcmp(token.name, "nolimits", 8) == 0)) {
+                    bool wants_limits = token.name_length == 6;
+                    if (frame->fraction != NULL || frame->radical != NULL) {
+                        return txc_fail(
+                            error,
+                            TEX_CORE_STATUS_UNSUPPORTED,
+                            &token.range,
+                            "missing %s argument",
+                            txc_argument_noun(frame)
+                        );
+                    }
+                    if (frame->pending != TXC_PENDING_NONE) {
+                        return txc_fail(
+                            error,
+                            TEX_CORE_STATUS_UNSUPPORTED,
+                            &token.range,
+                            "missing %s argument",
+                            txc_script_noun(frame->pending)
+                        );
+                    }
+                    txc_item *target = frame->list.tail;
+                    if (target == NULL || target->kind != TXC_ITEM_ATOM || target->atom_class != TXC_ATOM_OP) {
+                        return txc_fail(
+                            error,
+                            TEX_CORE_STATUS_UNSUPPORTED,
+                            &token.range,
+                            "misplaced \\%s",
+                            wants_limits ? "limits" : "nolimits"
+                        );
+                    }
+                    target->op_limits = wants_limits ? TXC_LIMITS_ALWAYS : TXC_LIMITS_NEVER;
+                    target->range.end = token.range.end;
+                    break;
+                }
                 if (token.name_length == 4 && memcmp(token.name, "sqrt", 4) == 0) {
                     if (frame->fraction != NULL || frame->radical != NULL) {
                         return txc_fail(
@@ -1381,6 +1594,9 @@ tex_core_status txc_parse(
                         txc_field_reset(&item->sup, token.range.end);
                         txc_field_reset(&item->sub, token.range.end);
                         item->sub_first = false;
+                        item->op_limits = TXC_LIMITS_DISPLAY;
+                        item->op_limits = TXC_LIMITS_DISPLAY;
+                        item->op_limits = TXC_LIMITS_DISPLAY;
                         item->range = token.range;
                         frame->radical_item = item;
                         frame->radical_target = NULL;

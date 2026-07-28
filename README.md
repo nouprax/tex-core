@@ -38,12 +38,13 @@ at TeX's script sizes per Appendix G, fractions and binomials (`\frac`,
 `\dfrac`, `\tfrac`, `\binom` family) built by Appendix G rule 15, and
 variable-size delimiters (`\left`/`\right`, the `\big` family) grown
 through the Computer Modern size faces into piece assemblies per rule 19,
-and radicals (`\sqrt` with the optional LaTeX index) per rule 11, laid
-out with TeX's inter-atom spacing over embedded Computer Modern metrics,
-with byte-identical canonical dumps on every platform. The rest of the
-M1–M4 surface (big operators, accents, style switches, text galley,
-domain notations) lands before `1.0.0`. Nothing usable is published
-yet.
+radicals (`\sqrt` with the optional LaTeX index) per rule 11, and big
+operators and function names (`\sum`/`\int`/`\sin`/`\lim` with
+display limits per rule 13a and `\limits`/`\nolimits`), laid out with
+TeX's inter-atom spacing over embedded Computer Modern metrics, with
+byte-identical canonical dumps on every platform. The rest of the M1–M4
+surface (accents, style switches, text galley, domain notations) lands
+before `1.0.0`. Nothing usable is published yet.
 
 Build and test the C core:
 

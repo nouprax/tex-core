@@ -5,7 +5,7 @@
         "file": "src/fontMetricsData.js",
         "source": "https://registry.npmjs.org/katex/-/katex-0.16.22.tgz",
         "license": "MIT",
-        "note": "Glyph metrics subset (em-relative depth/height/italic/skew/width) for the tex-core glyph inventory: from Main-Regular the ASCII letters, digits, and punctuation/operator/delimiter characters the math grammar maps to upright atoms, the uppercase Greek letters, and the symbol codepoints of the milestone M1 symbol-command set (binary operators, relations, arrows, letter-like and miscellaneous ordinaries, delimiter atoms); from Math-Italic the ASCII letters and lowercase Greek letters; from Size1-Size4 the delimiter size variants and the extensible-assembly pieces (corners, repeaters, middles) of the M1 delimiter set. Interword and rule spacing come from TeX font dimensions recorded in the generator, not from this table. The parameters table vendors the sigmasAndXis subset the M1 script layout needs (quad, xHeight, sup1-3, sub1-2, supDrop, subDrop, defaultRuleThickness) and the M1 fraction and delimiter parameters (num1, num2, num3, denom1, denom2, axisHeight, delim1, delim2) from src/fontMetrics.js: three columns per row for the text/script/scriptscript sizes, em-relative to each size's own font; the remaining sigmas and xis arrive with their milestones.",
+        "note": "Glyph metrics subset (em-relative depth/height/italic/skew/width) for the tex-core glyph inventory: from Main-Regular the ASCII letters, digits, and punctuation/operator/delimiter characters the math grammar maps to upright atoms, the uppercase Greek letters, and the symbol codepoints of the milestone M1 symbol-command set (binary operators, relations, arrows, letter-like and miscellaneous ordinaries, delimiter atoms); from Math-Italic the ASCII letters and lowercase Greek letters; from Size1-Size4 the delimiter size variants, the extensible-assembly pieces (corners, repeaters, middles) of the M1 delimiter set, and the big-operator text/display variants. Interword and rule spacing come from TeX font dimensions recorded in the generator, not from this table. The parameters table vendors the sigmasAndXis subset the M1 script layout needs (quad, xHeight, sup1-3, sub1-2, supDrop, subDrop, defaultRuleThickness) and the M1 fraction and delimiter parameters (num1, num2, num3, denom1, denom2, axisHeight, delim1, delim2, bigOpSpacing1-5) from src/fontMetrics.js: three columns per row for the text/script/scriptscript sizes, em-relative to each size's own font; the remaining sigmas and xis arrive with their milestones.",
         "parametersFile": "src/fontMetrics.js"
     },
     "parameters": {
@@ -26,7 +26,12 @@
         "axisHeight": [0.25, 0.25, 0.25],
         "delim1": [2.39, 1.7, 1.98],
         "delim2": [1.01, 1.157, 1.42],
-        "num3": [0.444, 0.471, 0.504]
+        "num3": [0.444, 0.471, 0.504],
+        "bigOpSpacing1": [0.111, 0.111, 0.111],
+        "bigOpSpacing2": [0.166, 0.166, 0.166],
+        "bigOpSpacing3": [0.2, 0.2, 0.2],
+        "bigOpSpacing4": [0.6, 0.611, 0.611],
+        "bigOpSpacing5": [0.1, 0.143, 0.143]
     },
     "fonts": {
         "Main-Regular": {
@@ -2204,6 +2209,27 @@
                 "skew": 0,
                 "width": 0.77778
             },
+            "8719": {
+                "depth": 0.25001,
+                "height": 0.75,
+                "italic": 0,
+                "skew": 0,
+                "width": 0.94445
+            },
+            "8720": {
+                "depth": 0.25001,
+                "height": 0.75,
+                "italic": 0,
+                "skew": 0,
+                "width": 0.94445
+            },
+            "8721": {
+                "depth": 0.25001,
+                "height": 0.75,
+                "italic": 0,
+                "skew": 0,
+                "width": 1.05556
+            },
             "8730": {
                 "depth": 0.35001,
                 "height": 0.85,
@@ -2224,6 +2250,48 @@
                 "italic": 0,
                 "skew": 0,
                 "width": 0.55556
+            },
+            "8747": {
+                "depth": 0.30612,
+                "height": 0.805,
+                "italic": 0.19445,
+                "skew": 0,
+                "width": 0.47222
+            },
+            "8750": {
+                "depth": 0.30612,
+                "height": 0.805,
+                "italic": 0.19445,
+                "skew": 0,
+                "width": 0.47222
+            },
+            "8896": {
+                "depth": 0.25001,
+                "height": 0.75,
+                "italic": 0,
+                "skew": 0,
+                "width": 0.83334
+            },
+            "8897": {
+                "depth": 0.25001,
+                "height": 0.75,
+                "italic": 0,
+                "skew": 0,
+                "width": 0.83334
+            },
+            "8898": {
+                "depth": 0.25001,
+                "height": 0.75,
+                "italic": 0,
+                "skew": 0,
+                "width": 0.83334
+            },
+            "8899": {
+                "depth": 0.25001,
+                "height": 0.75,
+                "italic": 0,
+                "skew": 0,
+                "width": 0.83334
             },
             "8968": {
                 "depth": 0.35001,
@@ -2273,6 +2341,41 @@
                 "italic": 0,
                 "skew": 0,
                 "width": 0.47222
+            },
+            "10752": {
+                "depth": 0.25001,
+                "height": 0.75,
+                "italic": 0,
+                "skew": 0,
+                "width": 1.11111
+            },
+            "10753": {
+                "depth": 0.25001,
+                "height": 0.75,
+                "italic": 0,
+                "skew": 0,
+                "width": 1.11111
+            },
+            "10754": {
+                "depth": 0.25001,
+                "height": 0.75,
+                "italic": 0,
+                "skew": 0,
+                "width": 1.11111
+            },
+            "10756": {
+                "depth": 0.25001,
+                "height": 0.75,
+                "italic": 0,
+                "skew": 0,
+                "width": 0.83334
+            },
+            "10758": {
+                "depth": 0.25001,
+                "height": 0.75,
+                "italic": 0,
+                "skew": 0,
+                "width": 0.83334
             }
         },
         "Size2-Regular": {
@@ -2332,12 +2435,75 @@
                 "skew": 0,
                 "width": 0.66667
             },
+            "8719": {
+                "depth": 0.55001,
+                "height": 1.05,
+                "italic": 0,
+                "skew": 0,
+                "width": 1.27778
+            },
+            "8720": {
+                "depth": 0.55001,
+                "height": 1.05,
+                "italic": 0,
+                "skew": 0,
+                "width": 1.27778
+            },
+            "8721": {
+                "depth": 0.55001,
+                "height": 1.05,
+                "italic": 0,
+                "skew": 0,
+                "width": 1.44445
+            },
             "8730": {
                 "depth": 0.65002,
                 "height": 1.15,
                 "italic": 0,
                 "skew": 0,
                 "width": 1
+            },
+            "8747": {
+                "depth": 0.86225,
+                "height": 1.36,
+                "italic": 0.44445,
+                "skew": 0,
+                "width": 0.55556
+            },
+            "8750": {
+                "depth": 0.86225,
+                "height": 1.36,
+                "italic": 0.44445,
+                "skew": 0,
+                "width": 0.55556
+            },
+            "8896": {
+                "depth": 0.55001,
+                "height": 1.05,
+                "italic": 0,
+                "skew": 0,
+                "width": 1.11111
+            },
+            "8897": {
+                "depth": 0.55001,
+                "height": 1.05,
+                "italic": 0,
+                "skew": 0,
+                "width": 1.11111
+            },
+            "8898": {
+                "depth": 0.55001,
+                "height": 1.05,
+                "italic": 0,
+                "skew": 0,
+                "width": 1.11111
+            },
+            "8899": {
+                "depth": 0.55001,
+                "height": 1.05,
+                "italic": 0,
+                "skew": 0,
+                "width": 1.11111
             },
             "8968": {
                 "depth": 0.65002,
@@ -2380,6 +2546,41 @@
                 "italic": 0,
                 "skew": 0,
                 "width": 0.61111
+            },
+            "10752": {
+                "depth": 0.55001,
+                "height": 1.05,
+                "italic": 0,
+                "skew": 0,
+                "width": 1.51112
+            },
+            "10753": {
+                "depth": 0.55001,
+                "height": 1.05,
+                "italic": 0,
+                "skew": 0,
+                "width": 1.51112
+            },
+            "10754": {
+                "depth": 0.55001,
+                "height": 1.05,
+                "italic": 0,
+                "skew": 0,
+                "width": 1.51112
+            },
+            "10756": {
+                "depth": 0.55001,
+                "height": 1.05,
+                "italic": 0,
+                "skew": 0,
+                "width": 1.11111
+            },
+            "10758": {
+                "depth": 0.55001,
+                "height": 1.05,
+                "italic": 0,
+                "skew": 0,
+                "width": 1.11111
             }
         },
         "Size3-Regular": {

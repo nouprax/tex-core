@@ -132,7 +132,12 @@
             "radical.sign",
             "radical.index",
             "error.missingRadical",
-            "error.unclosedIndex"
+            "error.unclosedIndex",
+            "op.big",
+            "op.limits",
+            "op.scripts",
+            "op.functionName",
+            "error.misplacedLimits"
         ],
         "orders": [
             "root.hbox",
@@ -1957,6 +1962,268 @@
                     "mode.mathInline",
                     "outcome.error",
                     "error.unclosedIndex"
+                ],
+                "orders": []
+            }
+        },
+        {
+            "name": "math-sum",
+            "input": "math-sum.tex",
+            "expected": "math-sum.tree",
+            "compileOptions": {
+                "mode": "mathDisplay"
+            },
+            "outcome": "tree",
+            "coverage": {
+                "kinds": [
+                    "hbox",
+                    "glyph",
+                    "kern"
+                ],
+                "states": [
+                    "mode.mathDisplay",
+                    "outcome.tree",
+                    "children.populated",
+                    "atom.lower",
+                    "atom.digit",
+                    "atom.rel",
+                    "glyph.style.upright",
+                    "glyph.style.italic",
+                    "glyph.italic.zero",
+                    "op.big",
+                    "op.limits",
+                    "script.subFirst",
+                    "size.script",
+                    "measure.zero",
+                    "measure.negative"
+                ],
+                "orders": [
+                    "root.hbox",
+                    "children.sourceOrder"
+                ]
+            }
+        },
+        {
+            "name": "math-int",
+            "input": "math-int.tex",
+            "expected": "math-int.tree",
+            "compileOptions": {
+                "mode": "mathDisplay"
+            },
+            "outcome": "tree",
+            "coverage": {
+                "kinds": [
+                    "hbox",
+                    "glyph"
+                ],
+                "states": [
+                    "mode.mathDisplay",
+                    "outcome.tree",
+                    "children.populated",
+                    "atom.lower",
+                    "glyph.style.upright",
+                    "glyph.style.italic",
+                    "glyph.italic.positive",
+                    "op.big",
+                    "op.scripts",
+                    "script.sup",
+                    "script.sub",
+                    "script.both",
+                    "script.subFirst",
+                    "size.script",
+                    "measure.zero",
+                    "measure.negative"
+                ],
+                "orders": [
+                    "root.hbox",
+                    "children.sourceOrder"
+                ]
+            }
+        },
+        {
+            "name": "math-op-inline",
+            "input": "math-op-inline.tex",
+            "expected": "math-op-inline.tree",
+            "compileOptions": {
+                "mode": "mathInline"
+            },
+            "outcome": "tree",
+            "coverage": {
+                "kinds": [
+                    "hbox",
+                    "glyph",
+                    "kern"
+                ],
+                "states": [
+                    "mode.mathInline",
+                    "outcome.tree",
+                    "children.populated",
+                    "atom.lower",
+                    "atom.bin",
+                    "glyph.style.upright",
+                    "glyph.style.italic",
+                    "glyph.italic.zero",
+                    "op.big",
+                    "op.scripts",
+                    "size.script",
+                    "measure.zero",
+                    "measure.negative"
+                ],
+                "orders": [
+                    "root.hbox",
+                    "children.sourceOrder"
+                ]
+            }
+        },
+        {
+            "name": "math-op-modifiers",
+            "input": "math-op-modifiers.tex",
+            "expected": "math-op-modifiers.tree",
+            "compileOptions": {
+                "mode": "mathDisplay"
+            },
+            "outcome": "tree",
+            "coverage": {
+                "kinds": [
+                    "hbox",
+                    "glyph",
+                    "kern"
+                ],
+                "states": [
+                    "mode.mathDisplay",
+                    "outcome.tree",
+                    "children.populated",
+                    "atom.bin",
+                    "atom.digit",
+                    "glyph.style.upright",
+                    "glyph.style.italic",
+                    "glyph.italic.zero",
+                    "glyph.italic.positive",
+                    "op.big",
+                    "op.limits",
+                    "op.scripts",
+                    "size.script",
+                    "measure.zero",
+                    "measure.negative"
+                ],
+                "orders": [
+                    "root.hbox",
+                    "children.sourceOrder"
+                ]
+            }
+        },
+        {
+            "name": "math-functions",
+            "input": "math-functions.tex",
+            "expected": "math-functions.tree",
+            "compileOptions": {
+                "mode": "mathInline"
+            },
+            "outcome": "tree",
+            "coverage": {
+                "kinds": [
+                    "hbox",
+                    "glyph",
+                    "kern"
+                ],
+                "states": [
+                    "mode.mathInline",
+                    "outcome.tree",
+                    "children.populated",
+                    "atom.lower",
+                    "atom.bin",
+                    "glyph.style.upright",
+                    "glyph.style.italic",
+                    "glyph.italic.zero",
+                    "bin.kept",
+                    "op.functionName",
+                    "measure.zero"
+                ],
+                "orders": [
+                    "root.hbox",
+                    "children.sourceOrder"
+                ]
+            }
+        },
+        {
+            "name": "math-lim",
+            "input": "math-lim.tex",
+            "expected": "math-lim.tree",
+            "compileOptions": {
+                "mode": "mathDisplay"
+            },
+            "outcome": "tree",
+            "coverage": {
+                "kinds": [
+                    "hbox",
+                    "glyph",
+                    "kern"
+                ],
+                "states": [
+                    "mode.mathDisplay",
+                    "outcome.tree",
+                    "children.populated",
+                    "atom.lower",
+                    "glyph.style.upright",
+                    "glyph.style.italic",
+                    "glyph.italic.zero",
+                    "op.limits",
+                    "op.functionName",
+                    "size.script",
+                    "measure.zero",
+                    "measure.negative"
+                ],
+                "orders": [
+                    "root.hbox",
+                    "children.sourceOrder"
+                ]
+            }
+        },
+        {
+            "name": "math-limsup",
+            "input": "math-limsup.tex",
+            "expected": "math-limsup.tree",
+            "compileOptions": {
+                "mode": "mathInline"
+            },
+            "outcome": "tree",
+            "coverage": {
+                "kinds": [
+                    "hbox",
+                    "glyph",
+                    "kern"
+                ],
+                "states": [
+                    "mode.mathInline",
+                    "outcome.tree",
+                    "children.populated",
+                    "atom.lower",
+                    "glyph.style.upright",
+                    "glyph.style.italic",
+                    "glyph.italic.zero",
+                    "op.functionName",
+                    "size.script",
+                    "measure.zero"
+                ],
+                "orders": [
+                    "root.hbox"
+                ]
+            }
+        },
+        {
+            "name": "error-misplaced-limits",
+            "input": "error-misplaced-limits.tex",
+            "expected": "error-misplaced-limits.tree",
+            "compileOptions": {
+                "mode": "mathInline"
+            },
+            "outcome": "error",
+            "coverage": {
+                "kinds": [],
+                "states": [
+                    "mode.mathInline",
+                    "outcome.error",
+                    "error.misplacedLimits"
                 ],
                 "orders": []
             }
