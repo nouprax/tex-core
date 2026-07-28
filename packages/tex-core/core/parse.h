@@ -92,12 +92,14 @@ typedef enum txc_field_kind {
     TXC_FIELD_FRACTION = 3,
     TXC_FIELD_DELIMITER = 4,
     TXC_FIELD_FENCED = 5,
-    TXC_FIELD_RADICAL = 6
+    TXC_FIELD_RADICAL = 6,
+    TXC_FIELD_ACCENT = 7
 } txc_field_kind;
 
 struct txc_fraction;
 struct txc_fenced;
 struct txc_radical;
+struct txc_accent;
 
 /* An explicit-size delimiter (\bigl … \Biggr): the delimiter and the
  * plain TeX size step 1-4 (\big through \Bigg). */
@@ -121,6 +123,8 @@ typedef struct txc_field {
     struct txc_fenced *fenced;
     /* TXC_FIELD_RADICAL only. */
     struct txc_radical *radical;
+    /* TXC_FIELD_ACCENT only. */
+    struct txc_accent *accent;
     /* The field's own source construct: the character or symbol command,
      * the braced group including its braces, the fraction command through
      * its last argument, the size command through its delimiter, \left
@@ -138,6 +142,16 @@ typedef struct txc_radical {
     txc_field argument;
     tex_core_range command;
 } txc_radical;
+
+/* A math accent (\hat through \vec): the accent glyph and the
+ * accented nucleus. Wide accents (\widehat, \widetilde) grow through
+ * the size-face width steps. `command` is the accent command's token. */
+typedef struct txc_accent {
+    uint32_t codepoint;
+    bool wide;
+    txc_field argument;
+    tex_core_range command;
+} txc_accent;
 
 /* A \left/\right fence: both delimiters with their own token ranges and
  * the enclosed sub-list. */

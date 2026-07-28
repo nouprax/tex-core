@@ -5,7 +5,7 @@
         "file": "src/fontMetricsData.js",
         "source": "https://registry.npmjs.org/katex/-/katex-0.16.22.tgz",
         "license": "MIT",
-        "note": "Glyph metrics subset (em-relative depth/height/italic/skew/width) for the tex-core glyph inventory: from Main-Regular the ASCII letters, digits, and punctuation/operator/delimiter characters the math grammar maps to upright atoms, the uppercase Greek letters, and the symbol codepoints of the milestone M1 symbol-command set (binary operators, relations, arrows, letter-like and miscellaneous ordinaries, delimiter atoms); from Math-Italic the ASCII letters and lowercase Greek letters; from Size1-Size4 the delimiter size variants, the extensible-assembly pieces (corners, repeaters, middles) of the M1 delimiter set, and the big-operator text/display variants. Interword and rule spacing come from TeX font dimensions recorded in the generator, not from this table. The parameters table vendors the sigmasAndXis subset the M1 script layout needs (quad, xHeight, sup1-3, sub1-2, supDrop, subDrop, defaultRuleThickness) and the M1 fraction and delimiter parameters (num1, num2, num3, denom1, denom2, axisHeight, delim1, delim2, bigOpSpacing1-5) from src/fontMetrics.js: three columns per row for the text/script/scriptscript sizes, em-relative to each size's own font; the remaining sigmas and xis arrive with their milestones.",
+        "note": "Glyph metrics subset (em-relative depth/height/italic/skew/width) for the tex-core glyph inventory: from Main-Regular the ASCII letters, digits, and punctuation/operator/delimiter characters the math grammar maps to upright atoms, the uppercase Greek letters, and the symbol codepoints of the milestone M1 symbol-command set (binary operators, relations, arrows, letter-like and miscellaneous ordinaries, delimiter atoms); from Math-Italic the ASCII letters and lowercase Greek letters; from Size1-Size4 the delimiter size variants, the extensible-assembly pieces (corners, repeaters, middles) of the M1 delimiter set, the big-operator text/display variants, and the math-accent glyphs with the wide-accent width steps. Interword and rule spacing come from TeX font dimensions recorded in the generator, not from this table. The parameters table vendors the sigmasAndXis subset the M1 script layout needs (quad, xHeight, sup1-3, sub1-2, supDrop, subDrop, defaultRuleThickness) and the M1 fraction and delimiter parameters (num1, num2, num3, denom1, denom2, axisHeight, delim1, delim2, bigOpSpacing1-5) from src/fontMetrics.js: three columns per row for the text/script/scriptscript sizes, em-relative to each size's own font; the remaining sigmas and xis arrive with their milestones.",
         "parametersFile": "src/fontMetrics.js"
     },
     "parameters": {
@@ -595,6 +595,13 @@
                 "skew": 0,
                 "width": 0.5
             },
+            "168": {
+                "depth": 0,
+                "height": 0.66786,
+                "italic": 0,
+                "skew": 0,
+                "width": 0.5
+            },
             "172": {
                 "depth": 0,
                 "height": 0.43056,
@@ -622,6 +629,62 @@
                 "italic": 0,
                 "skew": 0,
                 "width": 0.77778
+            },
+            "710": {
+                "depth": 0,
+                "height": 0.69444,
+                "italic": 0,
+                "skew": 0,
+                "width": 0.5
+            },
+            "711": {
+                "depth": 0,
+                "height": 0.62847,
+                "italic": 0,
+                "skew": 0,
+                "width": 0.5
+            },
+            "713": {
+                "depth": 0,
+                "height": 0.56778,
+                "italic": 0,
+                "skew": 0,
+                "width": 0.5
+            },
+            "714": {
+                "depth": 0,
+                "height": 0.69444,
+                "italic": 0,
+                "skew": 0,
+                "width": 0.5
+            },
+            "715": {
+                "depth": 0,
+                "height": 0.69444,
+                "italic": 0,
+                "skew": 0,
+                "width": 0.5
+            },
+            "728": {
+                "depth": 0,
+                "height": 0.69444,
+                "italic": 0,
+                "skew": 0,
+                "width": 0.5
+            },
+            "729": {
+                "depth": 0,
+                "height": 0.66786,
+                "italic": 0,
+                "skew": 0,
+                "width": 0.27778
+            },
+            "732": {
+                "depth": 0,
+                "height": 0.66786,
+                "italic": 0,
+                "skew": 0,
+                "width": 0.5
             },
             "915": {
                 "depth": 0,
@@ -720,6 +783,13 @@
                 "italic": 0,
                 "skew": 0,
                 "width": 0.275
+            },
+            "8407": {
+                "depth": 0,
+                "height": 0.71444,
+                "italic": 0.15382,
+                "skew": 0,
+                "width": 0.5
             },
             "8465": {
                 "depth": 0,
@@ -2174,6 +2244,20 @@
                 "skew": 0,
                 "width": 0.58334
             },
+            "710": {
+                "depth": 0,
+                "height": 0.72222,
+                "italic": 0,
+                "skew": 0,
+                "width": 0.55556
+            },
+            "732": {
+                "depth": 0,
+                "height": 0.72222,
+                "italic": 0,
+                "skew": 0,
+                "width": 0.55556
+            },
             "8214": {
                 "depth": -0.00099,
                 "height": 0.601,
@@ -2435,6 +2519,20 @@
                 "skew": 0,
                 "width": 0.66667
             },
+            "710": {
+                "depth": 0,
+                "height": 0.75,
+                "italic": 0,
+                "skew": 0,
+                "width": 1
+            },
+            "732": {
+                "depth": 0,
+                "height": 0.75,
+                "italic": 0,
+                "skew": 0,
+                "width": 1
+            },
             "8719": {
                 "depth": 0.55001,
                 "height": 1.05,
@@ -2640,6 +2738,20 @@
                 "skew": 0,
                 "width": 0.75
             },
+            "710": {
+                "depth": 0,
+                "height": 0.75,
+                "italic": 0,
+                "skew": 0,
+                "width": 1.44445
+            },
+            "732": {
+                "depth": 0,
+                "height": 0.75,
+                "italic": 0,
+                "skew": 0,
+                "width": 1.44445
+            },
             "8730": {
                 "depth": 0.95003,
                 "height": 1.45,
@@ -2746,6 +2858,20 @@
                 "italic": 0,
                 "skew": 0,
                 "width": 0.80556
+            },
+            "710": {
+                "depth": 0,
+                "height": 0.825,
+                "italic": 0,
+                "skew": 0,
+                "width": 1.8889
+            },
+            "732": {
+                "depth": 0,
+                "height": 0.825,
+                "italic": 0,
+                "skew": 0,
+                "width": 1.8889
             },
             "8730": {
                 "depth": 1.25003,

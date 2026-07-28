@@ -6,6 +6,18 @@ not promised to remain compatible between releases.
 
 ## Unreleased
 
+- Continue milestone M1 (math core) with math accents: \hat \check
+  \tilde \acute \grave \dot \ddot \breve \bar \vec take one
+  argument like a radical (`missing accent argument` pinned), the
+  accented atom is Ord and script-legal, and layout is TeXbook rule 12
+  (tex.web make_math_accent): cramped clean-box nucleus keeping its
+  width, the accent at its natural height over x-height material and
+  riding up over taller nuclei, shifted by the nucleus character's
+  skew — the vendored KaTeX skew column now flows through the whole
+  metrics pipeline as a fifth glyph field. \widehat/\widetilde run
+  the width ladder through the size faces, first fit at least the
+  nucleus width, capped at size4. Corpus 70 -> 74; schema unchanged at
+  version 4, no binding code changes.
 - Continue milestone M1 (math core) with big operators and function
   names: the \sum family and the integrals are Op atoms drawn from the
   Size1 face (Size2 in display style) at the text em, centered on the

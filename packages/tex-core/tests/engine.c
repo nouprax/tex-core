@@ -768,6 +768,47 @@ static void txc_test_operators(txc_test *test) {
     tex_core_render_tree_free(tree);
 }
 
+static void txc_test_accents(txc_test *test) {
+    /* Rule 12: the accent centers over the nucleus width plus the
+     * nucleus character's skew, at its natural height over x-height
+     * material, and the box keeps the nucleus width. */
+    tex_core_render_tree *tree = txc_compile(test, "\\hat x", TEX_CORE_MODE_MATH_INLINE, "hat");
+    const tex_core_node *box = tex_core_node_child(tex_core_render_tree_root(tree), 0);
+    txc_check_size(test, tex_core_node_child_count(box), 2, "accent children");
+    const tex_core_node *accent = tex_core_node_child(box, 0);
+    const tex_core_node *nucleus = tex_core_node_child(box, 1);
+    txc_check_int(test, (long long)tex_core_node_glyph(accent).codepoint, 0x2C6, "hat glyph");
+    txc_check(test, tex_core_node_frame(accent).y == 0.0, "x-height nucleus keeps the accent at rest");
+    txc_check(test, tex_core_node_frame(box).width == tex_core_node_frame(nucleus).width, "accent keeps the width");
+    /* Math-Italic x: skew 0.02778, width 0.57153; accent width 0.5. */
+    /* The skew applies to a bare character argument only — a braced
+     * {x} is a sub-list nucleus and takes none, exactly as TeX. */
+    txc_check(
+        test,
+        tex_core_node_frame(accent).x ==
+            txc_expected_points(0.02778) + (txc_expected_points(0.57153) - txc_expected_points(0.5)) / 2.0,
+        "accent skews and centers"
+    );
+    tex_core_render_tree_free(tree);
+
+    /* A tall nucleus lifts the accent by its ascent minus the x-height. */
+    tree = txc_compile(test, "\\vec{f}", TEX_CORE_MODE_MATH_INLINE, "vec f");
+    box = tex_core_node_child(tex_core_render_tree_root(tree), 0);
+    txc_check(test, tex_core_node_frame(tex_core_node_child(box, 0)).y > 0.0, "tall nucleus lifts the accent");
+    tex_core_render_tree_free(tree);
+
+    /* Wide accents climb the width ladder. */
+    tree = txc_compile(test, "\\widehat{x+y}", TEX_CORE_MODE_MATH_INLINE, "widehat");
+    box = tex_core_node_child(tex_core_render_tree_root(tree), 0);
+    txc_check_int(
+        test,
+        tex_core_node_glyph(tex_core_node_child(box, 0)).family,
+        TEX_CORE_FAMILY_SIZE4,
+        "wide accent reaches Size4"
+    );
+    tex_core_render_tree_free(tree);
+}
+
 int main(void) {
     txc_test test = {0, 0};
     txc_test_math_glyph(&test);
@@ -783,5 +824,6 @@ int main(void) {
     txc_test_delimiters(&test);
     txc_test_radicals(&test);
     txc_test_operators(&test);
+    txc_test_accents(&test);
     return txc_test_finish(&test, "engine");
 }
