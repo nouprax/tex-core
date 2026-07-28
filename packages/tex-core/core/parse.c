@@ -388,6 +388,39 @@ static const txc_function_name *txc_function_find(const uint8_t *name, size_t na
     return NULL;
 }
 
+/* Math accents (milestone M1): each maps to one accent glyph over the
+ * argument; the wide pair grows through the size-face width steps. */
+typedef struct txc_accent_command {
+    const char *name;
+    uint32_t codepoint;
+    bool wide;
+} txc_accent_command;
+
+static const txc_accent_command TXC_ACCENT_COMMANDS[] = {
+    {"acute", 0x02CA, false},
+    {"bar", 0x02C9, false},
+    {"breve", 0x02D8, false},
+    {"check", 0x02C7, false},
+    {"ddot", 0x00A8, false},
+    {"dot", 0x02D9, false},
+    {"grave", 0x02CB, false},
+    {"hat", 0x02C6, false},
+    {"tilde", 0x02DC, false},
+    {"vec", 0x20D7, false},
+    {"widehat", 0x02C6, true},
+    {"widetilde", 0x02DC, true},
+};
+
+static const txc_accent_command *txc_accent_find(const uint8_t *name, size_t name_length) {
+    for (size_t index = 0; index < sizeof(TXC_ACCENT_COMMANDS) / sizeof(TXC_ACCENT_COMMANDS[0]); index++) {
+        const txc_accent_command *command = &TXC_ACCENT_COMMANDS[index];
+        if (strlen(command->name) == name_length && memcmp(command->name, name, name_length) == 0) {
+            return command;
+        }
+    }
+    return NULL;
+}
+
 /* The plain TeX delimiter set (\delcode assignments plus the delimiter
  * control words): each row maps a source spelling to its main-family
  * text glyph, its growth ladder, and its extensible pieces. Piece data
@@ -618,6 +651,7 @@ typedef struct txc_construct {
     const txc_sized_delimiter *sized;
     txc_fenced *fenced;
     txc_radical *radical;
+    txc_accent *accent;
 } txc_construct;
 
 /* Fills one field from a delivered construct. */
@@ -638,6 +672,9 @@ static void txc_field_fill(txc_field *field, const txc_construct *construct, tex
     } else if (construct->radical != NULL) {
         field->kind = TXC_FIELD_RADICAL;
         field->radical = construct->radical;
+    } else if (construct->accent != NULL) {
+        field->kind = TXC_FIELD_ACCENT;
+        field->accent = construct->accent;
     } else {
         field->kind = TXC_FIELD_FENCED;
         field->fenced = construct->fenced;
@@ -730,6 +767,13 @@ typedef struct txc_frame {
     txc_item *radical_target;
     txc_pending radical_script;
     size_t radical_mark;
+    /* The accent whose argument this frame is collecting, if any.
+     * Completion mirrors the radical machinery. */
+    txc_accent *accent;
+    txc_item *accent_item;
+    txc_item *accent_target;
+    txc_pending accent_script;
+    size_t accent_mark;
     /* The delimiter token this frame is waiting for, if any, and the
      * command that asked for it. EXPLICIT carries the atom class and the
      * \big size step. */
@@ -768,6 +812,11 @@ static void txc_frame_init(txc_frame *frame, txc_frame_role role, txc_frame *par
     frame->radical_target = NULL;
     frame->radical_script = TXC_PENDING_NONE;
     frame->radical_mark = 0;
+    frame->accent = NULL;
+    frame->accent_item = NULL;
+    frame->accent_target = NULL;
+    frame->accent_script = TXC_PENDING_NONE;
+    frame->accent_mark = 0;
     frame->delim_wait = TXC_DELIM_WAIT_NONE;
     frame->delim_command.begin = 0;
     frame->delim_command.end = 0;
@@ -794,6 +843,9 @@ static txc_field *txc_script_field(txc_item *item, txc_pending pending) {
 }
 
 static const char *txc_argument_noun(const txc_frame *frame) {
+    if (frame->accent != NULL) {
+        return "accent";
+    }
     if (frame->radical != NULL) {
         return "radical";
     }
@@ -806,7 +858,7 @@ static const char *txc_argument_noun(const txc_frame *frame) {
 static void txc_fraction_complete(txc_frame *frame, size_t end) {
     txc_fraction *fraction = frame->fraction;
     tex_core_range range = {fraction->command.begin, end};
-    txc_construct construct = {NULL, NULL, fraction, NULL, NULL, NULL};
+    txc_construct construct = {NULL, NULL, fraction, NULL, NULL, NULL, NULL};
     if (frame->fraction_item != NULL) {
         txc_item *item = frame->fraction_item;
         txc_field_fill(&item->nucleus, &construct, range);
@@ -835,7 +887,7 @@ static void txc_fraction_complete(txc_frame *frame, size_t end) {
 static void txc_radical_complete(txc_frame *frame, size_t end) {
     txc_radical *radical = frame->radical;
     tex_core_range range = {radical->command.begin, end};
-    txc_construct construct = {NULL, NULL, NULL, NULL, NULL, radical};
+    txc_construct construct = {NULL, NULL, NULL, NULL, NULL, radical, NULL};
     if (frame->radical_item != NULL) {
         txc_item *item = frame->radical_item;
         txc_field_fill(&item->nucleus, &construct, range);
@@ -858,12 +910,39 @@ static void txc_radical_complete(txc_frame *frame, size_t end) {
     frame->radical_target = NULL;
 }
 
+/* Completes the accent in progress on `frame` once its argument has
+ * arrived. */
+static void txc_accent_complete(txc_frame *frame, size_t end) {
+    txc_accent *accent = frame->accent;
+    tex_core_range range = {accent->command.begin, end};
+    txc_construct construct = {NULL, NULL, NULL, NULL, NULL, NULL, accent};
+    if (frame->accent_item != NULL) {
+        txc_item *item = frame->accent_item;
+        txc_field_fill(&item->nucleus, &construct, range);
+        txc_field_reset(&item->sup, end);
+        txc_field_reset(&item->sub, end);
+        item->range = range;
+    } else {
+        txc_item *target = frame->accent_target;
+        txc_field *field = txc_script_field(target, frame->accent_script);
+        txc_field_fill(field, &construct, range);
+        field->range.begin = frame->accent_mark;
+        target->range.end = end;
+        if (frame->accent_script == TXC_PENDING_SUB && target->sup.kind == TXC_FIELD_EMPTY) {
+            target->sub_first = true;
+        }
+    }
+    frame->accent = NULL;
+    frame->accent_item = NULL;
+    frame->accent_target = NULL;
+}
+
 /* Delivers one parsed construct — a character, a symbol command, a
  * closed group list, a sized delimiter, or a closed fence — into the
- * frame: as the pending radical or fraction argument when one is being
- * collected, as the pending script field when one is pending, or as a
- * new atom of `atom_class`. `range` is the construct's own range; script
- * fields extend it back to their mark. */
+ * frame: as the pending accent, radical, or fraction argument when one
+ * is being collected, as the pending script field when one is pending,
+ * or as a new atom of `atom_class`. `range` is the construct's own
+ * range; script fields extend it back to their mark. */
 static tex_core_status txc_deliver(
     txc_arena *arena,
     txc_frame *frame,
@@ -872,12 +951,17 @@ static tex_core_status txc_deliver(
     tex_core_range range,
     tex_core_error *error
 ) {
+    if (frame->accent != NULL) {
+        txc_field_fill(&frame->accent->argument, construct, range);
+        txc_accent_complete(frame, range.end);
+        return TEX_CORE_STATUS_OK;
+    }
     if (frame->radical != NULL) {
         txc_field_fill(&frame->radical->argument, construct, range);
         txc_radical_complete(frame, range.end);
         return TEX_CORE_STATUS_OK;
     }
-    if (frame->fraction != NULL || frame->radical != NULL) {
+    if (frame->fraction != NULL || frame->radical != NULL || frame->accent != NULL) {
         txc_field *field = frame->fraction_denominator ? &frame->fraction->den : &frame->fraction->num;
         txc_field_fill(field, construct, range);
         if (frame->fraction_denominator) {
@@ -967,12 +1051,12 @@ static tex_core_status txc_delimiter_arrived(
         tex_core_range whole = {frame->open, range.end};
         *frame_slot = frame->parent;
         *depth -= 1;
-        txc_construct construct = {NULL, NULL, NULL, NULL, fenced, NULL};
+        txc_construct construct = {NULL, NULL, NULL, NULL, fenced, NULL, NULL};
         return txc_deliver(arena, *frame_slot, &construct, TXC_ATOM_INNER, whole, error);
     }
     txc_sized_delimiter sized = {*delimiter, frame->delim_size};
     tex_core_range whole = {frame->delim_command.begin, range.end};
-    txc_construct construct = {NULL, NULL, NULL, &sized, NULL, NULL};
+    txc_construct construct = {NULL, NULL, NULL, &sized, NULL, NULL, NULL};
     return txc_deliver(arena, frame, &construct, frame->delim_class, whole, error);
 }
 
@@ -1009,8 +1093,15 @@ tex_core_status txc_parse(
             if (frame->delim_wait != TXC_DELIM_WAIT_NONE) {
                 return txc_fail(error, TEX_CORE_STATUS_UNSUPPORTED, &frame->delim_command, "missing delimiter");
             }
-            if (frame->fraction != NULL || frame->radical != NULL) {
-                tex_core_range at = frame->radical != NULL ? frame->radical->command : frame->fraction->command;
+            if (frame->fraction != NULL || frame->radical != NULL || frame->accent != NULL) {
+                tex_core_range at;
+                if (frame->accent != NULL) {
+                    at = frame->accent->command;
+                } else if (frame->radical != NULL) {
+                    at = frame->radical->command;
+                } else {
+                    at = frame->fraction->command;
+                }
                 return txc_fail(
                     error,
                     TEX_CORE_STATUS_UNSUPPORTED,
@@ -1094,7 +1185,7 @@ tex_core_status txc_parse(
                     break;
                 }
                 if (codepoint == ']' && frame->role == TXC_FRAME_INDEX) {
-                    if (frame->fraction != NULL || frame->radical != NULL) {
+                    if (frame->fraction != NULL || frame->radical != NULL || frame->accent != NULL) {
                         return txc_fail(
                             error,
                             TEX_CORE_STATUS_UNSUPPORTED,
@@ -1148,7 +1239,7 @@ tex_core_status txc_parse(
                     break;
                 }
                 if (codepoint == '}') {
-                    if (frame->fraction != NULL || frame->radical != NULL) {
+                    if (frame->fraction != NULL || frame->radical != NULL || frame->accent != NULL) {
                         return txc_fail(
                             error,
                             TEX_CORE_STATUS_UNSUPPORTED,
@@ -1190,7 +1281,7 @@ tex_core_status txc_parse(
                         }
                     } else {
                         tex_core_range range = {closed->open, token.range.end};
-                        txc_construct construct = {NULL, &closed->list, NULL, NULL, NULL, NULL};
+                        txc_construct construct = {NULL, &closed->list, NULL, NULL, NULL, NULL, NULL};
                         status = txc_deliver(arena, frame, &construct, TXC_ATOM_ORD, range, error);
                         if (status != TEX_CORE_STATUS_OK) {
                             return status;
@@ -1200,7 +1291,7 @@ tex_core_status txc_parse(
                 }
                 if (codepoint == '^' || codepoint == '_') {
                     txc_pending pending = codepoint == '^' ? TXC_PENDING_SUP : TXC_PENDING_SUB;
-                    if (frame->fraction != NULL || frame->radical != NULL) {
+                    if (frame->fraction != NULL || frame->radical != NULL || frame->accent != NULL) {
                         return txc_fail(
                             error,
                             TEX_CORE_STATUS_UNSUPPORTED,
@@ -1253,7 +1344,7 @@ tex_core_status txc_parse(
                 if (!txc_reserved(codepoint)) {
                     txc_math_glyph glyph;
                     if (txc_math_classify(codepoint, &glyph)) {
-                        txc_construct construct = {&glyph, NULL, NULL, NULL, NULL, NULL};
+                        txc_construct construct = {&glyph, NULL, NULL, NULL, NULL, NULL, NULL};
                         status = txc_deliver(arena, frame, &construct, glyph.atom_class, token.range, error);
                         if (status != TEX_CORE_STATUS_OK) {
                             return status;
@@ -1300,7 +1391,7 @@ tex_core_status txc_parse(
             }
             const txc_spacing_command *command = txc_spacing(token.name, token.name_length);
             if (command != NULL) {
-                if (frame->fraction != NULL || frame->radical != NULL) {
+                if (frame->fraction != NULL || frame->radical != NULL || frame->accent != NULL) {
                     return txc_fail(
                         error,
                         TEX_CORE_STATUS_UNSUPPORTED,
@@ -1338,7 +1429,7 @@ tex_core_status txc_parse(
                      * required is not a legal argument: undelimited
                      * arguments are a character, a symbol command, or a
                      * braced group. */
-                    if (frame->fraction != NULL || frame->radical != NULL) {
+                    if (frame->fraction != NULL || frame->radical != NULL || frame->accent != NULL) {
                         return txc_fail(
                             error,
                             TEX_CORE_STATUS_UNSUPPORTED,
@@ -1389,7 +1480,7 @@ tex_core_status txc_parse(
                     break;
                 }
                 if (token.name_length == 4 && memcmp(token.name, "left", 4) == 0) {
-                    if (frame->fraction != NULL || frame->radical != NULL) {
+                    if (frame->fraction != NULL || frame->radical != NULL || frame->accent != NULL) {
                         return txc_fail(
                             error,
                             TEX_CORE_STATUS_UNSUPPORTED,
@@ -1412,7 +1503,7 @@ tex_core_status txc_parse(
                     break;
                 }
                 if (token.name_length == 5 && memcmp(token.name, "right", 5) == 0) {
-                    if (frame->fraction != NULL || frame->radical != NULL) {
+                    if (frame->fraction != NULL || frame->radical != NULL || frame->accent != NULL) {
                         return txc_fail(
                             error,
                             TEX_CORE_STATUS_UNSUPPORTED,
@@ -1502,7 +1593,7 @@ tex_core_status txc_parse(
                         }
                         if (frame->radical != NULL || frame->fraction != NULL || frame->pending != TXC_PENDING_NONE) {
                             txc_list wrapped = {op, op, 1};
-                            txc_construct construct = {NULL, &wrapped, NULL, NULL, NULL, NULL};
+                            txc_construct construct = {NULL, &wrapped, NULL, NULL, NULL, NULL, NULL};
                             status = txc_deliver(arena, frame, &construct, TXC_ATOM_ORD, token.range, error);
                             if (status != TEX_CORE_STATUS_OK) {
                                 return status;
@@ -1522,7 +1613,7 @@ tex_core_status txc_parse(
                 if ((token.name_length == 6 && memcmp(token.name, "limits", 6) == 0) ||
                     (token.name_length == 8 && memcmp(token.name, "nolimits", 8) == 0)) {
                     bool wants_limits = token.name_length == 6;
-                    if (frame->fraction != NULL || frame->radical != NULL) {
+                    if (frame->fraction != NULL || frame->radical != NULL || frame->accent != NULL) {
                         return txc_fail(
                             error,
                             TEX_CORE_STATUS_UNSUPPORTED,
@@ -1554,8 +1645,46 @@ tex_core_status txc_parse(
                     target->range.end = token.range.end;
                     break;
                 }
+                {
+                    const txc_accent_command *accent_command = txc_accent_find(token.name, token.name_length);
+                    if (accent_command != NULL) {
+                        txc_accent *accent = txc_arena_alloc(arena, sizeof(txc_accent));
+                        if (accent == NULL) {
+                            return txc_fail(error, TEX_CORE_STATUS_ALLOCATION_FAILED, NULL, "allocation failed");
+                        }
+                        accent->codepoint = accent_command->codepoint;
+                        accent->wide = accent_command->wide;
+                        accent->command = token.range;
+                        txc_field_reset(&accent->argument, token.range.end);
+                        frame->accent = accent;
+                        if (frame->pending != TXC_PENDING_NONE) {
+                            frame->accent_item = NULL;
+                            frame->accent_target = frame->pending_target;
+                            frame->accent_script = frame->pending;
+                            frame->accent_mark = frame->pending_mark;
+                            frame->pending = TXC_PENDING_NONE;
+                            frame->pending_target = NULL;
+                        } else {
+                            txc_item *item = txc_append(arena, &frame->list);
+                            if (item == NULL) {
+                                return txc_fail(error, TEX_CORE_STATUS_ALLOCATION_FAILED, NULL, "allocation failed");
+                            }
+                            item->kind = TXC_ITEM_ATOM;
+                            item->atom_class = TXC_ATOM_ORD;
+                            txc_field_reset(&item->nucleus, token.range.begin);
+                            txc_field_reset(&item->sup, token.range.end);
+                            txc_field_reset(&item->sub, token.range.end);
+                            item->sub_first = false;
+                            item->op_limits = TXC_LIMITS_DISPLAY;
+                            item->range = token.range;
+                            frame->accent_item = item;
+                            frame->accent_target = NULL;
+                        }
+                        break;
+                    }
+                }
                 if (token.name_length == 4 && memcmp(token.name, "sqrt", 4) == 0) {
-                    if (frame->fraction != NULL || frame->radical != NULL) {
+                    if (frame->fraction != NULL || frame->radical != NULL || frame->accent != NULL) {
                         return txc_fail(
                             error,
                             TEX_CORE_STATUS_UNSUPPORTED,
@@ -1614,7 +1743,7 @@ tex_core_status txc_parse(
                 const txc_math_symbol *symbol = txc_math_symbol_find(token.name, token.name_length);
                 if (symbol != NULL) {
                     txc_math_glyph glyph = {symbol->atom_class, symbol->codepoint, symbol->style};
-                    txc_construct construct = {&glyph, NULL, NULL, NULL, NULL, NULL};
+                    txc_construct construct = {&glyph, NULL, NULL, NULL, NULL, NULL, NULL};
                     status = txc_deliver(arena, frame, &construct, glyph.atom_class, token.range, error);
                     if (status != TEX_CORE_STATUS_OK) {
                         return status;

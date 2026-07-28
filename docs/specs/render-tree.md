@@ -283,6 +283,22 @@ extent deliberately exceeds its children's maxima. Its children keep
 source order: operator, then the script boxes in written order. Without
 limits the scripts attach exactly as on any box nucleus.
 
+## Accents
+
+The math accents (`\hat \check \tilde \acute \grave \dot \ddot
+\breve \bar \vec`) take one argument exactly as a radical does, and a
+missing one is `missing accent argument`. The accented atom is Ord and
+a legal script argument. Layout is TeXbook Appendix G rule 12 (tex.web's
+`make_math_accent`): the nucleus is a clean box in the cramped style and
+keeps its width; the accent glyph — main family at the current size —
+sits at its natural height over a nucleus no taller than the x-height
+and rides up with anything taller, shifted right by the nucleus
+character's skew (the vendored KaTeX `skew` column, TeX's skewchar
+kern). `\widehat` and `\widetilde` run a width ladder instead: the
+text-size glyph, then the size faces, the first at least as wide as the
+nucleus, capped at `size4`. Child order is source order: the accent
+glyph (its `src` is the command token), then the nucleus box.
+
 ## Source ranges
 
 Every node records the byte range of the source it came from, for caret

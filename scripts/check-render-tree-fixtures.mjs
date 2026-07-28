@@ -569,7 +569,39 @@ const stateValidators = {
             })
     ),
     "error.misplacedLimits": ({ outcome, tree }) =>
-        outcome === "error" && / message=misplaced \\(no)?limits\n$/.test(tree)
+        outcome === "error" && / message=misplaced \\(no)?limits\n$/.test(tree),
+    // An accent box: exactly one accent-codepoint glyph over one nucleus
+    // box, the box keeping the nucleus width.
+    "accent.over": treeStates(
+        (all, { source }) =>
+            /\\(hat|check|tilde|acute|grave|dot|ddot|breve|bar|vec)/.test(source ?? "") &&
+            all.some((node, index) => {
+                if (node.kind !== "hbox") return false;
+                const children = childrenOf(all, index);
+                return (
+                    children.length === 2 &&
+                    children[0].kind === "glyph" &&
+                    [0x2c6, 0x2c7, 0x2c9, 0x2ca, 0x2cb, 0x2d8, 0x2d9, 0x2dc, 0xa8, 0x20d7].includes(children[0].cp) &&
+                    children[1].kind === "hbox" &&
+                    near(node.width, children[1].width)
+                );
+            })
+    ),
+    "accent.wide": ({ outcome, source, tree }) =>
+        outcome === "tree" &&
+        /\\wide(hat|tilde)/.test(source ?? "") &&
+        / cp=U\+02(C6|DC) style=upright family=size[1-4] /.test(tree),
+    "accent.raised": treeStates((all) =>
+        all.some(
+            (node, index) =>
+                node.kind === "hbox" &&
+                childrenOf(all, index).some(
+                    (child) => child.kind === "glyph" && child.y > 0 && [0x2c6, 0x20d7].includes(child.cp)
+                )
+        )
+    ),
+    "error.missingAccent": ({ outcome, tree }) =>
+        outcome === "error" && / message=missing accent argument\n$/.test(tree)
 };
 const orderValidators = {
     "root.hbox": ({ outcome, tree }) =>
