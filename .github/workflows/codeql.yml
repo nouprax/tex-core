@@ -38,37 +38,58 @@ jobs:
                       build-mode: manual
                       os: macos-26
         steps:
-            - uses: actions/checkout@v7
+            - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
             - name: Set up JDK 26
-              if: matrix.language == 'java-kotlin'
-              uses: actions/setup-java@v5
+              if: matrix.language == 'java-kotlin' || matrix.language == 'c-cpp'
+              uses: actions/setup-java@03ad4de0992f5dab5e18fcb136590ce7c4a0ac95 # v5.6.0
               with:
                   cache: gradle
                   distribution: temurin
                   java-version: 26
+            - uses: android-actions/setup-android@40fd30fb8d7440372e1316f5d1809ec01dcd3699 # v4.0.1
+              if: matrix.language == 'java-kotlin'
+            - name: Install Android build dependencies
+              if: matrix.language == 'java-kotlin'
+              run: sdkmanager "platforms;android-36" "cmake;3.22.1" "ndk;28.2.13676358"
             - name: Select Xcode 26.6
               if: matrix.language == 'swift'
-              uses: maxim-lobanov/setup-xcode@v1
+              uses: maxim-lobanov/setup-xcode@ed7a3b1fda3918c0306d1b724322adc0b8cc0a90 # v1.7.0
               with:
                   xcode-version: "26.6"
             - name: Initialize CodeQL
-              uses: github/codeql-action/init@v4
+              uses: github/codeql-action/init@e4fba868fa4b1b91e1fdab776edc8cfbe6e9fb81 # v4.37.3
               with:
                   build-mode: ${{ matrix.build-mode }}
                   languages: ${{ matrix.language }}
-            - name: Build C/C++ product
+            # The traced C build covers the core plus every production FFI
+            # bridge: the shared TXC1 serializer, the JNI and Kotlin/Native
+            # adapters (TEX_CORE_KOTLIN_*), and the ES/WASM adapter compiled
+            # host-side for analysis — the densest pointer/ownership code
+            # must not receive less scrutiny than the facade.
+            - name: Build C/C++ product and FFI bridges
               if: matrix.language == 'c-cpp'
               run: |
-                  cmake -S . -B build/codeql -DTEX_CORE_TESTS=OFF
+                  cmake -S . -B build/codeql -DTEX_CORE_TESTS=OFF \
+                      -DTEX_CORE_KOTLIN_JNI=ON -DTEX_CORE_KOTLIN_NATIVE=ON
                   cmake --build build/codeql --parallel
+                  cc -c -std=c11 \
+                      -Ipackages/tex-core/include -Ipackages/tex-core/bridge \
+                      -DTEX_CORE_STATIC_DEFINE \
+                      packages/es-tex-core/src/bridge.c -o build/codeql/es-bridge.o
+            # Kotlin/JVM plus the Android source set. Kotlin/Native klibs are
+            # outside CodeQL's Java/Kotlin extractor and stay uncovered here;
+            # the native bridge C they bind is traced by the C/C++ lane.
             - name: Build Kotlin product
               if: matrix.language == 'java-kotlin'
-              run: scripts/gradle.sh --no-build-cache --rerun-tasks :packages:kotlin-tex-core:compileKotlinJvm
+              run: |
+                  scripts/gradle.sh --no-build-cache --rerun-tasks \
+                      :packages:kotlin-tex-core:compileKotlinJvm \
+                      :packages:kotlin-tex-core:assembleAndroidMain
             - name: Build Swift product
               if: matrix.language == 'swift'
               run: swift build --target TexCore
             - name: Perform CodeQL analysis
-              uses: github/codeql-action/analyze@v4
+              uses: github/codeql-action/analyze@e4fba868fa4b1b91e1fdab776edc8cfbe6e9fb81 # v4.37.3
               with:
                   category: /language:${{ matrix.language }}
 

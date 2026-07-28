@@ -11,7 +11,7 @@ public enum CompileStatus: Sendable, Hashable {
     case allocationFailed
 }
 
-/// The structured fail-fast compile error (plan decision D4): a failed
+/// The structured fail-fast compile error: a failed
 /// compile produces no tree, only this value naming the offending bytes.
 public struct CompileError: Error, Sendable, Hashable, CustomStringConvertible {
     /// The failure category.

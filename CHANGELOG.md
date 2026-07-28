@@ -6,6 +6,38 @@ not promised to remain compatible between releases.
 
 ## Unreleased
 
+- Close the independent M1 exit audit (#29–#69) in one hardening pass.
+  Engine: internal geometry widens to 64-bit scaled points, so long
+  single-line documents no longer overflow (a 64 KiB document produced
+  a negative root width; UBSan-clean now), and negative fixed-point
+  scaling is written portably. Style scope becomes lexical — the parser
+  stamps faces as glyphs are delivered, so an outer style switch never
+  overwrites an inner one (`\mathbf{a\mathit{b}c}` keeps `b` on the
+  textit face; corpus 80 -> 81 with `math-styles-inner-wins`) and the
+  depth×subtree rewrite pass is gone. Parser fields become a tagged
+  union (432 -> ~200-byte items), parser scratch memory is released
+  before compile returns, and arena chunks grow geometrically. The CLI
+  reports short writes and flush failures. Bindings: the TXC1
+  transport moves to `packages/tex-core/bridge` with an exact
+  single-allocation writer; every decoder (Kotlin, ES, Swift) fails
+  closed on unknown discriminants, non-scalar codepoints, leaf
+  children, node-count mismatches, and trailing bytes; ES decodes
+  straight from WASM memory without an extra payload copy; ES/Kotlin
+  frozen-value paths are deeply immutable across public construction
+  and copy; Swift borrows contiguous UTF-8 instead of copying; Kotlin
+  `Document.compile` gains `@JvmStatic`, drops the production
+  coroutines dependency, and targets JDK release 17. Release/CI: C and
+  Swift release archives are byte-reproducible and carry the license;
+  pkg-config metadata is relocatable with an explicit static contract;
+  macOS artifacts pin and audit deployment target 15; the 0.x SONAME
+  carries major.minor with a documented pre-1.0 ABI policy; sanitizer
+  lanes run the conformance corpus; a seeded, dictionary-guided fuzz
+  campaign joins required CI; Kotlin consumers verify the exact staged
+  publication artifacts; minimum runtimes (Node 20, JRE 17) get their
+  own lanes; workflow actions are pinned to commit SHAs and the
+  repo-managed installers are content-pinned; CodeQL traces the FFI
+  bridges and Android sources; C benchmarks join the PR metrics with
+  separate compile/dump boundaries.
 - Complete the milestone M1 surface with the style switches and \text,
   moving the render-tree contract to schemaVersion 5: the glyph
   `family` widens to the style faces (`bold`, `textit`, `cal`, `bb`,

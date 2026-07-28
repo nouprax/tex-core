@@ -4,7 +4,7 @@ import type { SourceRange } from "./model.js";
 export type CompileStatus = "invalidArgument" | "invalidUtf8" | "unsupported" | "allocationFailed";
 
 /**
- * The structured fail-fast compile error (plan decision D4): a failed
+ * The structured fail-fast compile error: a failed
  * compile produces no tree, only this error naming the offending bytes.
  */
 export class CompileError extends Error {
@@ -19,7 +19,9 @@ export class CompileError extends Error {
         super(range ? `${errorMessage} (bytes ${range.begin}..${range.end})` : errorMessage);
         this.name = "CompileError";
         this.status = status;
-        this.range = range;
+        // Snapshot and freeze: the whole error is a frozen value, so its
+        // range must not stay a live alias of a caller-mutable object.
+        this.range = range === null ? null : Object.freeze({ begin: range.begin, end: range.end });
         this.errorMessage = errorMessage;
         Object.freeze(this);
     }

@@ -827,6 +827,23 @@ const missingEntries = difference(allowedEntries, set(entries));
 if (unexpectedEntries.length > 0) failures.push(`unmanifested spec entries: ${unexpectedEntries.sort().join(", ")}`);
 if (missingEntries.length > 0) failures.push(`manifested spec entries missing on disk: ${missingEntries.join(", ")}`);
 
+// Documentation contract: every schema-version literal in public prose and
+// binding sources must match the manifest, so the docs cannot drift to an
+// old version while dumps carry a new one.
+const versionCarriers = [
+    "README.md",
+    "packages/es-tex-core/src/model.ts",
+    "packages/kotlin-tex-core/src/commonMain/kotlin/com/nouprax/tex/core/model/RenderTree.kt"
+];
+for (const carrier of versionCarriers) {
+    const text = await readFile(path.join(root, carrier), "utf8");
+    for (const match of text.matchAll(/schema[ vV]ersion[ :`(]*(\d+)/gu)) {
+        if (Number(match[1]) !== manifest.schemaVersion) {
+            failures.push(`${carrier} mentions schema version ${match[1]}, manifest is ${manifest.schemaVersion}`);
+        }
+    }
+}
+
 if (failures.length > 0) throw new Error(failures.join("\n"));
 process.stdout.write(
     `Render-tree manifest v${manifest.schemaVersion} covers ${canonicalKinds.length} node kinds, ` +

@@ -10,6 +10,9 @@ JAVA_VERSION=26
 XCODE_VERSION=26.6
 SWIFT_VERSION=6.3.3
 EMSCRIPTEN_VERSION=4.0.23
+# The emsdk repository commit of the 4.0.23 release tag; keep the pair in
+# lockstep when bumping the version.
+EMSCRIPTEN_COMMIT=c0bb220cb6e6f4e0fabb6f6db9efd53390ef5e56
 CLANG_FORMAT_VERSION=22.1.8
 CMAKE_FORMAT_VERSION=0.6.13
 SWIFTLINT_VERSION=0.65.0
@@ -220,12 +223,29 @@ check_core() {
     return 0
 }
 
+# Reports the version of an already-available pnpm without ever touching
+# the registry: the local dependency install first, then a PATH pnpm, then
+# the npx cache in offline mode. `--check` stays read-only and
+# offline-safe by contract; only `--install` may download (via
+# `npx --yes`).
+resolve_pnpm_version() {
+    if [ -x "node_modules/.bin/pnpm" ]; then
+        node_modules/.bin/pnpm --version
+    elif command -v pnpm >/dev/null 2>&1; then
+        pnpm --version
+    else
+        npx --yes --offline "pnpm@$PNPM_VERSION" --version 2>/dev/null
+    fi
+}
+
 check_node() {
     require_command node || return 0
-    require_command npx || return 0
     actual_node=$(node --version | sed 's/^v//')
     [ "$actual_node" = "$NODE_VERSION" ] || fail "Node.js $NODE_VERSION is required; found $actual_node"
-    actual_pnpm=$(npx --yes "pnpm@$PNPM_VERSION" --version)
+    if ! actual_pnpm=$(resolve_pnpm_version) || [ -z "$actual_pnpm" ]; then
+        fail "pnpm $PNPM_VERSION is not installed; run 'corepack enable' or 'npm install -g pnpm@$PNPM_VERSION' first"
+        return 0
+    fi
     [ "$actual_pnpm" = "$PNPM_VERSION" ] || fail "pnpm $PNPM_VERSION is required; found $actual_pnpm"
     [ "$actual_node" != "$NODE_VERSION" ] || [ "$actual_pnpm" != "$PNPM_VERSION" ] || ok "Node.js and pnpm"
     return 0
@@ -480,6 +500,16 @@ install_emscripten() {
         mkdir -p "$(dirname "$directory")"
         git clone --filter=blob:none https://github.com/emscripten-core/emsdk.git "$directory"
     fi
+    # Pin the emsdk manager itself to the immutable commit of the release
+    # tag matching EMSCRIPTEN_VERSION: a moved tag or new default-branch
+    # commit must never change the bytes this installer executes.
+    git -C "$directory" fetch --filter=blob:none origin "$EMSCRIPTEN_COMMIT"
+    git -C "$directory" checkout --quiet "$EMSCRIPTEN_COMMIT"
+    actual_commit=$(git -C "$directory" rev-parse HEAD)
+    [ "$actual_commit" = "$EMSCRIPTEN_COMMIT" ] || {
+        fail "emsdk checkout is $actual_commit, expected $EMSCRIPTEN_COMMIT"
+        return
+    }
     "$directory/emsdk" install "$EMSCRIPTEN_VERSION"
     "$directory/emsdk" activate "$EMSCRIPTEN_VERSION"
 }
@@ -490,15 +520,14 @@ install_tools() {
     if [ ! -x "$clang_directory/venv/bin/clang-format" ]; then
         python3 -m venv "$clang_directory/venv"
         "$clang_directory/venv/bin/python" -m pip install --disable-pip-version-check --quiet \
-            "clang-format==$CLANG_FORMAT_VERSION"
+            --require-hashes --requirement "$root/scripts/requirements/clang-format.txt"
     fi
     cmake_format_venv="$root/.tools/cmakelang/$CMAKE_FORMAT_VERSION/venv"
     if [ ! -x "$cmake_format_venv/bin/cmake-format" ] \
         || ! "$cmake_format_venv/bin/python" -c 'import yaml' 2>/dev/null; then
         python3 -m venv "$cmake_format_venv"
         "$cmake_format_venv/bin/python" -m pip install --disable-pip-version-check --quiet \
-            "cmakelang==$CMAKE_FORMAT_VERSION" \
-            "PyYAML==6.0.3"
+            --require-hashes --requirement "$root/scripts/requirements/cmakelang.txt"
     fi
     if landed_swift; then
         scripts/install-swiftlint.sh

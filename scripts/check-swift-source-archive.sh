@@ -21,7 +21,14 @@ cp -R packages/tex-core/include "$package/packages/tex-core/include"
 cp -R packages/swift-tex-core/Sources/TexCore \
     "$package/packages/swift-tex-core/Sources/TexCore"
 
-(cd "$unpacked" && zip -qr "$archive" tex-core)
+# Byte-reproducible zip: the release commit's timestamp on every entry, no
+# platform extra fields, and sorted member order, so two stagings of one
+# commit produce one digest.
+SOURCE_DATE_EPOCH=$(git -C "$root" log -1 --format=%ct 2>/dev/null || echo 0)
+epoch_touch=$(date -u -r "$SOURCE_DATE_EPOCH" +%Y%m%d%H%M.%S 2>/dev/null ||
+    date -u -d "@$SOURCE_DATE_EPOCH" +%Y%m%d%H%M.%S)
+find "$unpacked" -exec touch -t "$epoch_touch" {} +
+(cd "$unpacked" && find tex-core | LC_ALL=C sort | TZ=UTC zip -qX "$archive" -@)
 
 for required in \
     Package.swift \

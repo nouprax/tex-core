@@ -53,11 +53,18 @@ tex_core_status tex_core_document_compile(
     txc_arena_init(&compiled->arena);
     compiled->root = NULL;
 
+    /* Tokens and parser lists live in a scratch arena released as soon as
+     * layout finishes; only render nodes may outlive this call, so the
+     * returned tree retains memory proportional to itself, not to the
+     * parse. Layout copies everything it keeps into the tree arena. */
+    txc_arena scratch;
+    txc_arena_init(&scratch);
     txc_list list;
-    tex_core_status status = txc_parse(&compiled->arena, source, length, options->mode, &list, error);
+    tex_core_status status = txc_parse(&scratch, source, length, options->mode, &list, error);
     if (status == TEX_CORE_STATUS_OK) {
         status = txc_layout(&compiled->arena, &list, options->mode, length, &compiled->root, error);
     }
+    txc_arena_release(&scratch);
     if (status != TEX_CORE_STATUS_OK) {
         tex_core_render_tree_free(compiled);
         return status;

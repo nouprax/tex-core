@@ -8,7 +8,7 @@ package com.nouprax.tex.core.wire
  * mutation entry point, so the snapshot behind a decoded node cannot
  * change after `Document.compile` returns.
  */
-private class ReadOnlyList<out Element>(
+internal class ReadOnlyList<out Element>(
     private val snapshot: kotlin.collections.List<Element>,
 ) : AbstractList<Element>() {
     override val size: Int
@@ -21,3 +21,11 @@ internal fun <Element> immutableList(
     size: Int,
     initializer: (Int) -> Element,
 ): kotlin.collections.List<Element> = ReadOnlyList(kotlin.collections.List(size, initializer))
+
+/**
+ * Snapshots a caller-provided list behind the read-only wrapper. Lists the
+ * decoder already wrapped are adopted as-is; anything else is copied, so a
+ * mutable alias held by the caller can never change a published tree.
+ */
+internal fun <Element> readOnlySnapshot(list: kotlin.collections.List<Element>): kotlin.collections.List<Element> =
+    if (list is ReadOnlyList<Element>) list else ReadOnlyList(list.toList())

@@ -160,11 +160,28 @@ Publication ordering is:
 
 SwiftPM release identity is derived from
 `https://github.com/nouprax/tex-core` as `tex-core`; consumers import
-the `MarkdownCore` product/module. The Swift source archive intentionally keeps
-repo tests, canonical specs, and the build-tool plugin. The release consumer
-builds only `MarkdownCore`, does not execute the test plugin, and does not carry
-its generated fixture. Installed C, Maven, npm, and compiled Swift product
-artifacts exclude the shared spec and private implementation surface.
+the `TexCore` product/module. The Swift source archive is product-only
+(`Package.release.swift` as its `Package.swift`, the C core, and the
+`TexCore` sources plus `LICENSE`/`README.md`/`VERSION`): it carries no repo
+tests, no canonical specs, and no build-tool plugin, and its external
+consumer check builds only `TexCore`. Installed C, Maven, npm, and compiled
+Swift product artifacts exclude the shared spec and private implementation
+surface.
+
+## C ABI and compatibility policy (pre-1.0)
+
+Before 1.0.0 the C ABI is *not* frozen: any 0.x minor may change or break
+it. The shipped metadata encodes exactly that promise — the shared
+library's SONAME carries `major.minor` (`libtex-core.0.1`), and the CMake
+package config declares `SameMinorVersion` compatibility — so an
+incompatible 0.(x+1) library can never satisfy a 0.x consumer at load or
+configure time. At 1.0.0 both collapse to the major (`SameMajorVersion`),
+and from then on any incompatible change to public structs, enum values,
+or function signatures requires a major release. Caller-allocated public
+structs (`tex_core_options`, `tex_core_error`) carry no size field by
+design: extending them is an ABI break by policy, never an in-place
+extension, so a newer library can never write past storage an older
+caller allocated.
 
 ## Verification and recovery
 

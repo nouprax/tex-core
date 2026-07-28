@@ -32,6 +32,24 @@ else
     }
 fi
 
+# Supply-chain pinning: every workflow action must reference an immutable
+# commit SHA (a movable major tag lets a tag replacement change the code CI
+# and release jobs execute without a reviewed diff), and the repo-managed
+# installers must stay content-pinned.
+if grep -rhoE 'uses: [^ ]+' .github/workflows/ | grep -vE 'uses: [^ ]+@[0-9a-f]{40}$' | grep -v 'uses: \./' | grep -q .; then
+    echo "workflow action references must be pinned to a full commit SHA:" >&2
+    grep -rnE 'uses: [^ ]+' .github/workflows/ | grep -vE '@[0-9a-f]{40}( #.*)?$' | grep -v 'uses: \./' >&2
+    exit 1
+fi
+grep -q 'EMSCRIPTEN_COMMIT=[0-9a-f]\{40\}' scripts/init-environment.sh || {
+    echo "init-environment.sh must pin the emsdk commit" >&2
+    exit 1
+}
+grep -q -- '--require-hashes' scripts/init-environment.sh || {
+    echo "init-environment.sh must install Python tools with --require-hashes" >&2
+    exit 1
+}
+
 for required in \
     "$ci" \
     "$codeql" \

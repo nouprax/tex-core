@@ -2502,6 +2502,33 @@
             }
         },
         {
+            "name": "math-styles-inner-wins",
+            "input": "math-styles-inner-wins.tex",
+            "expected": "math-styles-inner-wins.tree",
+            "compileOptions": {
+                "mode": "mathInline"
+            },
+            "outcome": "tree",
+            "coverage": {
+                "kinds": [
+                    "hbox",
+                    "glyph"
+                ],
+                "states": [
+                    "mode.mathInline",
+                    "outcome.tree",
+                    "children.populated",
+                    "glyph.style.upright",
+                    "glyph.italic.zero",
+                    "style.face",
+                    "measure.zero"
+                ],
+                "orders": [
+                    "root.hbox"
+                ]
+            }
+        },
+        {
             "name": "error-missing-style",
             "input": "error-missing-style.tex",
             "expected": "error-missing-style.tree",

@@ -324,14 +324,15 @@ txc_clean_box(txc_arena *arena, const txc_field *field, int style, txc_node **ou
         return txc_mlist(arena, &field->list, style, false, field->range, out, error);
     }
     if (field->kind == TXC_FIELD_CHAR) {
-        const txc_metric *metric = txc_metric_find(field->family, field->style, field->codepoint);
+        const txc_metric *metric =
+            txc_metric_find(field->character.family, field->character.style, field->character.codepoint);
         if (metric == NULL) {
             return txc_fail(
                 error,
                 TEX_CORE_STATUS_UNSUPPORTED,
                 &field->range,
                 "unsupported character U+%04X",
-                (unsigned)field->codepoint
+                (unsigned)field->character.codepoint
             );
         }
         txc_scaled em = TXC_MATHSIZE_EM[txc_style_size(style)];
@@ -341,8 +342,8 @@ txc_clean_box(txc_arena *arena, const txc_field *field, int style, txc_node **ou
         if (box == NULL || children == NULL || glyph == NULL) {
             return txc_alloc_fail(error);
         }
-        txc_glyph_init(glyph, field->codepoint, field->family, metric, em, field->range);
-        glyph->style = field->style;
+        txc_glyph_init(glyph, field->character.codepoint, field->character.family, metric, em, field->range);
+        glyph->style = field->character.style;
         children[0] = glyph;
         box->kind = TEX_CORE_NODE_HBOX;
         box->x = 0;
@@ -1063,8 +1064,11 @@ static tex_core_status txc_accent_box(
     txc_scaled em = TXC_MATHSIZE_EM[size];
     txc_scaled skew = 0;
     if (accent->argument.kind == TXC_FIELD_CHAR) {
-        const txc_metric *metric =
-            txc_metric_find(accent->argument.family, accent->argument.style, accent->argument.codepoint);
+        const txc_metric *metric = txc_metric_find(
+            accent->argument.character.family,
+            accent->argument.character.style,
+            accent->argument.character.codepoint
+        );
         if (metric != NULL) {
             skew = txc_em(metric->skew, em);
         }
@@ -1172,14 +1176,14 @@ static tex_core_status txc_atom(
          * em, vertically centered on the axis. Its italic correction is
          * the script delta, exactly as for a character nucleus. */
         tex_core_family family = style < TXC_STYLE_TEXT ? TEX_CORE_FAMILY_SIZE2 : TEX_CORE_FAMILY_SIZE1;
-        const txc_metric *metric = txc_metric_find(family, TEX_CORE_STYLE_UPRIGHT, item->nucleus.codepoint);
+        const txc_metric *metric = txc_metric_find(family, TEX_CORE_STYLE_UPRIGHT, item->nucleus.character.codepoint);
         if (metric == NULL) {
             return txc_fail(
                 error,
                 TEX_CORE_STATUS_UNSUPPORTED,
                 &item->nucleus.range,
                 "unsupported character U+%04X",
-                (unsigned)item->nucleus.codepoint
+                (unsigned)item->nucleus.character.codepoint
             );
         }
         txc_node *glyph = txc_arena_alloc(arena, sizeof(txc_node));
@@ -1188,7 +1192,7 @@ static tex_core_status txc_atom(
         }
         txc_glyph_init(
             glyph,
-            item->nucleus.codepoint,
+            item->nucleus.character.codepoint,
             family,
             metric,
             TXC_MATHSIZE_EM[TXC_MATHSIZE_TEXT],
@@ -1204,22 +1208,33 @@ static tex_core_status txc_atom(
         shift_up = (glyph->ascent + glyph->y) - txc_param(TXC_PARAMETER_SUP_DROP, drop);
         shift_down = (glyph->descent - glyph->y) + txc_param(TXC_PARAMETER_SUB_DROP, drop);
     } else if (item->nucleus.kind == TXC_FIELD_CHAR) {
-        const txc_metric *metric = txc_metric_find(item->nucleus.family, item->nucleus.style, item->nucleus.codepoint);
+        const txc_metric *metric = txc_metric_find(
+            item->nucleus.character.family,
+            item->nucleus.character.style,
+            item->nucleus.character.codepoint
+        );
         if (metric == NULL) {
             return txc_fail(
                 error,
                 TEX_CORE_STATUS_UNSUPPORTED,
                 &item->nucleus.range,
                 "unsupported character U+%04X",
-                (unsigned)item->nucleus.codepoint
+                (unsigned)item->nucleus.character.codepoint
             );
         }
         txc_node *glyph = txc_arena_alloc(arena, sizeof(txc_node));
         if (glyph == NULL) {
             return txc_alloc_fail(error);
         }
-        txc_glyph_init(glyph, item->nucleus.codepoint, item->nucleus.family, metric, em, item->nucleus.range);
-        glyph->style = item->nucleus.style;
+        txc_glyph_init(
+            glyph,
+            item->nucleus.character.codepoint,
+            item->nucleus.character.family,
+            metric,
+            em,
+            item->nucleus.range
+        );
+        glyph->style = item->nucleus.character.style;
         glyph->x = *cursor;
         children[(*index)++] = glyph;
         nucleus_width = glyph->width;

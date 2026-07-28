@@ -3,7 +3,7 @@ import test from "node:test";
 import { readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
-import { CompileError, Document } from "../dist/index.js";
+import { CompileError, Document, accept } from "../dist/index.js";
 
 const packageDirectory = path.resolve(fileURLToPath(new URL("..", import.meta.url)));
 const bundle = JSON.parse(
@@ -53,16 +53,29 @@ test("conformance: string compiles agree with byte compiles for UTF-8 sources", 
     }
 });
 
-test("conformance: the corpus reaches every public node kind", () => {
+test("conformance: the corpus reaches every public node kind through accept", () => {
+    // Traversal goes through the public visitor dispatch, so the corpus
+    // exercises all four visit methods, not just the discriminant field.
     const kinds = new Set();
-    const collect = (node) => {
-        kinds.add(node.kind);
-        if (node.kind === "hbox") for (const child of node.children) collect(child);
+    const visitor = {
+        visitHBox(node) {
+            kinds.add("hbox");
+            for (const child of node.children) accept(child, visitor);
+        },
+        visitGlyph() {
+            kinds.add("glyph");
+        },
+        visitKern() {
+            kinds.add("kern");
+        },
+        visitRule() {
+            kinds.add("rule");
+        }
     };
     for (const testCase of bundle.cases) {
         if (testCase.outcome !== "tree") continue;
         const source = Uint8Array.from(Buffer.from(testCase.sourceBase64, "base64"));
-        collect(Document.compile(source, { mode: testCase.mode }).root);
+        accept(Document.compile(source, { mode: testCase.mode }).root, visitor);
     }
     assert.deepEqual([...kinds].sort(), ["glyph", "hbox", "kern", "rule"]);
 });
