@@ -797,6 +797,18 @@ static void txc_test_accents(txc_test *test) {
     txc_check(test, tex_core_node_frame(tex_core_node_child(box, 0)).y > 0.0, "tall nucleus lifts the accent");
     tex_core_render_tree_free(tree);
 
+    /* An operator routes into a pending accent (\hat\sum). */
+    tree = txc_compile(test, "\\hat\\sum", TEX_CORE_MODE_MATH_INLINE, "hat sum");
+    box = tex_core_node_child(tex_core_render_tree_root(tree), 0);
+    txc_check_size(test, tex_core_node_child_count(box), 2, "accented operator children");
+    txc_check_int(
+        test,
+        tex_core_node_glyph(tex_core_node_child(tex_core_node_child(box, 1), 0)).family,
+        TEX_CORE_FAMILY_SIZE1,
+        "the accented nucleus is the operator glyph"
+    );
+    tex_core_render_tree_free(tree);
+
     /* Wide accents climb the width ladder. */
     tree = txc_compile(test, "\\widehat{x+y}", TEX_CORE_MODE_MATH_INLINE, "widehat");
     box = tex_core_node_child(tex_core_render_tree_root(tree), 0);
