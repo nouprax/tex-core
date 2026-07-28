@@ -12,10 +12,16 @@ OWNER_REVIEW_BYPASS_USER=${OWNER_REVIEW_BYPASS_USER:-$RELEASE_REVIEWER}
 OWNER_REVIEW_RULESET_NAME=${OWNER_REVIEW_RULESET_NAME:-owner approval gate}
 TAG_RULESET_NAME=${TAG_RULESET_NAME:-release tag protection}
 TAG_PATTERN=${TAG_PATTERN:-v*.*.*}
-RULESET_ENFORCEMENT=${RULESET_ENFORCEMENT:-evaluate}
+# Mature-repository defaults: full enforcement, no standing bypass. A
+# re-run with only the required inputs must never weaken protections that
+# are already active; pass ALLOW_PROTECTION_DOWNGRADE=true explicitly to
+# downgrade a live ruleset (initial bootstrap of a fresh repository can
+# still opt into RULESET_ENFORCEMENT=evaluate while CI stabilizes).
+RULESET_ENFORCEMENT=${RULESET_ENFORCEMENT:-active}
 PREVENT_SELF_REVIEW=${PREVENT_SELF_REVIEW:-false}
 MERGE_QUEUE=${MERGE_QUEUE:-true}
-MAIN_ADMIN_BYPASS=${MAIN_ADMIN_BYPASS:-true}
+MAIN_ADMIN_BYPASS=${MAIN_ADMIN_BYPASS:-false}
+ALLOW_PROTECTION_DOWNGRADE=${ALLOW_PROTECTION_DOWNGRADE:-false}
 
 case "$RULESET_ENFORCEMENT" in
     disabled | evaluate | active) ;;
@@ -98,6 +104,28 @@ upsert_ruleset() {
         echo "multiple rulesets named '$name'; refusing ambiguous update" >&2
         exit 1
     elif [ "$count" -eq 1 ]; then
+        # Fail closed on protection downgrades: a maintenance re-run must
+        # not weaken a live ruleset (active -> evaluate/disabled) or add a
+        # bypass where none exists, unless the operator says so explicitly.
+        if [ "$ALLOW_PROTECTION_DOWNGRADE" != "true" ]; then
+            local current_enforcement current_bypasses requested_enforcement requested_bypasses
+            current_enforcement=$(gh api -H "X-GitHub-Api-Version: 2026-03-10" \
+                "repos/$GH_REPO/rulesets/$ids" --jq .enforcement)
+            current_bypasses=$(gh api -H "X-GitHub-Api-Version: 2026-03-10" \
+                "repos/$GH_REPO/rulesets/$ids" --jq '.bypass_actors | length')
+            requested_enforcement=$(jq -r .enforcement "$payload")
+            requested_bypasses=$(jq -r '.bypass_actors | length' "$payload")
+            if [ "$current_enforcement" = "active" ] && [ "$requested_enforcement" != "active" ]; then
+                echo "refusing to downgrade '$name' from active to $requested_enforcement;" >&2
+                echo "set ALLOW_PROTECTION_DOWNGRADE=true to override deliberately" >&2
+                exit 1
+            fi
+            if [ "$requested_bypasses" -gt "$current_bypasses" ]; then
+                echo "refusing to add bypass actors to '$name' ($current_bypasses -> $requested_bypasses);" >&2
+                echo "set ALLOW_PROTECTION_DOWNGRADE=true to override deliberately" >&2
+                exit 1
+            fi
+        fi
         gh api -H "X-GitHub-Api-Version: 2026-03-10" --method PUT \
             "repos/$GH_REPO/rulesets/$ids" --input "$payload" >/dev/null
     else

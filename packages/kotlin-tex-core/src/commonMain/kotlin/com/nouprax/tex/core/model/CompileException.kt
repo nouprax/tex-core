@@ -16,7 +16,7 @@ public enum class CompileStatus {
 }
 
 /**
- * The structured fail-fast compile error (plan decision D4): a failed
+ * The structured fail-fast compile error: a failed
  * compile produces no tree, only this exception naming the offending bytes.
  */
 public class CompileException(

@@ -26,11 +26,11 @@ jobs:
         name: Health Check - Repository
         runs-on: ubuntu-latest
         steps:
-            - uses: actions/checkout@v7
-            - uses: actions/setup-node@v7
+            - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+            - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
               with:
                   node-version: 26.5.0
-            - uses: pnpm/action-setup@v6
+            - uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6.0.9
               with:
                   run_install: false
                   version: 11.7.0
@@ -52,11 +52,11 @@ jobs:
         name: Health Check - C
         runs-on: ubuntu-latest
         steps:
-            - uses: actions/checkout@v7
-            - uses: actions/setup-node@v7
+            - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+            - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
               with:
                   node-version: 26.5.0
-            - uses: pnpm/action-setup@v6
+            - uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6.0.9
               with:
                   run_install: false
                   version: 11.7.0
@@ -73,14 +73,14 @@ jobs:
         name: Health Check - Swift
         runs-on: macos-26
         steps:
-            - uses: actions/checkout@v7
-            - uses: maxim-lobanov/setup-xcode@v1
+            - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+            - uses: maxim-lobanov/setup-xcode@ed7a3b1fda3918c0306d1b724322adc0b8cc0a90 # v1.7.0
               with:
                   xcode-version: "26.6"
-            - uses: actions/setup-node@v7
+            - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
               with:
                   node-version: 26.5.0
-            - uses: pnpm/action-setup@v6
+            - uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6.0.9
               with:
                   run_install: false
                   version: 11.7.0
@@ -95,11 +95,11 @@ jobs:
         name: Health Check - ES
         runs-on: ubuntu-latest
         steps:
-            - uses: actions/checkout@v7
-            - uses: actions/setup-node@v7
+            - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+            - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
               with:
                   node-version: 26.5.0
-            - uses: pnpm/action-setup@v6
+            - uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6.0.9
               with:
                   run_install: false
                   version: 11.7.0
@@ -114,15 +114,15 @@ jobs:
         name: Health Check - Kotlin
         runs-on: ubuntu-latest
         steps:
-            - uses: actions/checkout@v7
-            - uses: actions/setup-node@v7
+            - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+            - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
               with:
                   node-version: 26.5.0
-            - uses: pnpm/action-setup@v6
+            - uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6.0.9
               with:
                   run_install: false
                   version: 11.7.0
-            - uses: actions/setup-java@v5
+            - uses: actions/setup-java@03ad4de0992f5dab5e18fcb136590ce7c4a0ac95 # v5.6.0
               with:
                   cache: gradle
                   distribution: temurin
@@ -180,14 +180,14 @@ jobs:
             CC: ${{ matrix.cc }}
             CXX: ${{ matrix.cxx }}
         steps:
-            - uses: actions/checkout@v7
+            - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
             - name: Build immutable C product artifact
               run: |
                   scripts/build-c-product-artifact.sh \
                       "${{ matrix.variant }}" \
                       "${{ matrix.shared }}" \
                       build/ci-artifacts/c-product
-            - uses: actions/upload-artifact@v7
+            - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
               with:
                   name: c-product-${{ matrix.variant }}-${{ github.sha }}
                   if-no-files-found: error
@@ -199,11 +199,11 @@ jobs:
         needs: health-checks-ready
         runs-on: windows-latest
         steps:
-            - uses: actions/checkout@v7
+            - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
             - name: Build immutable C product artifact
               shell: bash
               run: scripts/build-c-product-artifact.sh windows-static OFF build/ci-artifacts/c-product Release
-            - uses: actions/upload-artifact@v7
+            - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
               with:
                   name: c-product-windows-static-${{ github.sha }}
                   if-no-files-found: error
@@ -215,22 +215,22 @@ jobs:
         needs: health-checks-ready
         runs-on: ubuntu-latest
         steps:
-            - uses: actions/checkout@v7
-            - uses: actions/setup-node@v7
+            - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+            - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
               with:
                   node-version: 26.5.0
-            - uses: pnpm/action-setup@v6
+            - uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6.0.9
               with:
                   run_install: false
                   version: 11.7.0
-            - uses: emscripten-core/setup-emsdk@v16
+            - uses: emscripten-core/setup-emsdk@4528d102f7230f0e7b276855c01ea1159be0e984 # v16
               with:
                   version: 4.0.23
             - name: Install ES build dependencies
               run: pnpm install --frozen-lockfile
             - name: Build immutable ES product artifact
               run: scripts/build-es-product-artifact.sh
-            - uses: actions/upload-artifact@v7
+            - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
               with:
                   name: es-product-${{ github.sha }}
                   if-no-files-found: error
@@ -254,13 +254,13 @@ jobs:
                       mode: macos-native
                       artifact-label: macos-native
         steps:
-            - uses: actions/checkout@v7
-            - uses: actions/setup-java@v5
+            - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+            - uses: actions/setup-java@03ad4de0992f5dab5e18fcb136590ce7c4a0ac95 # v5.6.0
               with:
                   cache: gradle
                   distribution: temurin
                   java-version: 26
-            - uses: android-actions/setup-android@v4
+            - uses: android-actions/setup-android@40fd30fb8d7440372e1316f5d1809ec01dcd3699 # v4.0.1
               if: matrix.mode == 'linux-release'
             - name: Install Android build dependencies
               if: matrix.mode == 'linux-release'
@@ -270,7 +270,7 @@ jobs:
                   scripts/build-kotlin-product-artifact.sh \
                       "${{ matrix.mode }}" \
                       "build/ci-artifacts/kotlin-product-${{ matrix.artifact-label }}"
-            - uses: actions/upload-artifact@v7
+            - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
               with:
                   name: kotlin-product-${{ matrix.artifact-label }}-${{ github.sha }}
                   if-no-files-found: error
@@ -282,13 +282,13 @@ jobs:
         needs: health-checks-ready
         runs-on: macos-26
         steps:
-            - uses: actions/checkout@v7
-            - uses: maxim-lobanov/setup-xcode@v1
+            - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+            - uses: maxim-lobanov/setup-xcode@ed7a3b1fda3918c0306d1b724322adc0b8cc0a90 # v1.7.0
               with:
                   xcode-version: "26.6"
             - name: Build immutable Swift product artifact
               run: scripts/build-swift-product-artifact.sh
-            - uses: actions/upload-artifact@v7
+            - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
               with:
                   name: swift-product-${{ github.sha }}
                   if-no-files-found: error
@@ -318,8 +318,8 @@ jobs:
                       version: "26.0"
                       label: macOS 26
         steps:
-            - uses: actions/checkout@v7
-            - uses: maxim-lobanov/setup-xcode@v1
+            - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+            - uses: maxim-lobanov/setup-xcode@ed7a3b1fda3918c0306d1b724322adc0b8cc0a90 # v1.7.0
               with:
                   xcode-version: "26.6"
             - name: Build declared deployment target
@@ -347,21 +347,21 @@ jobs:
         needs: builds-ready
         runs-on: ubuntu-latest
         steps:
-            - uses: actions/checkout@v7
-            - uses: actions/setup-node@v7
+            - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+            - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
               with:
                   node-version: 26.5.0
-            - uses: pnpm/action-setup@v6
+            - uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6.0.9
               with:
                   run_install: false
                   version: 11.7.0
-            - uses: actions/setup-java@v5
+            - uses: actions/setup-java@03ad4de0992f5dab5e18fcb136590ce7c4a0ac95 # v5.6.0
               with:
                   cache: gradle
                   distribution: temurin
                   java-version: 26
-            - uses: android-actions/setup-android@v4
-            - uses: emscripten-core/setup-emsdk@v16
+            - uses: android-actions/setup-android@40fd30fb8d7440372e1316f5d1809ec01dcd3699 # v4.0.1
+            - uses: emscripten-core/setup-emsdk@4528d102f7230f0e7b276855c01ea1159be0e984 # v16
               with:
                   version: 4.0.23
             - name: Install package-audit dependencies
@@ -406,8 +406,8 @@ jobs:
             CC: ${{ matrix.cc }}
             CXX: ${{ matrix.cxx }}
         steps:
-            - uses: actions/checkout@v7
-            - uses: actions/download-artifact@v8
+            - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+            - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
               with:
                   name: c-product-${{ matrix.product-variant }}-${{ github.sha }}
                   path: build/ci-artifacts/c-product
@@ -422,7 +422,7 @@ jobs:
                   tar -xzf c-product-tree.tar.gz -C ../../..
             - name: Build immutable C test artifact
               run: scripts/build-c-test-artifact.sh default "${{ matrix.shared }}" build/ci-artifacts/c
-            - uses: actions/upload-artifact@v7
+            - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
               with:
                   name: c-${{ matrix.os }}-${{ matrix.compiler }}-${{ matrix.shared }}-${{ github.sha }}
                   if-no-files-found: error
@@ -434,8 +434,8 @@ jobs:
         needs: builds-ready
         runs-on: windows-latest
         steps:
-            - uses: actions/checkout@v7
-            - uses: actions/download-artifact@v8
+            - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+            - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
               with:
                   name: c-product-windows-static-${{ github.sha }}
                   path: build/ci-artifacts/c-product
@@ -448,7 +448,7 @@ jobs:
             - name: Build immutable C test artifact
               shell: bash
               run: scripts/build-c-test-artifact.sh default OFF build/ci-artifacts/c Release
-            - uses: actions/upload-artifact@v7
+            - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
               with:
                   name: c-windows-static-${{ github.sha }}
                   if-no-files-found: error
@@ -471,10 +471,10 @@ jobs:
                       label: TSan
         env: { CC: clang, CXX: clang++ }
         steps:
-            - uses: actions/checkout@v7
+            - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
             - name: Build immutable sanitizer test artifact
               run: scripts/build-c-test-artifact.sh "${{ matrix.sanitizer }}" - build/ci-artifacts/c
-            - uses: actions/upload-artifact@v7
+            - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
               with:
                   name: c-${{ matrix.sanitizer }}-${{ github.sha }}
                   if-no-files-found: error
@@ -498,19 +498,19 @@ jobs:
                       target-id: macos-arm64
                       label: macOS arm64 · Host Tests
         steps:
-            - uses: actions/checkout@v7
-            - uses: actions/setup-java@v5
+            - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+            - uses: actions/setup-java@03ad4de0992f5dab5e18fcb136590ce7c4a0ac95 # v5.6.0
               with:
                   cache: gradle
                   distribution: temurin
                   java-version: 26
-            - uses: android-actions/setup-android@v4
+            - uses: android-actions/setup-android@40fd30fb8d7440372e1316f5d1809ec01dcd3699 # v4.0.1
             - name: Install Android build dependencies
               if: matrix.os == 'ubuntu-latest'
               run: sdkmanager "platforms;android-36" "cmake;3.22.1" "ndk;28.2.13676358"
             - name: Build immutable Kotlin test products
               run: scripts/build-kotlin-host-test-artifact.sh "${{ matrix.target }}"
-            - uses: actions/upload-artifact@v7
+            - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
               with:
                   name: kotlin-host-${{ matrix.target-id }}-${{ github.sha }}
                   if-no-files-found: error
@@ -518,28 +518,60 @@ jobs:
                   path: build/ci-artifacts/kotlin-${{ matrix.target }}
 
     kotlin-consumers:
+        # Consumers run against the exact staged publication artifacts the
+        # producer jobs uploaded — merged through the same assembly path the
+        # release uses — never against a fresh republish from source, so a
+        # malformed uploaded artifact cannot hide behind a green rebuild.
         name: Build Test - Kotlin / Consumers
         needs: builds-ready
         runs-on: ubuntu-latest
         steps:
-            - uses: actions/checkout@v7
-            - uses: actions/setup-java@v5
+            - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+            - uses: actions/setup-java@03ad4de0992f5dab5e18fcb136590ce7c4a0ac95 # v5.6.0
               with:
                   cache: gradle
                   distribution: temurin
-                  java-version: 26
-            - uses: actions/setup-node@v7
+                  java-version: |
+                      17
+                      26
+            - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
               with:
                   node-version: 26.5.0
-            - uses: pnpm/action-setup@v6
+            - uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6.0.9
               with:
                   run_install: false
                   version: 11.7.0
-            - uses: android-actions/setup-android@v4
+            - uses: android-actions/setup-android@40fd30fb8d7440372e1316f5d1809ec01dcd3699 # v4.0.1
             - name: Install Android build dependencies
               run: sdkmanager "platforms;android-36" "cmake;3.22.1" "ndk;28.2.13676358"
-            - name: Verify Kotlin publication consumers
-              run: pnpm check:kotlin-consumers
+            - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+              with:
+                  name: kotlin-product-linux-release-${{ github.sha }}
+                  path: build/kotlin-product-linux
+            - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+              with:
+                  name: kotlin-product-macos-native-${{ github.sha }}
+                  path: build/kotlin-product-macos
+            - name: Restore and verify the staged publication artifacts
+              run: |
+                  for host in linux macos; do
+                      (
+                          cd "build/kotlin-product-$host"
+                          sha256sum --check SHA256SUMS
+                          grep -Fxq "source_sha=$GITHUB_SHA" manifest.txt
+                          mkdir stage
+                          tar -xzf kotlin-product-publications.tar.gz -C stage
+                      )
+                  done
+            - name: Assemble the deployment from the staged artifacts
+              run: |
+                  node scripts/merge-maven-publications.mjs \
+                      build/kotlin-product-linux/stage \
+                      build/kotlin-product-macos/stage \
+                      build/kotlin-maven-central
+                  node scripts/audit-maven-publications.mjs build/kotlin-maven-central --full
+            - name: Verify Kotlin publication consumers against the staged bytes
+              run: scripts/check-kotlin-consumers.sh --repository build/kotlin-maven-central
 
     kotlin-android-test-build:
         name: Build Test - Kotlin / Android x86_64 · Instrumentation APK
@@ -547,19 +579,19 @@ jobs:
         runs-on: ubuntu-24.04
         timeout-minutes: 15
         steps:
-            - uses: actions/checkout@v7
-            - uses: actions/setup-java@v5
+            - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+            - uses: actions/setup-java@03ad4de0992f5dab5e18fcb136590ce7c4a0ac95 # v5.6.0
               with:
                   cache: gradle
                   distribution: temurin
                   java-version: 26
-            - uses: android-actions/setup-android@v4
+            - uses: android-actions/setup-android@40fd30fb8d7440372e1316f5d1809ec01dcd3699 # v4.0.1
             - name: Install Android build dependencies
               run: sdkmanager "platforms;android-36" "cmake;3.22.1" "ndk;28.2.13676358"
             - name: Build immutable Android instrumentation artifact
               run: scripts/build-kotlin-android-test-artifact.sh
             - name: Upload Android instrumentation artifact
-              uses: actions/upload-artifact@v7
+              uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
               with:
                   name: kotlin-android-x86_64-${{ github.sha }}
                   if-no-files-found: error
@@ -571,26 +603,26 @@ jobs:
         needs: builds-ready
         runs-on: ubuntu-latest
         steps:
-            - uses: actions/checkout@v7
-            - uses: actions/setup-node@v7
+            - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+            - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
               with:
                   node-version: 26.5.0
-            - uses: pnpm/action-setup@v6
+            - uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6.0.9
               with:
                   run_install: false
                   version: 11.7.0
-            - uses: emscripten-core/setup-emsdk@v16
+            - uses: emscripten-core/setup-emsdk@4528d102f7230f0e7b276855c01ea1159be0e984 # v16
               with:
                   version: 4.0.23
             - name: Install JavaScript dependencies
               run: pnpm install --frozen-lockfile
-            - uses: actions/download-artifact@v8
+            - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
               with:
                   name: es-product-${{ github.sha }}
                   path: build/ci-artifacts/es-product
             - name: Build immutable ES test artifact
               run: scripts/build-es-test-artifact.sh build/ci-artifacts/es build/ci-artifacts/es-product
-            - uses: actions/upload-artifact@v7
+            - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
               with:
                   name: es-test-${{ github.sha }}
                   if-no-files-found: error
@@ -603,11 +635,11 @@ jobs:
         runs-on: macos-26
         timeout-minutes: 20
         steps:
-            - uses: actions/checkout@v7
-            - uses: maxim-lobanov/setup-xcode@v1
+            - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+            - uses: maxim-lobanov/setup-xcode@ed7a3b1fda3918c0306d1b724322adc0b8cc0a90 # v1.7.0
               with:
                   xcode-version: "26.6"
-            - uses: actions/download-artifact@v8
+            - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
               with:
                   name: swift-product-${{ github.sha }}
                   path: build/ci-artifacts/swift-product
@@ -618,7 +650,7 @@ jobs:
                   tar -xzf swift-product-tree.tar.gz -C ../../..
             - name: Build immutable macOS and iOS test products
               run: scripts/build-swift-test-artifact.sh
-            - uses: actions/upload-artifact@v7
+            - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
               with:
                   name: swift-test-${{ github.sha }}
                   if-no-files-found: error
@@ -681,8 +713,8 @@ jobs:
                       suite: conformance
                       label: macOS · Clang · Shared · Conformance
         steps:
-            - uses: actions/checkout@v7
-            - uses: actions/download-artifact@v8
+            - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+            - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
               with:
                   name: c-${{ matrix.os }}-${{ matrix.compiler }}-${{ matrix.shared }}-${{ github.sha }}
                   path: build/ci-artifacts/c
@@ -702,8 +734,8 @@ jobs:
                     - suite: conformance
                       label: Windows · Static · Conformance
         steps:
-            - uses: actions/checkout@v7
-            - uses: actions/download-artifact@v8
+            - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+            - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
               with:
                   name: c-windows-static-${{ github.sha }}
                   path: build/ci-artifacts/c
@@ -735,13 +767,51 @@ jobs:
             UBSAN_OPTIONS: halt_on_error=1:abort_on_error=1:print_stacktrace=1
             TSAN_OPTIONS: halt_on_error=1:abort_on_error=1
         steps:
-            - uses: actions/checkout@v7
-            - uses: actions/download-artifact@v8
+            - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+            - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
               with:
                   name: c-${{ matrix.sanitizer }}-${{ github.sha }}
                   path: build/ci-artifacts/c
             - name: Run sanitizer suite without building
               run: scripts/run-c-test-artifact.sh build/ci-artifacts/c "${{ matrix.preset }}"
+
+    # Bounded coverage-guided campaign: seeded from the conformance corpus,
+    # dictionary-guided, Clang+ASan, and time-boxed so the required lane
+    # stays fast. New coverage and any crash inputs upload as artifacts.
+    fuzz-test:
+        name: Test - C / Linux · Fuzz
+        needs: build-tests-ready
+        runs-on: ubuntu-latest
+        timeout-minutes: 10
+        env: { CC: clang, CXX: clang++ }
+        steps:
+            - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+            - name: Build the libFuzzer harness
+              run: |
+                  cmake -S . -B build/fuzz -DCMAKE_BUILD_TYPE=Asan -DCMAKE_C_COMPILER=clang \
+                      -DTEX_CORE_SHARED=OFF -DTEX_CORE_TESTS=OFF -DTEX_CORE_LIB_FUZZER=ON
+                  cmake --build build/fuzz --parallel --target tex-core-fuzz
+            - name: Run the bounded fuzz campaign
+              env:
+                  ASAN_OPTIONS: halt_on_error=1:abort_on_error=1:detect_leaks=1
+              run: |
+                  scripts/build-fuzz-corpus.sh build/fuzz/corpus
+                  mkdir -p build/fuzz/artifacts
+                  build/fuzz/packages/tex-core/fuzz/tex-core-fuzz \
+                      -max_total_time=90 -max_len=4096 \
+                      -dict=packages/tex-core/fuzz/tex.dict \
+                      -artifact_prefix=build/fuzz/artifacts/ \
+                      build/fuzz/corpus
+            - name: Upload fuzz corpus and crash artifacts
+              if: ${{ always() }}
+              uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+              with:
+                  name: fuzz-campaign-${{ github.sha }}
+                  if-no-files-found: warn
+                  retention-days: 7
+                  path: |
+                      build/fuzz/corpus
+                      build/fuzz/artifacts
 
     kotlin-test:
         name: Test - Kotlin / ${{ matrix.label }}
@@ -800,13 +870,13 @@ jobs:
                       suite: conformance
                       label: Android Host · Conformance
         steps:
-            - uses: actions/checkout@v7
-            - uses: actions/setup-java@v5
+            - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+            - uses: actions/setup-java@03ad4de0992f5dab5e18fcb136590ce7c4a0ac95 # v5.6.0
               if: matrix.platform == 'jvm' || matrix.platform == 'android-host'
               with:
                   distribution: temurin
                   java-version: 26
-            - uses: actions/download-artifact@v8
+            - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
               with:
                   name: kotlin-host-${{ matrix.artifact-target }}-${{ github.sha }}
                   path: build/ci-artifacts/kotlin-${{ matrix.artifact-dir }}
@@ -858,11 +928,11 @@ jobs:
                       suite: conformance
                       label: 16 KB · x86_64 · Conformance
         steps:
-            - uses: actions/checkout@v7
-            - uses: android-actions/setup-android@v4
+            - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+            - uses: android-actions/setup-android@40fd30fb8d7440372e1316f5d1809ec01dcd3699 # v4.0.1
             - name: Restore the pinned emulator and system image
               id: emulator-cache
-              uses: actions/cache/restore@v4
+              uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
               with:
                   path: |
                       ${{ env.ANDROID_HOME }}/emulator
@@ -882,7 +952,7 @@ jobs:
             # already exists" is harmless.
             - name: Save the pinned emulator and system image
               if: steps.emulator-cache.outputs.cache-hit != 'true'
-              uses: actions/cache/save@v4
+              uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
               with:
                   path: |
                       ${{ env.ANDROID_HOME }}/emulator
@@ -901,7 +971,7 @@ jobs:
                   test -w /dev/kvm
                   "$ANDROID_HOME/emulator/emulator" -accel-check
             - name: Download immutable Android instrumentation artifact
-              uses: actions/download-artifact@v8
+              uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
               with:
                   name: kotlin-android-x86_64-${{ github.sha }}
                   path: build/ci-artifacts/kotlin-android-x86_64
@@ -924,7 +994,7 @@ jobs:
               # A job-timeout kill cancels the run step rather than failing
               # it; the evidence must survive that path too.
               if: failure() || cancelled()
-              uses: actions/upload-artifact@v7
+              uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
               with:
                   name: android-${{ matrix.page-size }}-${{ matrix.suite }}-failure-${{ github.run_attempt }}
                   if-no-files-found: warn
@@ -941,25 +1011,37 @@ jobs:
                 include:
                     - suite: node-correctness
                       label: Node · Correctness
+                      node-version: 26.5.0
+                    # The package declares engines.node >=20; the packed
+                    # artifact must actually run there, not only on current.
+                    - suite: node-minimum
+                      label: Node 20 · Minimum Runtime
+                      node-version: "20"
                     - suite: browser-correctness
                       label: Browser · Correctness
+                      node-version: 26.5.0
                     - suite: node-conformance
                       label: Node · Conformance
+                      node-version: 26.5.0
         steps:
-            - uses: actions/checkout@v7
-            - uses: actions/setup-node@v7
+            - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+            - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
               with:
-                  node-version: 26.5.0
-            - uses: pnpm/action-setup@v6
+                  node-version: ${{ matrix.node-version }}
+            - uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6.0.9
+              if: matrix.suite != 'node-minimum'
               with:
                   run_install: false
                   version: 11.7.0
-            - uses: browser-actions/setup-chrome@v2
+            - uses: browser-actions/setup-chrome@2e1d749697dd1612b833dba4a722266286fbefcd # v2.1.2
               id: setup-chrome
               if: matrix.suite == 'browser-correctness'
+            # The minimum-runtime lane runs the packed engine suites with
+            # nothing but Node itself, exactly like a consumer.
             - name: Install test-runner dependencies
+              if: matrix.suite != 'node-minimum'
               run: pnpm install --frozen-lockfile
-            - uses: actions/download-artifact@v8
+            - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
               with:
                   name: es-test-${{ github.sha }}
                   path: build/ci-artifacts/es
@@ -986,11 +1068,11 @@ jobs:
                     - suite: ios-conformance
                       label: iOS · Conformance
         steps:
-            - uses: actions/checkout@v7
-            - uses: maxim-lobanov/setup-xcode@v1
+            - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+            - uses: maxim-lobanov/setup-xcode@ed7a3b1fda3918c0306d1b724322adc0b8cc0a90 # v1.7.0
               with:
                   xcode-version: "26.6"
-            - uses: actions/download-artifact@v8
+            - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
               with:
                   name: swift-test-${{ github.sha }}
                   path: build/ci-artifacts/swift
@@ -1002,25 +1084,50 @@ jobs:
         needs: build-tests-ready
         runs-on: ubuntu-latest
         steps:
-            - uses: actions/checkout@v7
-            - uses: actions/download-artifact@v8
+            - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+            - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
               with:
                   name: c-ubuntu-latest-clang-ON-${{ github.sha }}
                   path: build/ci-artifacts/c
             - name: Run C benchmark suite without building
-              run: scripts/run-c-test-artifact.sh build/ci-artifacts/c benchmark
+              # The explicit bash shell adds -o pipefail; the default run
+              # shell would let tee's zero status mask a benchmark failure.
+              shell: bash
+              run: |
+                  mkdir -p build/pr-metrics-logs
+                  scripts/run-c-test-artifact.sh build/ci-artifacts/c benchmark \
+                      2>&1 | tee build/pr-metrics-logs/c.log
+            - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+              if: ${{ always() }}
+              with:
+                  node-version: 26.5.0
+            - name: Collect informational C metrics
+              if: ${{ always() }}
+              continue-on-error: true
+              env:
+                  SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+              run: node scripts/collect-pr-metrics.mjs --platform linux --logs build/pr-metrics-logs --output build/pr-metrics/c.json
+            - name: Upload informational C metrics
+              if: ${{ always() }}
+              continue-on-error: true
+              uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+              with:
+                  name: pr-metrics-c
+                  path: build/pr-metrics/c.json
+                  if-no-files-found: warn
+                  retention-days: 14
 
     benchmark-kotlin:
         name: Test - Kotlin / JVM · Benchmark
         needs: build-tests-ready
         runs-on: ubuntu-latest
         steps:
-            - uses: actions/checkout@v7
-            - uses: actions/setup-java@v5
+            - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+            - uses: actions/setup-java@03ad4de0992f5dab5e18fcb136590ce7c4a0ac95 # v5.6.0
               with:
                   distribution: temurin
                   java-version: 26
-            - uses: actions/download-artifact@v8
+            - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
               with:
                   name: kotlin-host-linux-x64-${{ github.sha }}
                   path: build/ci-artifacts/kotlin-linuxX64
@@ -1033,7 +1140,7 @@ jobs:
                   scripts/run-kotlin-host-test-artifact.sh \
                       build/ci-artifacts/kotlin-linuxX64 jvm benchmark \
                       2>&1 | tee build/pr-metrics-logs/kotlin.log
-            - uses: actions/setup-node@v7
+            - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
               if: ${{ always() }}
               with:
                   node-version: 26.5.0
@@ -1046,7 +1153,7 @@ jobs:
             - name: Upload informational Kotlin metrics
               if: ${{ always() }}
               continue-on-error: true
-              uses: actions/upload-artifact@v7
+              uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
               with:
                   name: pr-metrics-kotlin-jvm
                   path: build/pr-metrics/kotlin-jvm.json
@@ -1058,17 +1165,17 @@ jobs:
         needs: build-tests-ready
         runs-on: ubuntu-latest
         steps:
-            - uses: actions/checkout@v7
-            - uses: actions/setup-node@v7
+            - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+            - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
               with:
                   node-version: 26.5.0
-            - uses: pnpm/action-setup@v6
+            - uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6.0.9
               with:
                   run_install: false
                   version: 11.7.0
             - name: Install benchmark dependencies
               run: pnpm install --frozen-lockfile
-            - uses: actions/download-artifact@v8
+            - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
               with:
                   name: es-test-${{ github.sha }}
                   path: build/ci-artifacts/es
@@ -1089,7 +1196,7 @@ jobs:
             - name: Upload informational ES metrics
               if: ${{ always() }}
               continue-on-error: true
-              uses: actions/upload-artifact@v7
+              uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
               with:
                   name: pr-metrics-es-node
                   path: build/pr-metrics/es-node.json
@@ -1101,11 +1208,11 @@ jobs:
         needs: build-tests-ready
         runs-on: macos-26
         steps:
-            - uses: actions/checkout@v7
-            - uses: maxim-lobanov/setup-xcode@v1
+            - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+            - uses: maxim-lobanov/setup-xcode@ed7a3b1fda3918c0306d1b724322adc0b8cc0a90 # v1.7.0
               with:
                   xcode-version: "26.6"
-            - uses: actions/download-artifact@v8
+            - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
               with:
                   name: swift-test-${{ github.sha }}
                   path: build/ci-artifacts/swift
@@ -1117,7 +1224,7 @@ jobs:
                   mkdir -p build/pr-metrics-logs
                   scripts/run-swift-test-artifact.sh build/ci-artifacts/swift macos-benchmark \
                       2>&1 | tee build/pr-metrics-logs/swift.log
-            - uses: actions/setup-node@v7
+            - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
               if: ${{ always() }}
               with:
                   node-version: 26.5.0
@@ -1130,7 +1237,7 @@ jobs:
             - name: Upload informational Swift metrics
               if: ${{ always() }}
               continue-on-error: true
-              uses: actions/upload-artifact@v7
+              uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
               with:
                   name: pr-metrics-swift-macos
                   path: build/pr-metrics/swift-macos.json
@@ -1162,6 +1269,7 @@ jobs:
             - c-test
             - c-test-windows
             - c-sanitizer-test
+            - fuzz-test
             - kotlin-test
             - kotlin-android-test
             - es-test
@@ -1173,6 +1281,7 @@ jobs:
                   C_TEST: ${{ needs.c-test.result }}
                   C_TEST_WINDOWS: ${{ needs.c-test-windows.result }}
                   C_SANITIZER_TEST: ${{ needs.c-sanitizer-test.result }}
+                  FUZZ_TEST: ${{ needs.fuzz-test.result }}
                   KOTLIN_TEST: ${{ needs.kotlin-test.result }}
                   KOTLIN_ANDROID_TEST: ${{ needs.kotlin-android-test.result }}
                   ES_TEST: ${{ needs.es-test.result }}
@@ -1182,6 +1291,7 @@ jobs:
                       "$C_TEST" \
                       "$C_TEST_WINDOWS" \
                       "$C_SANITIZER_TEST" \
+                      "$FUZZ_TEST" \
                       "$KOTLIN_TEST" \
                       "$KOTLIN_ANDROID_TEST" \
                       "$ES_TEST" \

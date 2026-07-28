@@ -6,6 +6,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/wait.h>
+#include <unistd.h>
 
 #include "harness.h"
 #include "tex_core.h"
@@ -155,6 +157,17 @@ int main(int argc, char *argv[]) {
     output = txc_cli_run("--frobnicate", NULL, &exit_status);
     txc_check(&test, exit_status == 2, "unknown option exits 2 (got %d)", exit_status);
     free(output);
+
+    /* A failed or truncated stdout write must exit nonzero: scripts read
+     * the exit status as the compile verdict. /dev/full makes every write
+     * fail with ENOSPC; the device only exists on Linux, so the check is
+     * skipped elsewhere. */
+    if (access("/dev/full", W_OK) == 0) {
+        char command[1024];
+        snprintf(command, sizeof(command), "printf ab | '%s' --mode document >/dev/full 2>/dev/null", txc_cli_path);
+        int raw = system(command);
+        txc_check(&test, raw >= 0 && WIFEXITED(raw) && WEXITSTATUS(raw) == 1, "full output device exits 1");
+    }
 
     return txc_test_finish(&test, "cli");
 }

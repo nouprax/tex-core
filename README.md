@@ -25,8 +25,9 @@ two projects remain independently consumable.
 
 ## Status
 
-**Pre-release; the infrastructure phases (1–10) of the setup plan are
-complete and the engine is climbing milestone M1 (math core).** The C
+**Pre-release; the infrastructure phases (1–10) of the setup plan and
+milestone M1 (math core) are complete; M2 (math environments) is next.**
+The C
 engine, its render-tree contract (schemaVersion 5), the Swift, Kotlin
 Multiplatform, and ES/WASM bindings, the fail-closed CI quality gates, and
 the release workflows are all in place. `Document.compile` covers ordinary
@@ -94,7 +95,7 @@ Capability grows along a fixed major-version ladder:
   the normative CI/release/control-plane contract, imported from
   markdown-core.
 - [`docs/specs/render-tree.md`](docs/specs/render-tree.md) — the canonical
-  render-tree schema contract (schemaVersion 1), with
+  render-tree schema contract (schemaVersion 5), with
   [`docs/specs/render-tree-dump.md`](docs/specs/render-tree-dump.md) as its
   deterministic textual form and [`specs/render-tree/`](specs/render-tree/)
   as the executable cross-platform conformance corpus.

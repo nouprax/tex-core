@@ -9,7 +9,7 @@ const output = path.join(packageDirectory, "build/generated/conformance/render-t
 
 const manifest = JSON.parse(await readFile(path.join(specDirectory, "manifest.json"), "utf8"));
 if (manifest.schemaVersion !== 5 || !Array.isArray(manifest.cases) || manifest.cases.length === 0) {
-    throw new Error("shared render-tree manifest v2 must contain at least one case");
+    throw new Error("shared render-tree manifest must contain at least one case");
 }
 
 async function readFixture(relativePath) {

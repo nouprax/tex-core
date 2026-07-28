@@ -213,13 +213,22 @@ val androidManagedDeviceTestAbi =
     }
 val jvmNativeBuildDirectory = layout.buildDirectory.dir("native/jvm")
 val jvmNativeResourceDirectory = layout.buildDirectory.dir("generated/jvmResources")
+// The one desktop JNI support table: exactly the OS/architecture tuples the
+// release actually publishes (linux-x64 from the Linux lane, macos-arm64
+// from the macOS lane — see scripts/merge-maven-publications.mjs). The
+// runtime loader in CBridge.jvm.kt accepts the same tuples and no others;
+// any other host fails here, at configuration, instead of mislabeling a
+// payload or failing after deployment.
 val desktopPlatform =
     when {
         hostOs.contains("mac") && hostArchitecture in setOf("aarch64", "arm64") -> "macos-arm64"
-        hostOs.contains("mac") -> "macos-x64"
-        hostOs.contains("windows") -> "windows-x64"
-        else -> "linux-x64"
+        hostOs.contains("linux") && hostArchitecture in setOf("x86_64", "amd64") -> "linux-x64"
+        else -> error("Unsupported desktop JNI platform: $hostOs/$hostArchitecture (supported: macos-arm64, linux-x64)")
     }
+// The Apple support floor (Package.swift declares macOS 15): every native
+// artifact built on a macOS host pins this deployment target so a newer
+// toolchain cannot silently raise the artifact's minimum OS.
+val macosDeploymentTarget = "15.0"
 val nativeOutputDirectory =
     jvmNativeResourceDirectory.map {
         it.dir("com/nouprax/tex/core/native/$desktopPlatform")
@@ -247,22 +256,32 @@ fun KotlinNativeTarget.configureNativeBridge() {
             inputs.files(
                 repositoryRoot.files("CMakeLists.txt"),
                 repositoryRoot.dir("packages/tex-core/core"),
+                repositoryRoot.dir("packages/tex-core/bridge"),
                 repositoryRoot.dir("packages/tex-core/include"),
                 layout.projectDirectory.dir("src/native"),
             )
-            outputs.dir(buildDirectory)
+            // Configure owns only its stamp: the build task mutates the rest
+            // of the build tree, so claiming the whole directory here would
+            // give the two tasks overlapping outputs and unreliable
+            // up-to-date checks.
+            outputs.file(buildDirectory.map { it.file("CMakeCache.txt") })
             commandLine(
-                "cmake",
-                "-S",
-                repositoryRoot.asFile.absolutePath,
-                "-B",
-                buildDirectory.get().asFile.absolutePath,
-                "-DTEX_CORE_TESTS=OFF",
-                "-DTEX_CORE_SHARED=OFF",
-                "-DTEX_CORE_STATIC=ON",
-                "-DTEX_CORE_KOTLIN_NATIVE=ON",
-                "-DCMAKE_BUILD_TYPE=Release",
-                "-DCMAKE_ARCHIVE_OUTPUT_DIRECTORY=${archiveDirectory.get().asFile.absolutePath}",
+                buildList {
+                    add("cmake")
+                    add("-S")
+                    add(repositoryRoot.asFile.absolutePath)
+                    add("-B")
+                    add(buildDirectory.get().asFile.absolutePath)
+                    add("-DTEX_CORE_TESTS=OFF")
+                    add("-DTEX_CORE_SHARED=OFF")
+                    add("-DTEX_CORE_STATIC=ON")
+                    add("-DTEX_CORE_KOTLIN_NATIVE=ON")
+                    add("-DCMAKE_BUILD_TYPE=Release")
+                    add("-DCMAKE_ARCHIVE_OUTPUT_DIRECTORY=${archiveDirectory.get().asFile.absolutePath}")
+                    if (hostOs.contains("mac")) {
+                        add("-DCMAKE_OSX_DEPLOYMENT_TARGET=$macosDeploymentTarget")
+                    }
+                },
             )
         }
     val buildTask =
@@ -270,6 +289,7 @@ fun KotlinNativeTarget.configureNativeBridge() {
             dependsOn(configureTask)
             inputs.files(
                 repositoryRoot.dir("packages/tex-core/core"),
+                repositoryRoot.dir("packages/tex-core/bridge"),
                 repositoryRoot.dir("packages/tex-core/include"),
                 layout.projectDirectory.dir("src/native"),
             )
@@ -324,23 +344,31 @@ val configureJvmNative =
         inputs.files(
             repositoryRoot.files("CMakeLists.txt"),
             repositoryRoot.dir("packages/tex-core/core"),
+            repositoryRoot.dir("packages/tex-core/bridge"),
             repositoryRoot.dir("packages/tex-core/include"),
             layout.projectDirectory.dir("src/native"),
         )
-        outputs.dir(jvmNativeBuildDirectory)
+        // Configure owns only its stamp; the build task owns the payload
+        // directory, so the two tasks never claim overlapping outputs.
+        outputs.file(jvmNativeBuildDirectory.map { it.file("CMakeCache.txt") })
         commandLine(
-            "cmake",
-            "-S",
-            repositoryRoot.asFile.absolutePath,
-            "-B",
-            jvmNativeBuildDirectory.get().asFile.absolutePath,
-            "-DTEX_CORE_TESTS=OFF",
-            "-DTEX_CORE_SHARED=OFF",
-            "-DTEX_CORE_STATIC=ON",
-            "-DTEX_CORE_KOTLIN_JNI=ON",
-            "-DCMAKE_BUILD_TYPE=Release",
-            "-DCMAKE_LIBRARY_OUTPUT_DIRECTORY=${nativeOutputDirectory.get().asFile.absolutePath}",
-            "-DCMAKE_RUNTIME_OUTPUT_DIRECTORY=${nativeOutputDirectory.get().asFile.absolutePath}",
+            buildList {
+                add("cmake")
+                add("-S")
+                add(repositoryRoot.asFile.absolutePath)
+                add("-B")
+                add(jvmNativeBuildDirectory.get().asFile.absolutePath)
+                add("-DTEX_CORE_TESTS=OFF")
+                add("-DTEX_CORE_SHARED=OFF")
+                add("-DTEX_CORE_STATIC=ON")
+                add("-DTEX_CORE_KOTLIN_JNI=ON")
+                add("-DCMAKE_BUILD_TYPE=Release")
+                add("-DCMAKE_LIBRARY_OUTPUT_DIRECTORY=${nativeOutputDirectory.get().asFile.absolutePath}")
+                add("-DCMAKE_RUNTIME_OUTPUT_DIRECTORY=${nativeOutputDirectory.get().asFile.absolutePath}")
+                if (hostOs.contains("mac")) {
+                    add("-DCMAKE_OSX_DEPLOYMENT_TARGET=$macosDeploymentTarget")
+                }
+            },
         )
     }
 
@@ -349,6 +377,7 @@ val buildJvmNative =
         dependsOn(configureJvmNative)
         inputs.files(
             repositoryRoot.dir("packages/tex-core/core"),
+            repositoryRoot.dir("packages/tex-core/bridge"),
             repositoryRoot.dir("packages/tex-core/include"),
             layout.projectDirectory.dir("src/native"),
         )
@@ -374,6 +403,10 @@ kotlin {
 
     jvm {
         compilerOptions.jvmTarget.set(JvmTarget.JVM_17)
+        // Emitting 17 bytecode is not enough: without a JDK API release
+        // level the build can reference newer java.* APIs and fail only on
+        // the minimum runtime promised to consumers.
+        compilerOptions.freeCompilerArgs.add("-Xjdk-release=17")
         withSourcesJar(publish = true)
         testRuns["test"].executionTask.configure {
             useJUnitPlatform()
@@ -445,13 +478,17 @@ kotlin {
 
     sourceSets {
         commonMain.dependencies {
+            // The library is synchronous: production code takes no
+            // coroutine dependency. Only the concurrency tests use
+            // kotlinx-coroutines (test-scoped below), so consumers get no
+            // transitive coroutines requirement.
             api(libs.kotlin.stdlib)
-            api(libs.kotlinx.coroutines.core)
         }
         commonTest {
             kotlin.srcDir(layout.buildDirectory.dir("generated/renderTreeCommonTest/kotlin"))
             dependencies {
                 implementation(kotlin("test"))
+                implementation(libs.kotlinx.coroutines.core)
                 implementation(libs.kotlinx.coroutines.test)
             }
         }
@@ -480,6 +517,17 @@ tasks.matching { it.name.startsWith("runKtlint") && it.name.contains("CommonTest
 tasks.named<ProcessResources>("jvmProcessResources") {
     dependsOn(buildJvmNative)
     from(jvmNativeResourceDirectory)
+    // BSD-2-Clause requires binary redistributions to reproduce the license
+    // text; ship it inside the JVM jar.
+    from(repositoryRoot.file("LICENSE")) { into("META-INF") }
+}
+
+// Byte-reproducible archives: identical inputs must produce identical jars
+// regardless of file-system ordering or build time, so release artifacts
+// can be independently rebuilt and compared.
+tasks.withType<AbstractArchiveTask>().configureEach {
+    isPreserveFileTimestamps = false
+    isReproducibleFileOrder = true
 }
 
 val jvmTarget = kotlin.targets.getByName("jvm") as KotlinJvmTarget
@@ -547,8 +595,6 @@ val hostNativeLibraryPath =
         .resolve(
             if (desktopPlatform.startsWith("macos")) {
                 "libtex_core_kotlin.dylib"
-            } else if (desktopPlatform.startsWith("windows")) {
-                "tex_core_kotlin.dll"
             } else {
                 "libtex_core_kotlin.so"
             },
@@ -584,6 +630,9 @@ val javadocJar =
         archiveClassifier.set("javadoc")
         from(repositoryRoot.file("docs/specs/render-tree.md"))
         from(layout.projectDirectory.file("README.md"))
+        // Attached to every publication, so each Maven artifact set carries
+        // the BSD-2-Clause text its binaries redistribute under.
+        from(repositoryRoot.file("LICENSE")) { into("META-INF") }
     }
 
 publishing {
@@ -692,11 +741,33 @@ tasks.register("verifyKotlinNativePackaging") {
         val desktopLibrary =
             when {
                 expectedDesktopPlatform.startsWith("macos") -> "libtex_core_kotlin.dylib"
-                expectedDesktopPlatform.startsWith("windows") -> "tex_core_kotlin.dll"
                 else -> "libtex_core_kotlin.so"
             }
-        check(desktopOutputDirectory.resolve(desktopLibrary).isFile) {
+        val payload = desktopOutputDirectory.resolve(desktopLibrary)
+        check(payload.isFile) {
             "JVM native payload is missing for $expectedDesktopPlatform"
+        }
+        if (expectedDesktopPlatform.startsWith("macos")) {
+            // The artifact's Mach-O minimum OS must not exceed the declared
+            // support floor: a toolchain default of the build host's OS
+            // would publish a dylib older macOS releases refuse to load.
+            val process =
+                ProcessBuilder("vtool", "-show-build", payload.absolutePath)
+                    .redirectErrorStream(true)
+                    .start()
+            val output = process.inputStream.readBytes().decodeToString()
+            check(process.waitFor() == 0) { "vtool failed for $payload:\n$output" }
+            // Numeric comparison on major and minor: 15.1 must fail against
+            // the 15.0 floor, so extracting the major alone is not enough.
+            val minos =
+                Regex("minos\\s+(\\d+)(?:\\.(\\d+))?").find(output)
+                    ?: error("vtool reported no minos for $payload")
+            val minosMajor = minos.groupValues[1].toInt()
+            val minosMinor = minos.groupValues[2].ifEmpty { "0" }.toInt()
+            check(minosMajor < 15 || (minosMajor == 15 && minosMinor == 0)) {
+                "JVM native payload requires macOS $minosMajor.$minosMinor, " +
+                    "above the supported minimum macOS 15.0"
+            }
         }
     }
 }
