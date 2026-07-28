@@ -125,7 +125,7 @@ extension RenderNode {
     /// The native family values in enum order (the contract's family
     /// inventory); anything out of range reads as main.
     private static let families: [GlyphFamily] = [
-        .main, .size1, .size2, .size3, .size4, .bold, .textit, .cal, .bb, .sans, .mono
+        .main, .size1, .size2, .size3, .size4, .bold, .textit, .cal, .bb, .sans, .mono,
     ]
 
     private static func family(of native: tex_core_family) -> GlyphFamily {

@@ -6,6 +6,7 @@
 #include <string.h>
 
 #include "harness.h"
+#include "parse.h"
 #include "tex_core.h"
 
 /* Expected geometry is derived here exactly as the generator derives the
@@ -852,6 +853,11 @@ static void txc_test_styles(txc_test *test) {
     tex_core_render_tree_free(tree);
 }
 
+static void txc_test_command_table(txc_test *test) {
+    /* The dispatch binary search is only correct over a sorted table. */
+    txc_check(test, txc_command_table_sorted(), "the command table is strictly sorted");
+}
+
 static void txc_test_text_face_protection(txc_test *test) {
     /* A bare \text character keeps upright main under an outer style
      * switch, like braced \text content. */
@@ -884,5 +890,6 @@ int main(void) {
     txc_test_accents(&test);
     txc_test_styles(&test);
     txc_test_text_face_protection(&test);
+    txc_test_command_table(&test);
     return txc_test_finish(&test, "engine");
 }
