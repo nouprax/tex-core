@@ -1591,7 +1591,8 @@ tex_core_status txc_parse(
                                 }
                             }
                         }
-                        if (frame->radical != NULL || frame->fraction != NULL || frame->pending != TXC_PENDING_NONE) {
+                        if (frame->accent != NULL || frame->radical != NULL || frame->fraction != NULL ||
+                            frame->pending != TXC_PENDING_NONE) {
                             txc_list wrapped = {op, op, 1};
                             txc_construct construct = {NULL, &wrapped, NULL, NULL, NULL, NULL, NULL};
                             status = txc_deliver(arena, frame, &construct, TXC_ATOM_ORD, token.range, error);
