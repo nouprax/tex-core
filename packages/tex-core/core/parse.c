@@ -270,16 +270,6 @@ static const txc_math_symbol TXC_MATH_SYMBOLS[] = {
     {"colon", TXC_ATOM_PUNCT, 0x003A, TEX_CORE_STYLE_UPRIGHT},
 };
 
-static const txc_math_symbol *txc_math_symbol_find(const uint8_t *name, size_t name_length) {
-    for (size_t index = 0; index < sizeof(TXC_MATH_SYMBOLS) / sizeof(TXC_MATH_SYMBOLS[0]); index++) {
-        const txc_math_symbol *symbol = &TXC_MATH_SYMBOLS[index];
-        if (strlen(symbol->name) == name_length && memcmp(symbol->name, name, name_length) == 0) {
-            return symbol;
-        }
-    }
-    return NULL;
-}
-
 /* Fraction commands (milestone M1): \frac follows the surrounding style,
  * \dfrac and \tfrac force display and text style; the \binom family is
  * the barless fraction wrapped in sized parentheses. */
@@ -323,16 +313,6 @@ static const txc_big_op TXC_BIG_OPS[] = {
     {"prod", 0x220F, TXC_LIMITS_DISPLAY},
     {"sum", 0x2211, TXC_LIMITS_DISPLAY},
 };
-
-static const txc_big_op *txc_big_op_find(const uint8_t *name, size_t name_length) {
-    for (size_t index = 0; index < sizeof(TXC_BIG_OPS) / sizeof(TXC_BIG_OPS[0]); index++) {
-        const txc_big_op *op = &TXC_BIG_OPS[index];
-        if (strlen(op->name) == name_length && memcmp(op->name, name, name_length) == 0) {
-            return op;
-        }
-    }
-    return NULL;
-}
 
 /* Function names (milestone M1): Op atoms whose nucleus is the upright
  * letter run; `spelling` may carry one '\'' for the thin space inside
@@ -378,16 +358,6 @@ static const txc_function_name TXC_FUNCTION_NAMES[] = {
     {"tanh", "tanh", TXC_LIMITS_NEVER},
 };
 
-static const txc_function_name *txc_function_find(const uint8_t *name, size_t name_length) {
-    for (size_t index = 0; index < sizeof(TXC_FUNCTION_NAMES) / sizeof(TXC_FUNCTION_NAMES[0]); index++) {
-        const txc_function_name *function = &TXC_FUNCTION_NAMES[index];
-        if (strlen(function->name) == name_length && memcmp(function->name, name, name_length) == 0) {
-            return function;
-        }
-    }
-    return NULL;
-}
-
 /* Style switches (milestone M1): each takes one argument and rewrites
  * its letter and digit characters onto a face; \text instead sets its
  * braced content by document rules at the current size. */
@@ -406,16 +376,6 @@ static const txc_style_command TXC_STYLE_COMMANDS[] = {
     {"mathtt", TXC_FACE_TT},
     {"text", TXC_FACE_TEXT},
 };
-
-static const txc_style_command *txc_style_find(const uint8_t *name, size_t name_length) {
-    for (size_t index = 0; index < sizeof(TXC_STYLE_COMMANDS) / sizeof(TXC_STYLE_COMMANDS[0]); index++) {
-        const txc_style_command *command = &TXC_STYLE_COMMANDS[index];
-        if (strlen(command->name) == name_length && memcmp(command->name, name, name_length) == 0) {
-            return command;
-        }
-    }
-    return NULL;
-}
 
 static const tex_core_family TXC_FACE_FAMILIES[7] = {
     TEX_CORE_FAMILY_MAIN,
@@ -450,14 +410,348 @@ static const txc_accent_command TXC_ACCENT_COMMANDS[] = {
     {"widetilde", 0x02DC, true},
 };
 
-static const txc_accent_command *txc_accent_find(const uint8_t *name, size_t name_length) {
-    for (size_t index = 0; index < sizeof(TXC_ACCENT_COMMANDS) / sizeof(TXC_ACCENT_COMMANDS[0]); index++) {
-        const txc_accent_command *command = &TXC_ACCENT_COMMANDS[index];
-        if (strlen(command->name) == name_length && memcmp(command->name, name, name_length) == 0) {
-            return command;
+/* The math command dispatch: every math-mode control word in one table
+ * sorted by strcmp order, resolved with a single binary search instead
+ * of one linear scan per command class. `index` is the row within the
+ * class's own table. The spacing commands stay outside — they are live
+ * in document mode too — and the delimiter spellings resolve only where
+ * a delimiter is awaited. */
+typedef enum txc_command_kind {
+    TXC_COMMAND_SYMBOL = 0,
+    TXC_COMMAND_FRACTION = 1,
+    TXC_COMMAND_BIG_OP = 2,
+    TXC_COMMAND_FUNCTION = 3,
+    TXC_COMMAND_STYLE = 4,
+    TXC_COMMAND_ACCENT = 5,
+    TXC_COMMAND_SIZE = 6,
+    TXC_COMMAND_SQRT = 7,
+    TXC_COMMAND_LEFT = 8,
+    TXC_COMMAND_RIGHT = 9,
+    TXC_COMMAND_LIMITS = 10,
+    TXC_COMMAND_NOLIMITS = 11
+} txc_command_kind;
+
+typedef struct txc_command_entry {
+    const char *name;
+    txc_command_kind kind;
+    uint16_t index;
+} txc_command_entry;
+
+static const txc_command_entry TXC_COMMANDS[] = {
+    {"Big", TXC_COMMAND_SIZE, 0},
+    {"Bigg", TXC_COMMAND_SIZE, 1},
+    {"Biggl", TXC_COMMAND_SIZE, 2},
+    {"Biggm", TXC_COMMAND_SIZE, 3},
+    {"Biggr", TXC_COMMAND_SIZE, 4},
+    {"Bigl", TXC_COMMAND_SIZE, 5},
+    {"Bigm", TXC_COMMAND_SIZE, 6},
+    {"Bigr", TXC_COMMAND_SIZE, 7},
+    {"Delta", TXC_COMMAND_SYMBOL, 30},
+    {"Downarrow", TXC_COMMAND_SYMBOL, 161},
+    {"Gamma", TXC_COMMAND_SYMBOL, 29},
+    {"Im", TXC_COMMAND_SYMBOL, 43},
+    {"Lambda", TXC_COMMAND_SYMBOL, 32},
+    {"Leftarrow", TXC_COMMAND_SYMBOL, 144},
+    {"Leftrightarrow", TXC_COMMAND_SYMBOL, 146},
+    {"Longleftarrow", TXC_COMMAND_SYMBOL, 150},
+    {"Longleftrightarrow", TXC_COMMAND_SYMBOL, 152},
+    {"Longrightarrow", TXC_COMMAND_SYMBOL, 151},
+    {"Omega", TXC_COMMAND_SYMBOL, 39},
+    {"Phi", TXC_COMMAND_SYMBOL, 37},
+    {"Pi", TXC_COMMAND_SYMBOL, 34},
+    {"Pr", TXC_COMMAND_FUNCTION, 0},
+    {"Psi", TXC_COMMAND_SYMBOL, 38},
+    {"Re", TXC_COMMAND_SYMBOL, 42},
+    {"Rightarrow", TXC_COMMAND_SYMBOL, 145},
+    {"Sigma", TXC_COMMAND_SYMBOL, 35},
+    {"Theta", TXC_COMMAND_SYMBOL, 31},
+    {"Uparrow", TXC_COMMAND_SYMBOL, 160},
+    {"Updownarrow", TXC_COMMAND_SYMBOL, 162},
+    {"Upsilon", TXC_COMMAND_SYMBOL, 36},
+    {"Vert", TXC_COMMAND_SYMBOL, 68},
+    {"Xi", TXC_COMMAND_SYMBOL, 33},
+    {"acute", TXC_COMMAND_ACCENT, 0},
+    {"aleph", TXC_COMMAND_SYMBOL, 44},
+    {"alpha", TXC_COMMAND_SYMBOL, 0},
+    {"amalg", TXC_COMMAND_SYMBOL, 102},
+    {"angle", TXC_COMMAND_SYMBOL, 53},
+    {"approx", TXC_COMMAND_SYMBOL, 134},
+    {"arccos", TXC_COMMAND_FUNCTION, 1},
+    {"arcsin", TXC_COMMAND_FUNCTION, 2},
+    {"arctan", TXC_COMMAND_FUNCTION, 3},
+    {"arg", TXC_COMMAND_FUNCTION, 4},
+    {"ast", TXC_COMMAND_SYMBOL, 75},
+    {"asymp", TXC_COMMAND_SYMBOL, 131},
+    {"backslash", TXC_COMMAND_SYMBOL, 66},
+    {"bar", TXC_COMMAND_ACCENT, 1},
+    {"beta", TXC_COMMAND_SYMBOL, 1},
+    {"big", TXC_COMMAND_SIZE, 8},
+    {"bigcap", TXC_COMMAND_BIG_OP, 0},
+    {"bigcup", TXC_COMMAND_BIG_OP, 1},
+    {"bigg", TXC_COMMAND_SIZE, 9},
+    {"biggl", TXC_COMMAND_SIZE, 10},
+    {"biggm", TXC_COMMAND_SIZE, 11},
+    {"biggr", TXC_COMMAND_SIZE, 12},
+    {"bigl", TXC_COMMAND_SIZE, 13},
+    {"bigm", TXC_COMMAND_SIZE, 14},
+    {"bigodot", TXC_COMMAND_BIG_OP, 2},
+    {"bigoplus", TXC_COMMAND_BIG_OP, 3},
+    {"bigotimes", TXC_COMMAND_BIG_OP, 4},
+    {"bigr", TXC_COMMAND_SIZE, 15},
+    {"bigsqcup", TXC_COMMAND_BIG_OP, 5},
+    {"bigtriangledown", TXC_COMMAND_SYMBOL, 92},
+    {"bigtriangleup", TXC_COMMAND_SYMBOL, 91},
+    {"biguplus", TXC_COMMAND_BIG_OP, 6},
+    {"bigvee", TXC_COMMAND_BIG_OP, 7},
+    {"bigwedge", TXC_COMMAND_BIG_OP, 8},
+    {"binom", TXC_COMMAND_FRACTION, 0},
+    {"bot", TXC_COMMAND_SYMBOL, 52},
+    {"bowtie", TXC_COMMAND_SYMBOL, 138},
+    {"breve", TXC_COMMAND_ACCENT, 2},
+    {"bullet", TXC_COMMAND_SYMBOL, 78},
+    {"cap", TXC_COMMAND_SYMBOL, 79},
+    {"cdot", TXC_COMMAND_SYMBOL, 74},
+    {"check", TXC_COMMAND_ACCENT, 3},
+    {"chi", TXC_COMMAND_SYMBOL, 26},
+    {"circ", TXC_COMMAND_SYMBOL, 77},
+    {"clubsuit", TXC_COMMAND_SYMBOL, 62},
+    {"colon", TXC_COMMAND_SYMBOL, 182},
+    {"cong", TXC_COMMAND_SYMBOL, 135},
+    {"coprod", TXC_COMMAND_BIG_OP, 9},
+    {"cos", TXC_COMMAND_FUNCTION, 5},
+    {"cosh", TXC_COMMAND_FUNCTION, 6},
+    {"cot", TXC_COMMAND_FUNCTION, 7},
+    {"coth", TXC_COMMAND_FUNCTION, 8},
+    {"csc", TXC_COMMAND_FUNCTION, 9},
+    {"cup", TXC_COMMAND_SYMBOL, 80},
+    {"dagger", TXC_COMMAND_SYMBOL, 100},
+    {"dashv", TXC_COMMAND_SYMBOL, 124},
+    {"dbinom", TXC_COMMAND_FRACTION, 1},
+    {"ddagger", TXC_COMMAND_SYMBOL, 101},
+    {"ddot", TXC_COMMAND_ACCENT, 4},
+    {"deg", TXC_COMMAND_FUNCTION, 10},
+    {"delta", TXC_COMMAND_SYMBOL, 3},
+    {"det", TXC_COMMAND_FUNCTION, 11},
+    {"dfrac", TXC_COMMAND_FRACTION, 2},
+    {"diamond", TXC_COMMAND_SYMBOL, 90},
+    {"diamondsuit", TXC_COMMAND_SYMBOL, 63},
+    {"dim", TXC_COMMAND_FUNCTION, 12},
+    {"div", TXC_COMMAND_SYMBOL, 73},
+    {"dot", TXC_COMMAND_ACCENT, 5},
+    {"doteq", TXC_COMMAND_SYMBOL, 136},
+    {"downarrow", TXC_COMMAND_SYMBOL, 158},
+    {"ell", TXC_COMMAND_SYMBOL, 40},
+    {"emptyset", TXC_COMMAND_SYMBOL, 48},
+    {"epsilon", TXC_COMMAND_SYMBOL, 4},
+    {"equiv", TXC_COMMAND_SYMBOL, 107},
+    {"eta", TXC_COMMAND_SYMBOL, 7},
+    {"exists", TXC_COMMAND_SYMBOL, 56},
+    {"exp", TXC_COMMAND_FUNCTION, 13},
+    {"flat", TXC_COMMAND_SYMBOL, 59},
+    {"forall", TXC_COMMAND_SYMBOL, 55},
+    {"frac", TXC_COMMAND_FRACTION, 3},
+    {"frown", TXC_COMMAND_SYMBOL, 126},
+    {"gamma", TXC_COMMAND_SYMBOL, 2},
+    {"gcd", TXC_COMMAND_FUNCTION, 14},
+    {"ge", TXC_COMMAND_SYMBOL, 106},
+    {"geq", TXC_COMMAND_SYMBOL, 105},
+    {"gets", TXC_COMMAND_SYMBOL, 140},
+    {"gg", TXC_COMMAND_SYMBOL, 113},
+    {"grave", TXC_COMMAND_ACCENT, 6},
+    {"hat", TXC_COMMAND_ACCENT, 7},
+    {"heartsuit", TXC_COMMAND_SYMBOL, 64},
+    {"hom", TXC_COMMAND_FUNCTION, 15},
+    {"hookleftarrow", TXC_COMMAND_SYMBOL, 155},
+    {"hookrightarrow", TXC_COMMAND_SYMBOL, 156},
+    {"in", TXC_COMMAND_SYMBOL, 120},
+    {"inf", TXC_COMMAND_FUNCTION, 16},
+    {"infty", TXC_COMMAND_SYMBOL, 46},
+    {"int", TXC_COMMAND_BIG_OP, 10},
+    {"iota", TXC_COMMAND_SYMBOL, 10},
+    {"kappa", TXC_COMMAND_SYMBOL, 11},
+    {"ker", TXC_COMMAND_FUNCTION, 17},
+    {"lambda", TXC_COMMAND_SYMBOL, 12},
+    {"land", TXC_COMMAND_SYMBOL, 87},
+    {"langle", TXC_COMMAND_SYMBOL, 176},
+    {"lbrace", TXC_COMMAND_SYMBOL, 172},
+    {"lceil", TXC_COMMAND_SYMBOL, 180},
+    {"le", TXC_COMMAND_SYMBOL, 104},
+    {"left", TXC_COMMAND_LEFT, 0},
+    {"leftarrow", TXC_COMMAND_SYMBOL, 139},
+    {"leftharpoondown", TXC_COMMAND_SYMBOL, 168},
+    {"leftharpoonup", TXC_COMMAND_SYMBOL, 167},
+    {"leftrightarrow", TXC_COMMAND_SYMBOL, 143},
+    {"leq", TXC_COMMAND_SYMBOL, 103},
+    {"lfloor", TXC_COMMAND_SYMBOL, 178},
+    {"lg", TXC_COMMAND_FUNCTION, 18},
+    {"lim", TXC_COMMAND_FUNCTION, 19},
+    {"liminf", TXC_COMMAND_FUNCTION, 20},
+    {"limits", TXC_COMMAND_LIMITS, 0},
+    {"limsup", TXC_COMMAND_FUNCTION, 21},
+    {"ll", TXC_COMMAND_SYMBOL, 112},
+    {"ln", TXC_COMMAND_FUNCTION, 22},
+    {"lnot", TXC_COMMAND_SYMBOL, 58},
+    {"log", TXC_COMMAND_FUNCTION, 23},
+    {"longleftarrow", TXC_COMMAND_SYMBOL, 147},
+    {"longleftrightarrow", TXC_COMMAND_SYMBOL, 149},
+    {"longmapsto", TXC_COMMAND_SYMBOL, 154},
+    {"longrightarrow", TXC_COMMAND_SYMBOL, 148},
+    {"lor", TXC_COMMAND_SYMBOL, 85},
+    {"mapsto", TXC_COMMAND_SYMBOL, 153},
+    {"mathbb", TXC_COMMAND_STYLE, 0},
+    {"mathbf", TXC_COMMAND_STYLE, 1},
+    {"mathcal", TXC_COMMAND_STYLE, 2},
+    {"mathit", TXC_COMMAND_STYLE, 3},
+    {"mathrm", TXC_COMMAND_STYLE, 4},
+    {"mathsf", TXC_COMMAND_STYLE, 5},
+    {"mathtt", TXC_COMMAND_STYLE, 6},
+    {"max", TXC_COMMAND_FUNCTION, 24},
+    {"mid", TXC_COMMAND_SYMBOL, 127},
+    {"min", TXC_COMMAND_FUNCTION, 25},
+    {"models", TXC_COMMAND_SYMBOL, 130},
+    {"mp", TXC_COMMAND_SYMBOL, 71},
+    {"mu", TXC_COMMAND_SYMBOL, 13},
+    {"nabla", TXC_COMMAND_SYMBOL, 49},
+    {"natural", TXC_COMMAND_SYMBOL, 60},
+    {"nearrow", TXC_COMMAND_SYMBOL, 163},
+    {"neg", TXC_COMMAND_SYMBOL, 57},
+    {"ni", TXC_COMMAND_SYMBOL, 121},
+    {"nolimits", TXC_COMMAND_NOLIMITS, 0},
+    {"nu", TXC_COMMAND_SYMBOL, 14},
+    {"nwarrow", TXC_COMMAND_SYMBOL, 166},
+    {"odot", TXC_COMMAND_SYMBOL, 99},
+    {"oint", TXC_COMMAND_BIG_OP, 11},
+    {"omega", TXC_COMMAND_SYMBOL, 28},
+    {"ominus", TXC_COMMAND_SYMBOL, 96},
+    {"oplus", TXC_COMMAND_SYMBOL, 95},
+    {"oslash", TXC_COMMAND_SYMBOL, 98},
+    {"otimes", TXC_COMMAND_SYMBOL, 97},
+    {"owns", TXC_COMMAND_SYMBOL, 122},
+    {"parallel", TXC_COMMAND_SYMBOL, 128},
+    {"partial", TXC_COMMAND_SYMBOL, 45},
+    {"perp", TXC_COMMAND_SYMBOL, 129},
+    {"phi", TXC_COMMAND_SYMBOL, 24},
+    {"pi", TXC_COMMAND_SYMBOL, 16},
+    {"pm", TXC_COMMAND_SYMBOL, 70},
+    {"prec", TXC_COMMAND_SYMBOL, 108},
+    {"preceq", TXC_COMMAND_SYMBOL, 110},
+    {"prime", TXC_COMMAND_SYMBOL, 47},
+    {"prod", TXC_COMMAND_BIG_OP, 12},
+    {"propto", TXC_COMMAND_SYMBOL, 137},
+    {"psi", TXC_COMMAND_SYMBOL, 27},
+    {"rangle", TXC_COMMAND_SYMBOL, 177},
+    {"rbrace", TXC_COMMAND_SYMBOL, 174},
+    {"rceil", TXC_COMMAND_SYMBOL, 181},
+    {"rfloor", TXC_COMMAND_SYMBOL, 179},
+    {"rho", TXC_COMMAND_SYMBOL, 18},
+    {"right", TXC_COMMAND_RIGHT, 0},
+    {"rightarrow", TXC_COMMAND_SYMBOL, 141},
+    {"rightharpoondown", TXC_COMMAND_SYMBOL, 170},
+    {"rightharpoonup", TXC_COMMAND_SYMBOL, 169},
+    {"rightleftharpoons", TXC_COMMAND_SYMBOL, 171},
+    {"searrow", TXC_COMMAND_SYMBOL, 164},
+    {"sec", TXC_COMMAND_FUNCTION, 26},
+    {"setminus", TXC_COMMAND_SYMBOL, 88},
+    {"sharp", TXC_COMMAND_SYMBOL, 61},
+    {"sigma", TXC_COMMAND_SYMBOL, 20},
+    {"sim", TXC_COMMAND_SYMBOL, 132},
+    {"simeq", TXC_COMMAND_SYMBOL, 133},
+    {"sin", TXC_COMMAND_FUNCTION, 27},
+    {"sinh", TXC_COMMAND_FUNCTION, 28},
+    {"smile", TXC_COMMAND_SYMBOL, 125},
+    {"spadesuit", TXC_COMMAND_SYMBOL, 65},
+    {"sqcap", TXC_COMMAND_SYMBOL, 81},
+    {"sqcup", TXC_COMMAND_SYMBOL, 82},
+    {"sqrt", TXC_COMMAND_SQRT, 0},
+    {"sqsubseteq", TXC_COMMAND_SYMBOL, 118},
+    {"sqsupseteq", TXC_COMMAND_SYMBOL, 119},
+    {"star", TXC_COMMAND_SYMBOL, 76},
+    {"subset", TXC_COMMAND_SYMBOL, 114},
+    {"subseteq", TXC_COMMAND_SYMBOL, 116},
+    {"succ", TXC_COMMAND_SYMBOL, 109},
+    {"succeq", TXC_COMMAND_SYMBOL, 111},
+    {"sum", TXC_COMMAND_BIG_OP, 13},
+    {"sup", TXC_COMMAND_FUNCTION, 29},
+    {"supset", TXC_COMMAND_SYMBOL, 115},
+    {"supseteq", TXC_COMMAND_SYMBOL, 117},
+    {"surd", TXC_COMMAND_SYMBOL, 50},
+    {"swarrow", TXC_COMMAND_SYMBOL, 165},
+    {"tan", TXC_COMMAND_FUNCTION, 30},
+    {"tanh", TXC_COMMAND_FUNCTION, 31},
+    {"tau", TXC_COMMAND_SYMBOL, 22},
+    {"tbinom", TXC_COMMAND_FRACTION, 4},
+    {"text", TXC_COMMAND_STYLE, 7},
+    {"tfrac", TXC_COMMAND_FRACTION, 5},
+    {"theta", TXC_COMMAND_SYMBOL, 8},
+    {"tilde", TXC_COMMAND_ACCENT, 8},
+    {"times", TXC_COMMAND_SYMBOL, 72},
+    {"to", TXC_COMMAND_SYMBOL, 142},
+    {"top", TXC_COMMAND_SYMBOL, 51},
+    {"triangle", TXC_COMMAND_SYMBOL, 54},
+    {"triangleleft", TXC_COMMAND_SYMBOL, 93},
+    {"triangleright", TXC_COMMAND_SYMBOL, 94},
+    {"uparrow", TXC_COMMAND_SYMBOL, 157},
+    {"updownarrow", TXC_COMMAND_SYMBOL, 159},
+    {"uplus", TXC_COMMAND_SYMBOL, 83},
+    {"upsilon", TXC_COMMAND_SYMBOL, 23},
+    {"varepsilon", TXC_COMMAND_SYMBOL, 5},
+    {"varphi", TXC_COMMAND_SYMBOL, 25},
+    {"varpi", TXC_COMMAND_SYMBOL, 17},
+    {"varrho", TXC_COMMAND_SYMBOL, 19},
+    {"varsigma", TXC_COMMAND_SYMBOL, 21},
+    {"vartheta", TXC_COMMAND_SYMBOL, 9},
+    {"vdash", TXC_COMMAND_SYMBOL, 123},
+    {"vec", TXC_COMMAND_ACCENT, 9},
+    {"vee", TXC_COMMAND_SYMBOL, 84},
+    {"vert", TXC_COMMAND_SYMBOL, 67},
+    {"wedge", TXC_COMMAND_SYMBOL, 86},
+    {"widehat", TXC_COMMAND_ACCENT, 10},
+    {"widetilde", TXC_COMMAND_ACCENT, 11},
+    {"wp", TXC_COMMAND_SYMBOL, 41},
+    {"wr", TXC_COMMAND_SYMBOL, 89},
+    {"xi", TXC_COMMAND_SYMBOL, 15},
+    {"zeta", TXC_COMMAND_SYMBOL, 6},
+    {"{", TXC_COMMAND_SYMBOL, 173},
+    {"|", TXC_COMMAND_SYMBOL, 69},
+    {"}", TXC_COMMAND_SYMBOL, 175},
+};
+
+static int txc_command_order(const uint8_t *name, size_t name_length, const char *entry) {
+    size_t entry_length = strlen(entry);
+    size_t shared = name_length < entry_length ? name_length : entry_length;
+    int order = memcmp(name, entry, shared);
+    if (order != 0) {
+        return order;
+    }
+    return name_length < entry_length ? -1 : (name_length > entry_length ? 1 : 0);
+}
+
+static const txc_command_entry *txc_command_lookup(const uint8_t *name, size_t name_length) {
+    size_t low = 0;
+    size_t high = sizeof(TXC_COMMANDS) / sizeof(TXC_COMMANDS[0]);
+    while (low < high) {
+        size_t middle = low + (high - low) / 2;
+        int order = txc_command_order(name, name_length, TXC_COMMANDS[middle].name);
+        if (order == 0) {
+            return &TXC_COMMANDS[middle];
+        }
+        if (order > 0) {
+            low = middle + 1;
+        } else {
+            high = middle;
         }
     }
     return NULL;
+}
+
+bool txc_command_table_sorted(void) {
+    size_t count = sizeof(TXC_COMMANDS) / sizeof(TXC_COMMANDS[0]);
+    for (size_t index = 1; index < count; index++) {
+        if (strcmp(TXC_COMMANDS[index - 1].name, TXC_COMMANDS[index].name) >= 0) {
+            return false;
+        }
+    }
+    return true;
 }
 
 /* The plain TeX delimiter set (\delcode assignments plus the delimiter
@@ -555,26 +849,6 @@ static const txc_size_command TXC_SIZE_COMMANDS[] = {
     {"bigm", TXC_ATOM_REL, 1},
     {"bigr", TXC_ATOM_CLOSE, 1},
 };
-
-static const txc_size_command *txc_size_find(const uint8_t *name, size_t name_length) {
-    for (size_t index = 0; index < sizeof(TXC_SIZE_COMMANDS) / sizeof(TXC_SIZE_COMMANDS[0]); index++) {
-        const txc_size_command *command = &TXC_SIZE_COMMANDS[index];
-        if (strlen(command->name) == name_length && memcmp(command->name, name, name_length) == 0) {
-            return command;
-        }
-    }
-    return NULL;
-}
-
-static const txc_fraction_command *txc_fraction_find(const uint8_t *name, size_t name_length) {
-    for (size_t index = 0; index < sizeof(TXC_FRACTION_COMMANDS) / sizeof(TXC_FRACTION_COMMANDS[0]); index++) {
-        const txc_fraction_command *command = &TXC_FRACTION_COMMANDS[index];
-        if (strlen(command->name) == name_length && memcmp(command->name, name, name_length) == 0) {
-            return command;
-        }
-    }
-    return NULL;
-}
 
 typedef struct txc_spacing_command {
     const char *name;
@@ -776,6 +1050,32 @@ typedef enum txc_delim_wait {
 /* Which script a pending `^`/`_` will fill. */
 typedef enum txc_pending { TXC_PENDING_NONE = 0, TXC_PENDING_SUP = 1, TXC_PENDING_SUB = 2 } txc_pending;
 
+/* Which command a frame is collecting arguments for. */
+typedef enum txc_collect_kind {
+    TXC_COLLECT_NONE = 0,
+    TXC_COLLECT_FRACTION = 1,
+    TXC_COLLECT_RADICAL = 2,
+    TXC_COLLECT_ACCENT = 3,
+    TXC_COLLECT_STYLE = 4
+} txc_collect_kind;
+
+typedef struct txc_collect {
+    txc_collect_kind kind;
+    tex_core_range command;
+    /* The construct being filled (one of, by kind). */
+    txc_fraction *fraction;
+    txc_radical *radical;
+    txc_accent *accent;
+    txc_face face;
+    /* FRACTION: the denominator is next; RADICAL: the index was taken. */
+    bool second;
+    /* The destination: the eagerly appended atom, or a script field. */
+    txc_item *item;
+    txc_item *target;
+    txc_pending script;
+    size_t mark;
+} txc_collect;
+
 typedef struct txc_frame {
     txc_list list;
     txc_frame_role role;
@@ -790,43 +1090,14 @@ typedef struct txc_frame {
     txc_pending pending;
     txc_item *pending_target;
     size_t pending_mark;
-    /* The fraction whose arguments this frame is collecting, if any:
-     * delivered constructs fill the numerator, then the denominator. On
-     * completion the fraction becomes `fraction_item`'s nucleus — the
-     * Inner atom appended at the command — or, when the command itself
-     * was a script argument, the captured script field. */
-    txc_fraction *fraction;
-    bool fraction_denominator;
-    txc_item *fraction_item;
-    txc_item *fraction_target;
-    txc_pending fraction_script;
-    size_t fraction_mark;
-    /* The radical whose parts this frame is collecting, if any:
-     * a leading `[` opens the index once, and the next construct is the
-     * radicand. Completion mirrors the fraction machinery. */
-    txc_radical *radical;
-    bool radical_index_taken;
-    txc_item *radical_item;
-    txc_item *radical_target;
-    txc_pending radical_script;
-    size_t radical_mark;
-    /* The style switch whose argument this frame is collecting, if
-     * any, and whether this frame is \text content (document rules). */
-    bool styled;
-    txc_face styled_face;
-    tex_core_range styled_command;
-    txc_item *styled_item;
-    txc_item *styled_target;
-    txc_pending styled_script;
-    size_t styled_mark;
+    /* The argument-collecting command in progress on this frame, if
+     * any: which construct the next delivery fills, its phase, and
+     * where the completed construct lands — the atom appended at the
+     * command, or the script field captured from a pending mark. The
+     * guards keep at most one collector active per frame. */
+    txc_collect collect;
+    /* Whether this frame is \text content (document rules). */
     bool text_mode;
-    /* The accent whose argument this frame is collecting, if any.
-     * Completion mirrors the radical machinery. */
-    txc_accent *accent;
-    txc_item *accent_item;
-    txc_item *accent_target;
-    txc_pending accent_script;
-    size_t accent_mark;
     /* The delimiter token this frame is waiting for, if any, and the
      * command that asked for it. EXPLICIT carries the atom class and the
      * \big size step. */
@@ -853,32 +1124,19 @@ static void txc_frame_init(txc_frame *frame, txc_frame_role role, txc_frame *par
     frame->pending = TXC_PENDING_NONE;
     frame->pending_target = NULL;
     frame->pending_mark = 0;
-    frame->fraction = NULL;
-    frame->fraction_denominator = false;
-    frame->fraction_item = NULL;
-    frame->fraction_target = NULL;
-    frame->fraction_script = TXC_PENDING_NONE;
-    frame->fraction_mark = 0;
-    frame->radical = NULL;
-    frame->radical_index_taken = false;
-    frame->radical_item = NULL;
-    frame->radical_target = NULL;
-    frame->radical_script = TXC_PENDING_NONE;
-    frame->radical_mark = 0;
-    frame->styled = false;
-    frame->styled_face = TXC_FACE_RM;
-    frame->styled_command.begin = 0;
-    frame->styled_command.end = 0;
-    frame->styled_item = NULL;
-    frame->styled_target = NULL;
-    frame->styled_script = TXC_PENDING_NONE;
-    frame->styled_mark = 0;
+    frame->collect.kind = TXC_COLLECT_NONE;
+    frame->collect.command.begin = 0;
+    frame->collect.command.end = 0;
+    frame->collect.fraction = NULL;
+    frame->collect.radical = NULL;
+    frame->collect.accent = NULL;
+    frame->collect.face = TXC_FACE_RM;
+    frame->collect.second = false;
+    frame->collect.item = NULL;
+    frame->collect.target = NULL;
+    frame->collect.script = TXC_PENDING_NONE;
+    frame->collect.mark = 0;
     frame->text_mode = false;
-    frame->accent = NULL;
-    frame->accent_item = NULL;
-    frame->accent_target = NULL;
-    frame->accent_script = TXC_PENDING_NONE;
-    frame->accent_mark = 0;
     frame->delim_wait = TXC_DELIM_WAIT_NONE;
     frame->delim_command.begin = 0;
     frame->delim_command.end = 0;
@@ -905,74 +1163,16 @@ static txc_field *txc_script_field(txc_item *item, txc_pending pending) {
 }
 
 static const char *txc_argument_noun(const txc_frame *frame) {
-    if (frame->styled) {
-        return frame->styled_face == TXC_FACE_TEXT ? "text" : "style";
-    }
-    if (frame->accent != NULL) {
+    switch (frame->collect.kind) {
+    case TXC_COLLECT_STYLE:
+        return frame->collect.face == TXC_FACE_TEXT ? "text" : "style";
+    case TXC_COLLECT_ACCENT:
         return "accent";
-    }
-    if (frame->radical != NULL) {
+    case TXC_COLLECT_RADICAL:
         return "radical";
+    default:
+        return frame->collect.second ? "denominator" : "numerator";
     }
-    return frame->fraction_denominator ? "denominator" : "numerator";
-}
-
-/* Completes the fraction in progress on `frame` once its denominator has
- * arrived: the construct becomes the destination captured at the command —
- * the appended Inner atom's nucleus or a script field. */
-static void txc_fraction_complete(txc_frame *frame, size_t end) {
-    txc_fraction *fraction = frame->fraction;
-    tex_core_range range = {fraction->command.begin, end};
-    txc_construct construct = {NULL, NULL, fraction, NULL, NULL, NULL, NULL};
-    if (frame->fraction_item != NULL) {
-        txc_item *item = frame->fraction_item;
-        txc_field_fill(&item->nucleus, &construct, range);
-        txc_field_reset(&item->sup, end);
-        txc_field_reset(&item->sub, end);
-        item->range = range;
-    } else {
-        txc_item *target = frame->fraction_target;
-        txc_field *field = txc_script_field(target, frame->fraction_script);
-        txc_field_fill(field, &construct, range);
-        field->range.begin = frame->fraction_mark;
-        target->range.end = end;
-        if (frame->fraction_script == TXC_PENDING_SUB && target->sup.kind == TXC_FIELD_EMPTY) {
-            target->sub_first = true;
-        }
-    }
-    frame->fraction = NULL;
-    frame->fraction_denominator = false;
-    frame->fraction_item = NULL;
-    frame->fraction_target = NULL;
-}
-
-/* Completes the radical in progress on `frame` once its radicand has
- * arrived: the construct becomes the destination captured at the
- * command — the appended Ord atom's nucleus or a script field. */
-static void txc_radical_complete(txc_frame *frame, size_t end) {
-    txc_radical *radical = frame->radical;
-    tex_core_range range = {radical->command.begin, end};
-    txc_construct construct = {NULL, NULL, NULL, NULL, NULL, radical, NULL};
-    if (frame->radical_item != NULL) {
-        txc_item *item = frame->radical_item;
-        txc_field_fill(&item->nucleus, &construct, range);
-        txc_field_reset(&item->sup, end);
-        txc_field_reset(&item->sub, end);
-        item->range = range;
-    } else {
-        txc_item *target = frame->radical_target;
-        txc_field *field = txc_script_field(target, frame->radical_script);
-        txc_field_fill(field, &construct, range);
-        field->range.begin = frame->radical_mark;
-        target->range.end = end;
-        if (frame->radical_script == TXC_PENDING_SUB && target->sup.kind == TXC_FIELD_EMPTY) {
-            target->sub_first = true;
-        }
-    }
-    frame->radical = NULL;
-    frame->radical_index_taken = false;
-    frame->radical_item = NULL;
-    frame->radical_target = NULL;
 }
 
 static void txc_face_field(txc_field *field, tex_core_family family);
@@ -1024,39 +1224,82 @@ static void txc_face_field(txc_field *field, tex_core_family family) {
     }
 }
 
-/* Completes the accent in progress on `frame` once its argument has
- * arrived. */
-static void txc_accent_complete(txc_frame *frame, size_t end) {
-    txc_accent *accent = frame->accent;
-    tex_core_range range = {accent->command.begin, end};
-    txc_construct construct = {NULL, NULL, NULL, NULL, NULL, NULL, accent};
-    if (frame->accent_item != NULL) {
-        txc_item *item = frame->accent_item;
-        txc_field_fill(&item->nucleus, &construct, range);
+/* Lands a completed construct at the collector's destination: the
+ * eagerly appended atom's nucleus, or the captured script field. */
+static void txc_collect_finish(txc_frame *frame, const txc_field *staged, size_t end) {
+    tex_core_range whole = {frame->collect.command.begin, end};
+    if (frame->collect.item != NULL) {
+        txc_item *item = frame->collect.item;
+        item->nucleus = *staged;
+        item->nucleus.range = whole;
         txc_field_reset(&item->sup, end);
         txc_field_reset(&item->sub, end);
-        item->range = range;
+        item->range = whole;
     } else {
-        txc_item *target = frame->accent_target;
-        txc_field *field = txc_script_field(target, frame->accent_script);
-        txc_field_fill(field, &construct, range);
-        field->range.begin = frame->accent_mark;
+        txc_item *target = frame->collect.target;
+        txc_field *field = txc_script_field(target, frame->collect.script);
+        *field = *staged;
+        field->range.begin = frame->collect.mark;
+        field->range.end = end;
         target->range.end = end;
-        if (frame->accent_script == TXC_PENDING_SUB && target->sup.kind == TXC_FIELD_EMPTY) {
+        if (frame->collect.script == TXC_PENDING_SUB && target->sup.kind == TXC_FIELD_EMPTY) {
             target->sub_first = true;
         }
     }
-    frame->accent = NULL;
-    frame->accent_item = NULL;
-    frame->accent_target = NULL;
+    frame->collect.kind = TXC_COLLECT_NONE;
+    frame->collect.fraction = NULL;
+    frame->collect.radical = NULL;
+    frame->collect.accent = NULL;
+    frame->collect.second = false;
+    frame->collect.item = NULL;
+    frame->collect.target = NULL;
+}
+
+/* Starts collecting for `kind` at `command`: a pending script mark
+ * captures the destination, otherwise the eager atom of `atom_class`
+ * is appended so child order stays source order. */
+static tex_core_status txc_collect_begin(
+    txc_arena *arena,
+    txc_frame *frame,
+    txc_collect_kind kind,
+    txc_atom_class atom_class,
+    tex_core_range command,
+    tex_core_error *error
+) {
+    frame->collect.kind = kind;
+    frame->collect.command = command;
+    frame->collect.second = false;
+    if (frame->pending != TXC_PENDING_NONE) {
+        frame->collect.item = NULL;
+        frame->collect.target = frame->pending_target;
+        frame->collect.script = frame->pending;
+        frame->collect.mark = frame->pending_mark;
+        frame->pending = TXC_PENDING_NONE;
+        frame->pending_target = NULL;
+        return TEX_CORE_STATUS_OK;
+    }
+    txc_item *item = txc_append(arena, &frame->list);
+    if (item == NULL) {
+        return txc_fail(error, TEX_CORE_STATUS_ALLOCATION_FAILED, NULL, "allocation failed");
+    }
+    item->kind = TXC_ITEM_ATOM;
+    item->atom_class = atom_class;
+    txc_field_reset(&item->nucleus, command.begin);
+    txc_field_reset(&item->sup, command.end);
+    txc_field_reset(&item->sub, command.end);
+    item->sub_first = false;
+    item->op_limits = TXC_LIMITS_DISPLAY;
+    item->range = command;
+    frame->collect.item = item;
+    frame->collect.target = NULL;
+    return TEX_CORE_STATUS_OK;
 }
 
 /* Delivers one parsed construct — a character, a symbol command, a
  * closed group list, a sized delimiter, or a closed fence — into the
- * frame: as the pending accent, radical, or fraction argument when one
- * is being collected, as the pending script field when one is pending,
- * or as a new atom of `atom_class`. `range` is the construct's own
- * range; script fields extend it back to their mark. */
+ * frame: as the active collector's next argument, as the pending script
+ * field, or as a new atom of `atom_class`. `range` is the construct's
+ * own range; script fields extend it back to their mark. */
 static tex_core_status txc_deliver(
     txc_arena *arena,
     txc_frame *frame,
@@ -1065,65 +1308,53 @@ static tex_core_status txc_deliver(
     tex_core_range range,
     tex_core_error *error
 ) {
-    if (frame->styled) {
+    if (frame->collect.kind != TXC_COLLECT_NONE) {
         txc_field staged;
         txc_field_reset(&staged, range.begin);
-        txc_field_fill(&staged, construct, range);
-        if (frame->styled_face == TXC_FACE_TEXT) {
-            /* A braced argument becomes document-rule text content; a
-             * bare character is upright main, exactly \mathrm. */
-            if (staged.kind == TXC_FIELD_LIST) {
-                staged.kind = TXC_FIELD_TEXT;
-            } else if (staged.kind == TXC_FIELD_CHAR) {
-                staged.style = TEX_CORE_STYLE_UPRIGHT;
-                staged.family = TEX_CORE_FAMILY_MAIN;
-                staged.text_face = true;
+        switch (frame->collect.kind) {
+        case TXC_COLLECT_FRACTION:
+            txc_field_fill(
+                frame->collect.second ? &frame->collect.fraction->den : &frame->collect.fraction->num,
+                construct,
+                range
+            );
+            if (!frame->collect.second) {
+                frame->collect.second = true;
+                return TEX_CORE_STATUS_OK;
             }
-        } else {
-            txc_face_field(&staged, TXC_FACE_FAMILIES[frame->styled_face]);
-        }
-        tex_core_range whole = {frame->styled_command.begin, range.end};
-        if (frame->styled_item != NULL) {
-            txc_item *item = frame->styled_item;
-            item->nucleus = staged;
-            item->nucleus.range = whole;
-            txc_field_reset(&item->sup, whole.end);
-            txc_field_reset(&item->sub, whole.end);
-            item->range = whole;
-        } else {
-            txc_item *target = frame->styled_target;
-            txc_field *field = txc_script_field(target, frame->styled_script);
-            *field = staged;
-            field->range.begin = frame->styled_mark;
-            field->range.end = whole.end;
-            target->range.end = whole.end;
-            if (frame->styled_script == TXC_PENDING_SUB && target->sup.kind == TXC_FIELD_EMPTY) {
-                target->sub_first = true;
+            staged.kind = TXC_FIELD_FRACTION;
+            staged.fraction = frame->collect.fraction;
+            break;
+        case TXC_COLLECT_RADICAL:
+            txc_field_fill(&frame->collect.radical->argument, construct, range);
+            staged.kind = TXC_FIELD_RADICAL;
+            staged.radical = frame->collect.radical;
+            break;
+        case TXC_COLLECT_ACCENT:
+            txc_field_fill(&frame->collect.accent->argument, construct, range);
+            staged.kind = TXC_FIELD_ACCENT;
+            staged.accent = frame->collect.accent;
+            break;
+        case TXC_COLLECT_STYLE:
+        default:
+            txc_field_fill(&staged, construct, range);
+            if (frame->collect.face == TXC_FACE_TEXT) {
+                /* A braced argument becomes document-rule text content;
+                 * a bare character is upright main, exactly \mathrm,
+                 * and keeps that face under an outer style switch. */
+                if (staged.kind == TXC_FIELD_LIST) {
+                    staged.kind = TXC_FIELD_TEXT;
+                } else if (staged.kind == TXC_FIELD_CHAR) {
+                    staged.style = TEX_CORE_STYLE_UPRIGHT;
+                    staged.family = TEX_CORE_FAMILY_MAIN;
+                    staged.text_face = true;
+                }
+            } else {
+                txc_face_field(&staged, TXC_FACE_FAMILIES[frame->collect.face]);
             }
+            break;
         }
-        frame->styled = false;
-        frame->styled_item = NULL;
-        frame->styled_target = NULL;
-        return TEX_CORE_STATUS_OK;
-    }
-    if (frame->accent != NULL) {
-        txc_field_fill(&frame->accent->argument, construct, range);
-        txc_accent_complete(frame, range.end);
-        return TEX_CORE_STATUS_OK;
-    }
-    if (frame->radical != NULL) {
-        txc_field_fill(&frame->radical->argument, construct, range);
-        txc_radical_complete(frame, range.end);
-        return TEX_CORE_STATUS_OK;
-    }
-    if (frame->fraction != NULL || frame->radical != NULL || frame->accent != NULL || frame->styled) {
-        txc_field *field = frame->fraction_denominator ? &frame->fraction->den : &frame->fraction->num;
-        txc_field_fill(field, construct, range);
-        if (frame->fraction_denominator) {
-            txc_fraction_complete(frame, range.end);
-        } else {
-            frame->fraction_denominator = true;
-        }
+        txc_collect_finish(frame, &staged, range.end);
         return TEX_CORE_STATUS_OK;
     }
     if (frame->pending != TXC_PENDING_NONE) {
@@ -1248,21 +1479,11 @@ tex_core_status txc_parse(
             if (frame->delim_wait != TXC_DELIM_WAIT_NONE) {
                 return txc_fail(error, TEX_CORE_STATUS_UNSUPPORTED, &frame->delim_command, "missing delimiter");
             }
-            if (frame->fraction != NULL || frame->radical != NULL || frame->accent != NULL || frame->styled) {
-                tex_core_range at;
-                if (frame->styled) {
-                    at = frame->styled_command;
-                } else if (frame->accent != NULL) {
-                    at = frame->accent->command;
-                } else if (frame->radical != NULL) {
-                    at = frame->radical->command;
-                } else {
-                    at = frame->fraction->command;
-                }
+            if (frame->collect.kind != TXC_COLLECT_NONE) {
                 return txc_fail(
                     error,
                     TEX_CORE_STATUS_UNSUPPORTED,
-                    &at,
+                    &frame->collect.command,
                     "missing %s argument",
                     txc_argument_noun(frame)
                 );
@@ -1339,7 +1560,7 @@ tex_core_status txc_parse(
                     }
                     break;
                 }
-                if (codepoint == '[' && frame->radical != NULL && !frame->radical_index_taken) {
+                if (codepoint == '[' && frame->collect.kind == TXC_COLLECT_RADICAL && !frame->collect.second) {
                     /* The LaTeX optional index: one leading bracket right
                      * after \sqrt opens it; anywhere else `[` stays an
                      * ordinary Open atom. */
@@ -1357,7 +1578,7 @@ tex_core_status txc_parse(
                     break;
                 }
                 if (codepoint == ']' && frame->role == TXC_FRAME_INDEX) {
-                    if (frame->fraction != NULL || frame->radical != NULL || frame->accent != NULL || frame->styled) {
+                    if (frame->collect.kind != TXC_COLLECT_NONE) {
                         return txc_fail(
                             error,
                             TEX_CORE_STATUS_UNSUPPORTED,
@@ -1378,11 +1599,11 @@ tex_core_status txc_parse(
                     txc_frame *closed = frame;
                     frame = frame->parent;
                     depth -= 1;
-                    frame->radical->index.kind = TXC_FIELD_LIST;
-                    frame->radical->index.list = closed->list;
-                    frame->radical->index.range.begin = closed->open;
-                    frame->radical->index.range.end = token.range.end;
-                    frame->radical_index_taken = true;
+                    frame->collect.radical->index.kind = TXC_FIELD_LIST;
+                    frame->collect.radical->index.list = closed->list;
+                    frame->collect.radical->index.range.begin = closed->open;
+                    frame->collect.radical->index.range.end = token.range.end;
+                    frame->collect.second = true;
                     break;
                 }
                 if (codepoint == '{') {
@@ -1398,7 +1619,7 @@ tex_core_status txc_parse(
                     }
                     txc_frame_init(inner, TXC_FRAME_GROUP, frame);
                     inner->open = token.range.begin;
-                    inner->text_mode = frame->styled && frame->styled_face == TXC_FACE_TEXT;
+                    inner->text_mode = frame->collect.kind == TXC_COLLECT_STYLE && frame->collect.face == TXC_FACE_TEXT;
                     if (frame->pending != TXC_PENDING_NONE) {
                         inner->role = TXC_FRAME_SCRIPT;
                         inner->target = frame->pending_target;
@@ -1412,7 +1633,7 @@ tex_core_status txc_parse(
                     break;
                 }
                 if (codepoint == '}') {
-                    if (frame->fraction != NULL || frame->radical != NULL || frame->accent != NULL || frame->styled) {
+                    if (frame->collect.kind != TXC_COLLECT_NONE) {
                         return txc_fail(
                             error,
                             TEX_CORE_STATUS_UNSUPPORTED,
@@ -1464,7 +1685,7 @@ tex_core_status txc_parse(
                 }
                 if (codepoint == '^' || codepoint == '_') {
                     txc_pending pending = codepoint == '^' ? TXC_PENDING_SUP : TXC_PENDING_SUB;
-                    if (frame->fraction != NULL || frame->radical != NULL || frame->accent != NULL || frame->styled) {
+                    if (frame->collect.kind != TXC_COLLECT_NONE) {
                         return txc_fail(
                             error,
                             TEX_CORE_STATUS_UNSUPPORTED,
@@ -1564,7 +1785,7 @@ tex_core_status txc_parse(
             }
             const txc_spacing_command *command = txc_spacing(token.name, token.name_length);
             if (command != NULL) {
-                if (frame->fraction != NULL || frame->radical != NULL || frame->accent != NULL || frame->styled) {
+                if (frame->collect.kind != TXC_COLLECT_NONE) {
                     return txc_fail(
                         error,
                         TEX_CORE_STATUS_UNSUPPORTED,
@@ -1596,13 +1817,14 @@ tex_core_status txc_parse(
              * the text surface (milestone M3) arrives, exactly like
              * TeX's missing-$ complaint. */
             if (math && !frame->text_mode) {
-                const txc_fraction_command *fraction_command = txc_fraction_find(token.name, token.name_length);
-                if (fraction_command != NULL) {
+                const txc_command_entry *entry = txc_command_lookup(token.name, token.name_length);
+                if (entry != NULL && entry->kind == TXC_COMMAND_FRACTION) {
+                    const txc_fraction_command *fraction_command = &TXC_FRACTION_COMMANDS[entry->index];
                     /* A fraction command where a fraction argument is
                      * required is not a legal argument: undelimited
                      * arguments are a character, a symbol command, or a
                      * braced group. */
-                    if (frame->fraction != NULL || frame->radical != NULL || frame->accent != NULL || frame->styled) {
+                    if (frame->collect.kind != TXC_COLLECT_NONE) {
                         return txc_fail(
                             error,
                             TEX_CORE_STATUS_UNSUPPORTED,
@@ -1620,40 +1842,15 @@ tex_core_status txc_parse(
                     fraction->command = token.range;
                     txc_field_reset(&fraction->num, token.range.end);
                     txc_field_reset(&fraction->den, token.range.end);
-                    frame->fraction = fraction;
-                    frame->fraction_denominator = false;
-                    if (frame->pending != TXC_PENDING_NONE) {
-                        /* The fraction is itself a script argument
-                         * (x^\frac{1}{2}): capture the destination and
-                         * fill it on completion. */
-                        frame->fraction_item = NULL;
-                        frame->fraction_target = frame->pending_target;
-                        frame->fraction_script = frame->pending;
-                        frame->fraction_mark = frame->pending_mark;
-                        frame->pending = TXC_PENDING_NONE;
-                        frame->pending_target = NULL;
-                    } else {
-                        txc_item *item = txc_append(arena, &frame->list);
-                        if (item == NULL) {
-                            return txc_fail(error, TEX_CORE_STATUS_ALLOCATION_FAILED, NULL, "allocation failed");
-                        }
-                        item->kind = TXC_ITEM_ATOM;
-                        item->atom_class = TXC_ATOM_INNER;
-                        txc_field_reset(&item->nucleus, token.range.begin);
-                        txc_field_reset(&item->sup, token.range.end);
-                        txc_field_reset(&item->sub, token.range.end);
-                        item->sub_first = false;
-                        item->op_limits = TXC_LIMITS_DISPLAY;
-                        item->op_limits = TXC_LIMITS_DISPLAY;
-                        item->op_limits = TXC_LIMITS_DISPLAY;
-                        item->range = token.range;
-                        frame->fraction_item = item;
-                        frame->fraction_target = NULL;
+                    status = txc_collect_begin(arena, frame, TXC_COLLECT_FRACTION, TXC_ATOM_INNER, token.range, error);
+                    if (status != TEX_CORE_STATUS_OK) {
+                        return status;
                     }
+                    frame->collect.fraction = fraction;
                     break;
                 }
-                if (token.name_length == 4 && memcmp(token.name, "left", 4) == 0) {
-                    if (frame->fraction != NULL || frame->radical != NULL || frame->accent != NULL || frame->styled) {
+                if (entry != NULL && entry->kind == TXC_COMMAND_LEFT) {
+                    if (frame->collect.kind != TXC_COLLECT_NONE) {
                         return txc_fail(
                             error,
                             TEX_CORE_STATUS_UNSUPPORTED,
@@ -1675,8 +1872,8 @@ tex_core_status txc_parse(
                     frame->delim_command = token.range;
                     break;
                 }
-                if (token.name_length == 5 && memcmp(token.name, "right", 5) == 0) {
-                    if (frame->fraction != NULL || frame->radical != NULL || frame->accent != NULL || frame->styled) {
+                if (entry != NULL && entry->kind == TXC_COMMAND_RIGHT) {
+                    if (frame->collect.kind != TXC_COLLECT_NONE) {
                         return txc_fail(
                             error,
                             TEX_CORE_STATUS_UNSUPPORTED,
@@ -1702,9 +1899,10 @@ tex_core_status txc_parse(
                     break;
                 }
                 {
-                    const txc_big_op *big_op = txc_big_op_find(token.name, token.name_length);
+                    const txc_big_op *big_op =
+                        entry != NULL && entry->kind == TXC_COMMAND_BIG_OP ? &TXC_BIG_OPS[entry->index] : NULL;
                     const txc_function_name *function =
-                        big_op == NULL ? txc_function_find(token.name, token.name_length) : NULL;
+                        entry != NULL && entry->kind == TXC_COMMAND_FUNCTION ? &TXC_FUNCTION_NAMES[entry->index] : NULL;
                     if (big_op != NULL || function != NULL) {
                         /* Build the Op atom, then route it like a braced
                          * group so it stays an atom inside script and
@@ -1764,8 +1962,7 @@ tex_core_status txc_parse(
                                 }
                             }
                         }
-                        if (frame->styled || frame->accent != NULL || frame->radical != NULL ||
-                            frame->fraction != NULL || frame->pending != TXC_PENDING_NONE) {
+                        if (frame->collect.kind != TXC_COLLECT_NONE || frame->pending != TXC_PENDING_NONE) {
                             txc_list wrapped = {op, op, 1};
                             txc_construct construct = {NULL, &wrapped, NULL, NULL, NULL, NULL, NULL};
                             status = txc_deliver(arena, frame, &construct, TXC_ATOM_ORD, token.range, error);
@@ -1784,10 +1981,9 @@ tex_core_status txc_parse(
                         break;
                     }
                 }
-                if ((token.name_length == 6 && memcmp(token.name, "limits", 6) == 0) ||
-                    (token.name_length == 8 && memcmp(token.name, "nolimits", 8) == 0)) {
-                    bool wants_limits = token.name_length == 6;
-                    if (frame->fraction != NULL || frame->radical != NULL || frame->accent != NULL || frame->styled) {
+                if (entry != NULL && (entry->kind == TXC_COMMAND_LIMITS || entry->kind == TXC_COMMAND_NOLIMITS)) {
+                    bool wants_limits = entry->kind == TXC_COMMAND_LIMITS;
+                    if (frame->collect.kind != TXC_COLLECT_NONE) {
                         return txc_fail(
                             error,
                             TEX_CORE_STATUS_UNSUPPORTED,
@@ -1820,10 +2016,10 @@ tex_core_status txc_parse(
                     break;
                 }
                 {
-                    const txc_style_command *style_command = txc_style_find(token.name, token.name_length);
+                    const txc_style_command *style_command =
+                        entry != NULL && entry->kind == TXC_COMMAND_STYLE ? &TXC_STYLE_COMMANDS[entry->index] : NULL;
                     if (style_command != NULL) {
-                        if (frame->fraction != NULL || frame->radical != NULL || frame->accent != NULL ||
-                            frame->styled) {
+                        if (frame->collect.kind != TXC_COLLECT_NONE) {
                             return txc_fail(
                                 error,
                                 TEX_CORE_STATUS_UNSUPPORTED,
@@ -1832,42 +2028,21 @@ tex_core_status txc_parse(
                                 txc_argument_noun(frame)
                             );
                         }
-                        frame->styled = true;
-                        frame->styled_face = style_command->face;
-                        frame->styled_command = token.range;
-                        if (frame->pending != TXC_PENDING_NONE) {
-                            frame->styled_item = NULL;
-                            frame->styled_target = frame->pending_target;
-                            frame->styled_script = frame->pending;
-                            frame->styled_mark = frame->pending_mark;
-                            frame->pending = TXC_PENDING_NONE;
-                            frame->pending_target = NULL;
-                        } else {
-                            txc_item *item = txc_append(arena, &frame->list);
-                            if (item == NULL) {
-                                return txc_fail(error, TEX_CORE_STATUS_ALLOCATION_FAILED, NULL, "allocation failed");
-                            }
-                            item->kind = TXC_ITEM_ATOM;
-                            item->atom_class = TXC_ATOM_ORD;
-                            txc_field_reset(&item->nucleus, token.range.begin);
-                            txc_field_reset(&item->sup, token.range.end);
-                            txc_field_reset(&item->sub, token.range.end);
-                            item->sub_first = false;
-                            item->op_limits = TXC_LIMITS_DISPLAY;
-                            item->range = token.range;
-                            frame->styled_item = item;
-                            frame->styled_target = NULL;
+                        status = txc_collect_begin(arena, frame, TXC_COLLECT_STYLE, TXC_ATOM_ORD, token.range, error);
+                        if (status != TEX_CORE_STATUS_OK) {
+                            return status;
                         }
+                        frame->collect.face = style_command->face;
                         break;
                     }
                 }
                 {
-                    const txc_accent_command *accent_command = txc_accent_find(token.name, token.name_length);
+                    const txc_accent_command *accent_command =
+                        entry != NULL && entry->kind == TXC_COMMAND_ACCENT ? &TXC_ACCENT_COMMANDS[entry->index] : NULL;
                     if (accent_command != NULL) {
                         /* A bare accent command is not a legal argument:
                          * nested accents need braces (\hat{\bar{x}}). */
-                        if (frame->fraction != NULL || frame->radical != NULL || frame->accent != NULL ||
-                            frame->styled) {
+                        if (frame->collect.kind != TXC_COLLECT_NONE) {
                             return txc_fail(
                                 error,
                                 TEX_CORE_STATUS_UNSUPPORTED,
@@ -1884,35 +2059,16 @@ tex_core_status txc_parse(
                         accent->wide = accent_command->wide;
                         accent->command = token.range;
                         txc_field_reset(&accent->argument, token.range.end);
-                        frame->accent = accent;
-                        if (frame->pending != TXC_PENDING_NONE) {
-                            frame->accent_item = NULL;
-                            frame->accent_target = frame->pending_target;
-                            frame->accent_script = frame->pending;
-                            frame->accent_mark = frame->pending_mark;
-                            frame->pending = TXC_PENDING_NONE;
-                            frame->pending_target = NULL;
-                        } else {
-                            txc_item *item = txc_append(arena, &frame->list);
-                            if (item == NULL) {
-                                return txc_fail(error, TEX_CORE_STATUS_ALLOCATION_FAILED, NULL, "allocation failed");
-                            }
-                            item->kind = TXC_ITEM_ATOM;
-                            item->atom_class = TXC_ATOM_ORD;
-                            txc_field_reset(&item->nucleus, token.range.begin);
-                            txc_field_reset(&item->sup, token.range.end);
-                            txc_field_reset(&item->sub, token.range.end);
-                            item->sub_first = false;
-                            item->op_limits = TXC_LIMITS_DISPLAY;
-                            item->range = token.range;
-                            frame->accent_item = item;
-                            frame->accent_target = NULL;
+                        status = txc_collect_begin(arena, frame, TXC_COLLECT_ACCENT, TXC_ATOM_ORD, token.range, error);
+                        if (status != TEX_CORE_STATUS_OK) {
+                            return status;
                         }
+                        frame->collect.accent = accent;
                         break;
                     }
                 }
-                if (token.name_length == 4 && memcmp(token.name, "sqrt", 4) == 0) {
-                    if (frame->fraction != NULL || frame->radical != NULL || frame->accent != NULL || frame->styled) {
+                if (entry != NULL && entry->kind == TXC_COMMAND_SQRT) {
+                    if (frame->collect.kind != TXC_COLLECT_NONE) {
                         return txc_fail(
                             error,
                             TEX_CORE_STATUS_UNSUPPORTED,
@@ -1928,48 +2084,23 @@ tex_core_status txc_parse(
                     radical->command = token.range;
                     txc_field_reset(&radical->index, token.range.end);
                     txc_field_reset(&radical->argument, token.range.end);
-                    frame->radical = radical;
-                    frame->radical_index_taken = false;
-                    if (frame->pending != TXC_PENDING_NONE) {
-                        /* The radical is itself a script argument
-                         * (x^\sqrt{2}): capture the destination and fill
-                         * it on completion. */
-                        frame->radical_item = NULL;
-                        frame->radical_target = frame->pending_target;
-                        frame->radical_script = frame->pending;
-                        frame->radical_mark = frame->pending_mark;
-                        frame->pending = TXC_PENDING_NONE;
-                        frame->pending_target = NULL;
-                    } else {
-                        txc_item *item = txc_append(arena, &frame->list);
-                        if (item == NULL) {
-                            return txc_fail(error, TEX_CORE_STATUS_ALLOCATION_FAILED, NULL, "allocation failed");
-                        }
-                        item->kind = TXC_ITEM_ATOM;
-                        item->atom_class = TXC_ATOM_ORD;
-                        txc_field_reset(&item->nucleus, token.range.begin);
-                        txc_field_reset(&item->sup, token.range.end);
-                        txc_field_reset(&item->sub, token.range.end);
-                        item->sub_first = false;
-                        item->op_limits = TXC_LIMITS_DISPLAY;
-                        item->op_limits = TXC_LIMITS_DISPLAY;
-                        item->op_limits = TXC_LIMITS_DISPLAY;
-                        item->range = token.range;
-                        frame->radical_item = item;
-                        frame->radical_target = NULL;
+                    status = txc_collect_begin(arena, frame, TXC_COLLECT_RADICAL, TXC_ATOM_ORD, token.range, error);
+                    if (status != TEX_CORE_STATUS_OK) {
+                        return status;
                     }
+                    frame->collect.radical = radical;
                     break;
                 }
-                const txc_size_command *size_command = txc_size_find(token.name, token.name_length);
-                if (size_command != NULL) {
+                if (entry != NULL && entry->kind == TXC_COMMAND_SIZE) {
+                    const txc_size_command *size_command = &TXC_SIZE_COMMANDS[entry->index];
                     frame->delim_wait = TXC_DELIM_WAIT_EXPLICIT;
                     frame->delim_command = token.range;
                     frame->delim_class = size_command->atom_class;
                     frame->delim_size = size_command->size;
                     break;
                 }
-                const txc_math_symbol *symbol = txc_math_symbol_find(token.name, token.name_length);
-                if (symbol != NULL) {
+                if (entry != NULL && entry->kind == TXC_COMMAND_SYMBOL) {
+                    const txc_math_symbol *symbol = &TXC_MATH_SYMBOLS[entry->index];
                     txc_math_glyph glyph = {symbol->atom_class, symbol->codepoint, symbol->style};
                     txc_construct construct = {&glyph, NULL, NULL, NULL, NULL, NULL, NULL};
                     status = txc_deliver(arena, frame, &construct, glyph.atom_class, token.range, error);
