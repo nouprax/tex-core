@@ -10,6 +10,10 @@
 #include "tex_core.h"
 
 static const char TXC_BENCH_PHRASE[] = "The quick brown fox \\quad jumps over the lazy dog 0123456789. \\, ";
+/* A command-heavy math phrase: every command class goes through the
+ * parser dispatch, and the constructs exercise the layout builders. */
+static const char TXC_BENCH_MATH_PHRASE[] =
+    "\\alpha+\\beta\\frac{1}{2}\\sqrt{x}\\sum_{i}^{n}\\hat{y}\\mathbf{z}\\left(\\gamma\\right)\\leq\\infty ";
 #define TXC_BENCH_TARGET_BYTES 65536
 #define TXC_BENCH_ITERATIONS 64
 
@@ -76,6 +80,22 @@ int main(void) {
     int failures = 0;
     failures += txc_bench("compile-document", document, repeats * phrase, TEX_CORE_MODE_DOCUMENT);
     failures += txc_bench("compile-math-inline", document, repeats * phrase, TEX_CORE_MODE_MATH_INLINE);
+
+    size_t math_phrase = strlen(TXC_BENCH_MATH_PHRASE);
+    size_t math_repeats = TXC_BENCH_TARGET_BYTES / math_phrase;
+    char *math = malloc(math_repeats * math_phrase + 1);
+    if (math == NULL) {
+        free(document);
+        fputs("benchmark: workload allocation failed\n", stderr);
+        return 1;
+    }
+    for (size_t index = 0; index < math_repeats; index++) {
+        memcpy(math + index * math_phrase, TXC_BENCH_MATH_PHRASE, math_phrase);
+    }
+    math[math_repeats * math_phrase] = '\0';
+    failures += txc_bench("compile-math-commands", math, math_repeats * math_phrase, TEX_CORE_MODE_MATH_INLINE);
+    free(math);
+
     failures += txc_bench("compile-trivial", "x", 1, TEX_CORE_MODE_MATH_INLINE);
     free(document);
     return failures == 0 ? 0 : 1;

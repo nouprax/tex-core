@@ -223,6 +223,11 @@ typedef struct txc_item {
     struct txc_item *next;
 } txc_item;
 
+/* Verifies the command dispatch table is strictly sorted (a test seam,
+ * like txc_allocation_limit: the binary search is only correct over a
+ * sorted table, and the table is maintained by hand). */
+bool txc_command_table_sorted(void);
+
 /* Parses the whole source into `list`, allocating items from `arena`. */
 tex_core_status txc_parse(
     txc_arena *arena,
