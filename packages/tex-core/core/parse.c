@@ -715,7 +715,7 @@ static const char *txc_argument_noun(const txc_frame *frame) {
 static void txc_fraction_complete(txc_frame *frame, size_t end) {
     txc_fraction *fraction = frame->fraction;
     tex_core_range range = {fraction->command.begin, end};
-    txc_construct construct = {NULL, NULL, fraction, NULL, NULL};
+    txc_construct construct = {NULL, NULL, fraction, NULL, NULL, NULL};
     if (frame->fraction_item != NULL) {
         txc_item *item = frame->fraction_item;
         txc_field_fill(&item->nucleus, &construct, range);
@@ -875,12 +875,12 @@ static tex_core_status txc_delimiter_arrived(
         tex_core_range whole = {frame->open, range.end};
         *frame_slot = frame->parent;
         *depth -= 1;
-        txc_construct construct = {NULL, NULL, NULL, NULL, fenced};
+        txc_construct construct = {NULL, NULL, NULL, NULL, fenced, NULL};
         return txc_deliver(arena, *frame_slot, &construct, TXC_ATOM_INNER, whole, error);
     }
     txc_sized_delimiter sized = {*delimiter, frame->delim_size};
     tex_core_range whole = {frame->delim_command.begin, range.end};
-    txc_construct construct = {NULL, NULL, NULL, &sized, NULL};
+    txc_construct construct = {NULL, NULL, NULL, &sized, NULL, NULL};
     return txc_deliver(arena, frame, &construct, frame->delim_class, whole, error);
 }
 
@@ -1098,7 +1098,7 @@ tex_core_status txc_parse(
                         }
                     } else {
                         tex_core_range range = {closed->open, token.range.end};
-                        txc_construct construct = {NULL, &closed->list, NULL, NULL, NULL};
+                        txc_construct construct = {NULL, &closed->list, NULL, NULL, NULL, NULL};
                         status = txc_deliver(arena, frame, &construct, TXC_ATOM_ORD, range, error);
                         if (status != TEX_CORE_STATUS_OK) {
                             return status;
@@ -1160,7 +1160,7 @@ tex_core_status txc_parse(
                 if (!txc_reserved(codepoint)) {
                     txc_math_glyph glyph;
                     if (txc_math_classify(codepoint, &glyph)) {
-                        txc_construct construct = {&glyph, NULL, NULL, NULL, NULL};
+                        txc_construct construct = {&glyph, NULL, NULL, NULL, NULL, NULL};
                         status = txc_deliver(arena, frame, &construct, glyph.atom_class, token.range, error);
                         if (status != TEX_CORE_STATUS_OK) {
                             return status;
@@ -1398,7 +1398,7 @@ tex_core_status txc_parse(
                 const txc_math_symbol *symbol = txc_math_symbol_find(token.name, token.name_length);
                 if (symbol != NULL) {
                     txc_math_glyph glyph = {symbol->atom_class, symbol->codepoint, symbol->style};
-                    txc_construct construct = {&glyph, NULL, NULL, NULL, NULL};
+                    txc_construct construct = {&glyph, NULL, NULL, NULL, NULL, NULL};
                     status = txc_deliver(arena, frame, &construct, glyph.atom_class, token.range, error);
                     if (status != TEX_CORE_STATUS_OK) {
                         return status;
