@@ -115,6 +115,8 @@ int main(void) {
     txc_sweep(&test, "\\sum_{i=1}^{n}\\lim_{x}\\int\\limits_a^b", TEX_CORE_MODE_MATH_DISPLAY);
     /* Accents allocate the construct, the accent glyph, and the box. */
     txc_sweep(&test, "\\hat{x}+\\widehat{y+z}^2", TEX_CORE_MODE_MATH_DISPLAY);
+    /* Style switches rewrite in place; \text allocates its word list. */
+    txc_sweep(&test, "\\mathbf{ab1}+\\text{on it}^2", TEX_CORE_MODE_MATH_DISPLAY);
     txc_allocation_limit(-1);
     return txc_test_finish(&test, "allocfail");
 }

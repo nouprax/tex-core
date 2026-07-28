@@ -292,8 +292,11 @@ txc_clean_box(txc_arena *arena, const txc_field *field, int style, txc_node **ou
             error
         );
     }
+    if (field->kind == TXC_FIELD_TEXT) {
+        return txc_mlist(arena, &field->list, style, false, field->range, out, error);
+    }
     if (field->kind == TXC_FIELD_CHAR) {
-        const txc_metric *metric = txc_metric_find(TEX_CORE_FAMILY_MAIN, field->style, field->codepoint);
+        const txc_metric *metric = txc_metric_find(field->family, field->style, field->codepoint);
         if (metric == NULL) {
             return txc_fail(
                 error,
@@ -315,7 +318,7 @@ txc_clean_box(txc_arena *arena, const txc_field *field, int style, txc_node **ou
         glyph->y = 0;
         glyph->codepoint = field->codepoint;
         glyph->style = field->style;
-        glyph->family = TEX_CORE_FAMILY_MAIN;
+        glyph->family = field->family;
         glyph->size = em;
         glyph->width = txc_em(metric->width, em);
         glyph->ascent = txc_em(metric->height, em);
@@ -1095,7 +1098,7 @@ static tex_core_status txc_accent_box(
     txc_scaled skew = 0;
     if (accent->argument.kind == TXC_FIELD_CHAR) {
         const txc_metric *metric =
-            txc_metric_find(TEX_CORE_FAMILY_MAIN, accent->argument.style, accent->argument.codepoint);
+            txc_metric_find(accent->argument.family, accent->argument.style, accent->argument.codepoint);
         if (metric != NULL) {
             skew = txc_em(metric->skew, em);
         }
@@ -1245,7 +1248,7 @@ static tex_core_status txc_atom(
         shift_up = (glyph->ascent + glyph->y) - txc_param(TXC_PARAMETER_SUP_DROP, drop);
         shift_down = (glyph->descent - glyph->y) + txc_param(TXC_PARAMETER_SUB_DROP, drop);
     } else if (item->nucleus.kind == TXC_FIELD_CHAR) {
-        const txc_metric *metric = txc_metric_find(TEX_CORE_FAMILY_MAIN, item->nucleus.style, item->nucleus.codepoint);
+        const txc_metric *metric = txc_metric_find(item->nucleus.family, item->nucleus.style, item->nucleus.codepoint);
         if (metric == NULL) {
             return txc_fail(
                 error,
@@ -1264,7 +1267,7 @@ static tex_core_status txc_atom(
         glyph->y = 0;
         glyph->codepoint = item->nucleus.codepoint;
         glyph->style = item->nucleus.style;
-        glyph->family = TEX_CORE_FAMILY_MAIN;
+        glyph->family = item->nucleus.family;
         glyph->size = em;
         glyph->width = txc_em(metric->width, em);
         glyph->ascent = txc_em(metric->height, em);
@@ -1291,6 +1294,9 @@ static tex_core_status txc_atom(
             break;
         case TXC_FIELD_ACCENT:
             status = txc_accent_box(arena, item->nucleus.accent, style, item->nucleus.range, &box, error);
+            break;
+        case TXC_FIELD_TEXT:
+            status = txc_mlist(arena, &item->nucleus.list, style, false, item->nucleus.range, &box, error);
             break;
         case TXC_FIELD_DELIMITER:
             status = txc_delimiter_boxed(

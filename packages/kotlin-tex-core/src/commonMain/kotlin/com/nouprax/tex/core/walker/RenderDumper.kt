@@ -24,7 +24,7 @@ internal object RenderDumper {
 }
 
 private class DumpVisitor : RenderVisitor<Unit> {
-    val output = StringBuilder("render-tree 4\n")
+    val output = StringBuilder("render-tree 5\n")
     private var depth = 0
 
     override fun visit(node: HBox) {
@@ -73,6 +73,12 @@ private class DumpVisitor : RenderVisitor<Unit> {
                     GlyphFamily.SIZE2 -> "size2"
                     GlyphFamily.SIZE3 -> "size3"
                     GlyphFamily.SIZE4 -> "size4"
+                    GlyphFamily.BOLD -> "bold"
+                    GlyphFamily.TEXTIT -> "textit"
+                    GlyphFamily.CAL -> "cal"
+                    GlyphFamily.BB -> "bb"
+                    GlyphFamily.SANS -> "sans"
+                    GlyphFamily.MONO -> "mono"
                 },
             ).append(" size=")
             .append(measure(node.size))

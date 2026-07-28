@@ -75,7 +75,7 @@ static void txc_error_record(const tex_core_error *error, char *record, size_t c
         snprintf(
             record,
             capacity,
-            "render-error 4\nerror status=%s src=%zu..%zu message=%s\n",
+            "render-error 5\nerror status=%s src=%zu..%zu message=%s\n",
             txc_status_name(error->status),
             error->range.begin,
             error->range.end,
@@ -85,7 +85,7 @@ static void txc_error_record(const tex_core_error *error, char *record, size_t c
         snprintf(
             record,
             capacity,
-            "render-error 4\nerror status=%s src=none message=%s\n",
+            "render-error 5\nerror status=%s src=none message=%s\n",
             txc_status_name(error->status),
             error->message
         );

@@ -27,6 +27,24 @@ public enum class GlyphFamily {
 
     /** The fourth delimiter size-variant face. */
     SIZE4,
+
+    /** The bold style face. */
+    BOLD,
+
+    /** The text-italic style face. */
+    TEXTIT,
+
+    /** The calligraphic style face. */
+    CAL,
+
+    /** The double-struck style face. */
+    BB,
+
+    /** The sans-serif style face. */
+    SANS,
+
+    /** The typewriter style face. */
+    MONO,
 }
 
 /**

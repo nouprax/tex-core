@@ -53,7 +53,7 @@ class TexCoreTest {
     fun dumpIsCanonicalAndDeterministic() {
         val tree = Document.compile("")
         assertEquals(
-            "render-tree 4\nhbox x=0.0pt y=0.0pt width=0.0pt ascent=0.0pt descent=0.0pt src=0..0\n",
+            "render-tree 5\nhbox x=0.0pt y=0.0pt width=0.0pt ascent=0.0pt descent=0.0pt src=0..0\n",
             tree.dump(),
         )
         assertEquals(tree.dump(), tree.dump())

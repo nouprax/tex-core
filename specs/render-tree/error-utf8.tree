@@ -1,2 +1,2 @@
-render-error 4
+render-error 5
 error status=invalid-utf8 src=1..2 message=invalid UTF-8 sequence

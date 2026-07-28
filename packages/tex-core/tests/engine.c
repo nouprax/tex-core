@@ -821,6 +821,51 @@ static void txc_test_accents(txc_test *test) {
     tex_core_render_tree_free(tree);
 }
 
+static void txc_test_styles(txc_test *test) {
+    /* Letters and digits rewrite onto the face; other atoms keep their
+     * glyphs and classes. */
+    tex_core_render_tree *tree = txc_compile(test, "\\mathbf{a+1}", TEX_CORE_MODE_MATH_INLINE, "mathbf");
+    const tex_core_node *box = tex_core_node_child(tex_core_render_tree_root(tree), 0);
+    txc_check_int(test, tex_core_node_glyph(tex_core_node_child(box, 0)).family, TEX_CORE_FAMILY_BOLD, "bold a");
+    txc_check_int(
+        test,
+        tex_core_node_glyph(tex_core_node_child(box, 2)).family,
+        TEX_CORE_FAMILY_MAIN,
+        "the plus keeps the main face"
+    );
+    txc_check_int(test, tex_core_node_glyph(tex_core_node_child(box, 4)).family, TEX_CORE_FAMILY_BOLD, "bold 1");
+    tex_core_render_tree_free(tree);
+
+    /* \text keeps interword spaces and scales in scripts. */
+    tree = txc_compile(test, "x^{\\text{up up}}", TEX_CORE_MODE_MATH_INLINE, "text in script");
+    const tex_core_node *root = tex_core_render_tree_root(tree);
+    const tex_core_node *sup = tex_core_node_child(root, 1);
+    const tex_core_node *content = tex_core_node_child(sup, 0);
+    txc_check(test, tex_core_node_child_count(content) == 5, "text words and space");
+    txc_check_int(
+        test,
+        tex_core_node_get_kind(tex_core_node_child(content, 2)),
+        TEX_CORE_NODE_KERN,
+        "interword space inside \\text"
+    );
+    txc_check(test, tex_core_node_glyph(tex_core_node_child(content, 0)).size == 7.0, "text scales in scripts");
+    tex_core_render_tree_free(tree);
+}
+
+static void txc_test_text_face_protection(txc_test *test) {
+    /* A bare \text character keeps upright main under an outer style
+     * switch, like braced \text content. */
+    tex_core_render_tree *tree = txc_compile(test, "\\mathbf{\\text a}", TEX_CORE_MODE_MATH_INLINE, "bf text");
+    const tex_core_node *box = tex_core_node_child(tex_core_render_tree_root(tree), 0);
+    txc_check_int(
+        test,
+        tex_core_node_glyph(tex_core_node_child(box, 0)).family,
+        TEX_CORE_FAMILY_MAIN,
+        "bare text stays main under \\mathbf"
+    );
+    tex_core_render_tree_free(tree);
+}
+
 int main(void) {
     txc_test test = {0, 0};
     txc_test_math_glyph(&test);
@@ -837,5 +882,7 @@ int main(void) {
     txc_test_radicals(&test);
     txc_test_operators(&test);
     txc_test_accents(&test);
+    txc_test_styles(&test);
+    txc_test_text_face_protection(&test);
     return txc_test_finish(&test, "engine");
 }
