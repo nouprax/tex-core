@@ -526,6 +526,7 @@ typedef struct txc_construct {
     txc_fraction *fraction;
     const txc_sized_delimiter *sized;
     txc_fenced *fenced;
+    txc_radical *radical;
 } txc_construct;
 
 /* Fills one field from a delivered construct. */
@@ -543,6 +544,9 @@ static void txc_field_fill(txc_field *field, const txc_construct *construct, tex
     } else if (construct->sized != NULL) {
         field->kind = TXC_FIELD_DELIMITER;
         field->sized = *construct->sized;
+    } else if (construct->radical != NULL) {
+        field->kind = TXC_FIELD_RADICAL;
+        field->radical = construct->radical;
     } else {
         field->kind = TXC_FIELD_FENCED;
         field->fenced = construct->fenced;
@@ -585,7 +589,8 @@ typedef enum txc_frame_role {
     TXC_FRAME_ROOT = 0,
     TXC_FRAME_GROUP = 1,
     TXC_FRAME_SCRIPT = 2,
-    TXC_FRAME_FENCED = 3
+    TXC_FRAME_FENCED = 3,
+    TXC_FRAME_INDEX = 4
 } txc_frame_role;
 
 /* Which construct the next delimiter token completes: a \left push, a
@@ -625,6 +630,15 @@ typedef struct txc_frame {
     txc_item *fraction_target;
     txc_pending fraction_script;
     size_t fraction_mark;
+    /* The radical whose parts this frame is collecting, if any:
+     * a leading `[` opens the index once, and the next construct is the
+     * radicand. Completion mirrors the fraction machinery. */
+    txc_radical *radical;
+    bool radical_index_taken;
+    txc_item *radical_item;
+    txc_item *radical_target;
+    txc_pending radical_script;
+    size_t radical_mark;
     /* The delimiter token this frame is waiting for, if any, and the
      * command that asked for it. EXPLICIT carries the atom class and the
      * \big size step. */
@@ -657,6 +671,12 @@ static void txc_frame_init(txc_frame *frame, txc_frame_role role, txc_frame *par
     frame->fraction_target = NULL;
     frame->fraction_script = TXC_PENDING_NONE;
     frame->fraction_mark = 0;
+    frame->radical = NULL;
+    frame->radical_index_taken = false;
+    frame->radical_item = NULL;
+    frame->radical_target = NULL;
+    frame->radical_script = TXC_PENDING_NONE;
+    frame->radical_mark = 0;
     frame->delim_wait = TXC_DELIM_WAIT_NONE;
     frame->delim_command.begin = 0;
     frame->delim_command.end = 0;
@@ -683,6 +703,9 @@ static txc_field *txc_script_field(txc_item *item, txc_pending pending) {
 }
 
 static const char *txc_argument_noun(const txc_frame *frame) {
+    if (frame->radical != NULL) {
+        return "radical";
+    }
     return frame->fraction_denominator ? "denominator" : "numerator";
 }
 
@@ -692,7 +715,7 @@ static const char *txc_argument_noun(const txc_frame *frame) {
 static void txc_fraction_complete(txc_frame *frame, size_t end) {
     txc_fraction *fraction = frame->fraction;
     tex_core_range range = {fraction->command.begin, end};
-    txc_construct construct = {NULL, NULL, fraction, NULL, NULL};
+    txc_construct construct = {NULL, NULL, fraction, NULL, NULL, NULL};
     if (frame->fraction_item != NULL) {
         txc_item *item = frame->fraction_item;
         txc_field_fill(&item->nucleus, &construct, range);
@@ -715,12 +738,41 @@ static void txc_fraction_complete(txc_frame *frame, size_t end) {
     frame->fraction_target = NULL;
 }
 
+/* Completes the radical in progress on `frame` once its radicand has
+ * arrived: the construct becomes the destination captured at the
+ * command — the appended Ord atom's nucleus or a script field. */
+static void txc_radical_complete(txc_frame *frame, size_t end) {
+    txc_radical *radical = frame->radical;
+    tex_core_range range = {radical->command.begin, end};
+    txc_construct construct = {NULL, NULL, NULL, NULL, NULL, radical};
+    if (frame->radical_item != NULL) {
+        txc_item *item = frame->radical_item;
+        txc_field_fill(&item->nucleus, &construct, range);
+        txc_field_reset(&item->sup, end);
+        txc_field_reset(&item->sub, end);
+        item->range = range;
+    } else {
+        txc_item *target = frame->radical_target;
+        txc_field *field = txc_script_field(target, frame->radical_script);
+        txc_field_fill(field, &construct, range);
+        field->range.begin = frame->radical_mark;
+        target->range.end = end;
+        if (frame->radical_script == TXC_PENDING_SUB && target->sup.kind == TXC_FIELD_EMPTY) {
+            target->sub_first = true;
+        }
+    }
+    frame->radical = NULL;
+    frame->radical_index_taken = false;
+    frame->radical_item = NULL;
+    frame->radical_target = NULL;
+}
+
 /* Delivers one parsed construct — a character, a symbol command, a
  * closed group list, a sized delimiter, or a closed fence — into the
- * frame: as the next fraction argument when one is being collected, as
- * the pending script field when one is pending, or as a new atom of
- * `atom_class`. `range` is the construct's own range; script fields
- * extend it back to their mark. */
+ * frame: as the pending radical or fraction argument when one is being
+ * collected, as the pending script field when one is pending, or as a
+ * new atom of `atom_class`. `range` is the construct's own range; script
+ * fields extend it back to their mark. */
 static tex_core_status txc_deliver(
     txc_arena *arena,
     txc_frame *frame,
@@ -729,7 +781,12 @@ static tex_core_status txc_deliver(
     tex_core_range range,
     tex_core_error *error
 ) {
-    if (frame->fraction != NULL) {
+    if (frame->radical != NULL) {
+        txc_field_fill(&frame->radical->argument, construct, range);
+        txc_radical_complete(frame, range.end);
+        return TEX_CORE_STATUS_OK;
+    }
+    if (frame->fraction != NULL || frame->radical != NULL) {
         txc_field *field = frame->fraction_denominator ? &frame->fraction->den : &frame->fraction->num;
         txc_field_fill(field, construct, range);
         if (frame->fraction_denominator) {
@@ -818,12 +875,12 @@ static tex_core_status txc_delimiter_arrived(
         tex_core_range whole = {frame->open, range.end};
         *frame_slot = frame->parent;
         *depth -= 1;
-        txc_construct construct = {NULL, NULL, NULL, NULL, fenced};
+        txc_construct construct = {NULL, NULL, NULL, NULL, fenced, NULL};
         return txc_deliver(arena, *frame_slot, &construct, TXC_ATOM_INNER, whole, error);
     }
     txc_sized_delimiter sized = {*delimiter, frame->delim_size};
     tex_core_range whole = {frame->delim_command.begin, range.end};
-    txc_construct construct = {NULL, NULL, NULL, &sized, NULL};
+    txc_construct construct = {NULL, NULL, NULL, &sized, NULL, NULL};
     return txc_deliver(arena, frame, &construct, frame->delim_class, whole, error);
 }
 
@@ -860,14 +917,19 @@ tex_core_status txc_parse(
             if (frame->delim_wait != TXC_DELIM_WAIT_NONE) {
                 return txc_fail(error, TEX_CORE_STATUS_UNSUPPORTED, &frame->delim_command, "missing delimiter");
             }
-            if (frame->fraction != NULL) {
+            if (frame->fraction != NULL || frame->radical != NULL) {
+                tex_core_range at = frame->radical != NULL ? frame->radical->command : frame->fraction->command;
                 return txc_fail(
                     error,
                     TEX_CORE_STATUS_UNSUPPORTED,
-                    &frame->fraction->command,
+                    &at,
                     "missing %s argument",
                     txc_argument_noun(frame)
                 );
+            }
+            if (frame->role == TXC_FRAME_INDEX) {
+                tex_core_range open = {frame->open, frame->open + 1};
+                return txc_fail(error, TEX_CORE_STATUS_UNSUPPORTED, &open, "unclosed radical index");
             }
             if (frame->pending != TXC_PENDING_NONE) {
                 tex_core_range mark = {frame->pending_mark, frame->pending_mark + 1};
@@ -922,6 +984,52 @@ tex_core_status txc_parse(
                     }
                     break;
                 }
+                if (codepoint == '[' && frame->radical != NULL && !frame->radical_index_taken) {
+                    /* The LaTeX optional index: one leading bracket right
+                     * after \sqrt opens it; anywhere else `[` stays an
+                     * ordinary Open atom. */
+                    if (depth == TXC_GROUP_DEPTH_LIMIT) {
+                        return txc_fail(error, TEX_CORE_STATUS_UNSUPPORTED, &token.range, "group nesting too deep");
+                    }
+                    txc_frame *inner = txc_arena_alloc(arena, sizeof(txc_frame));
+                    if (inner == NULL) {
+                        return txc_fail(error, TEX_CORE_STATUS_ALLOCATION_FAILED, NULL, "allocation failed");
+                    }
+                    txc_frame_init(inner, TXC_FRAME_INDEX, frame);
+                    inner->open = token.range.begin;
+                    frame = inner;
+                    depth += 1;
+                    break;
+                }
+                if (codepoint == ']' && frame->role == TXC_FRAME_INDEX) {
+                    if (frame->fraction != NULL || frame->radical != NULL) {
+                        return txc_fail(
+                            error,
+                            TEX_CORE_STATUS_UNSUPPORTED,
+                            &token.range,
+                            "missing %s argument",
+                            txc_argument_noun(frame)
+                        );
+                    }
+                    if (frame->pending != TXC_PENDING_NONE) {
+                        return txc_fail(
+                            error,
+                            TEX_CORE_STATUS_UNSUPPORTED,
+                            &token.range,
+                            "missing %s argument",
+                            txc_script_noun(frame->pending)
+                        );
+                    }
+                    txc_frame *closed = frame;
+                    frame = frame->parent;
+                    depth -= 1;
+                    frame->radical->index.kind = TXC_FIELD_LIST;
+                    frame->radical->index.list = closed->list;
+                    frame->radical->index.range.begin = closed->open;
+                    frame->radical->index.range.end = token.range.end;
+                    frame->radical_index_taken = true;
+                    break;
+                }
                 if (codepoint == '{') {
                     /* Group nesting is bounded so that layout's recursion
                      * over nuclei and script fields has a proven stack
@@ -948,7 +1056,7 @@ tex_core_status txc_parse(
                     break;
                 }
                 if (codepoint == '}') {
-                    if (frame->fraction != NULL) {
+                    if (frame->fraction != NULL || frame->radical != NULL) {
                         return txc_fail(
                             error,
                             TEX_CORE_STATUS_UNSUPPORTED,
@@ -969,6 +1077,9 @@ tex_core_status txc_parse(
                     if (frame->role == TXC_FRAME_FENCED) {
                         return txc_fail(error, TEX_CORE_STATUS_UNSUPPORTED, &token.range, "missing \\right");
                     }
+                    if (frame->role == TXC_FRAME_INDEX) {
+                        return txc_fail(error, TEX_CORE_STATUS_UNSUPPORTED, &token.range, "unclosed radical index");
+                    }
                     if (frame->role == TXC_FRAME_ROOT) {
                         return txc_fail(error, TEX_CORE_STATUS_UNSUPPORTED, &token.range, "unmatched closing brace");
                     }
@@ -987,7 +1098,7 @@ tex_core_status txc_parse(
                         }
                     } else {
                         tex_core_range range = {closed->open, token.range.end};
-                        txc_construct construct = {NULL, &closed->list, NULL, NULL, NULL};
+                        txc_construct construct = {NULL, &closed->list, NULL, NULL, NULL, NULL};
                         status = txc_deliver(arena, frame, &construct, TXC_ATOM_ORD, range, error);
                         if (status != TEX_CORE_STATUS_OK) {
                             return status;
@@ -997,7 +1108,7 @@ tex_core_status txc_parse(
                 }
                 if (codepoint == '^' || codepoint == '_') {
                     txc_pending pending = codepoint == '^' ? TXC_PENDING_SUP : TXC_PENDING_SUB;
-                    if (frame->fraction != NULL) {
+                    if (frame->fraction != NULL || frame->radical != NULL) {
                         return txc_fail(
                             error,
                             TEX_CORE_STATUS_UNSUPPORTED,
@@ -1049,7 +1160,7 @@ tex_core_status txc_parse(
                 if (!txc_reserved(codepoint)) {
                     txc_math_glyph glyph;
                     if (txc_math_classify(codepoint, &glyph)) {
-                        txc_construct construct = {&glyph, NULL, NULL, NULL, NULL};
+                        txc_construct construct = {&glyph, NULL, NULL, NULL, NULL, NULL};
                         status = txc_deliver(arena, frame, &construct, glyph.atom_class, token.range, error);
                         if (status != TEX_CORE_STATUS_OK) {
                             return status;
@@ -1096,7 +1207,7 @@ tex_core_status txc_parse(
             }
             const txc_spacing_command *command = txc_spacing(token.name, token.name_length);
             if (command != NULL) {
-                if (frame->fraction != NULL) {
+                if (frame->fraction != NULL || frame->radical != NULL) {
                     return txc_fail(
                         error,
                         TEX_CORE_STATUS_UNSUPPORTED,
@@ -1134,7 +1245,7 @@ tex_core_status txc_parse(
                      * required is not a legal argument: undelimited
                      * arguments are a character, a symbol command, or a
                      * braced group. */
-                    if (frame->fraction != NULL) {
+                    if (frame->fraction != NULL || frame->radical != NULL) {
                         return txc_fail(
                             error,
                             TEX_CORE_STATUS_UNSUPPORTED,
@@ -1182,7 +1293,7 @@ tex_core_status txc_parse(
                     break;
                 }
                 if (token.name_length == 4 && memcmp(token.name, "left", 4) == 0) {
-                    if (frame->fraction != NULL) {
+                    if (frame->fraction != NULL || frame->radical != NULL) {
                         return txc_fail(
                             error,
                             TEX_CORE_STATUS_UNSUPPORTED,
@@ -1205,7 +1316,7 @@ tex_core_status txc_parse(
                     break;
                 }
                 if (token.name_length == 5 && memcmp(token.name, "right", 5) == 0) {
-                    if (frame->fraction != NULL) {
+                    if (frame->fraction != NULL || frame->radical != NULL) {
                         return txc_fail(
                             error,
                             TEX_CORE_STATUS_UNSUPPORTED,
@@ -1230,6 +1341,52 @@ tex_core_status txc_parse(
                     frame->delim_command = token.range;
                     break;
                 }
+                if (token.name_length == 4 && memcmp(token.name, "sqrt", 4) == 0) {
+                    if (frame->fraction != NULL || frame->radical != NULL) {
+                        return txc_fail(
+                            error,
+                            TEX_CORE_STATUS_UNSUPPORTED,
+                            &token.range,
+                            "missing %s argument",
+                            txc_argument_noun(frame)
+                        );
+                    }
+                    txc_radical *radical = txc_arena_alloc(arena, sizeof(txc_radical));
+                    if (radical == NULL) {
+                        return txc_fail(error, TEX_CORE_STATUS_ALLOCATION_FAILED, NULL, "allocation failed");
+                    }
+                    radical->command = token.range;
+                    txc_field_reset(&radical->index, token.range.end);
+                    txc_field_reset(&radical->argument, token.range.end);
+                    frame->radical = radical;
+                    frame->radical_index_taken = false;
+                    if (frame->pending != TXC_PENDING_NONE) {
+                        /* The radical is itself a script argument
+                         * (x^\sqrt{2}): capture the destination and fill
+                         * it on completion. */
+                        frame->radical_item = NULL;
+                        frame->radical_target = frame->pending_target;
+                        frame->radical_script = frame->pending;
+                        frame->radical_mark = frame->pending_mark;
+                        frame->pending = TXC_PENDING_NONE;
+                        frame->pending_target = NULL;
+                    } else {
+                        txc_item *item = txc_append(arena, &frame->list);
+                        if (item == NULL) {
+                            return txc_fail(error, TEX_CORE_STATUS_ALLOCATION_FAILED, NULL, "allocation failed");
+                        }
+                        item->kind = TXC_ITEM_ATOM;
+                        item->atom_class = TXC_ATOM_ORD;
+                        txc_field_reset(&item->nucleus, token.range.begin);
+                        txc_field_reset(&item->sup, token.range.end);
+                        txc_field_reset(&item->sub, token.range.end);
+                        item->sub_first = false;
+                        item->range = token.range;
+                        frame->radical_item = item;
+                        frame->radical_target = NULL;
+                    }
+                    break;
+                }
                 const txc_size_command *size_command = txc_size_find(token.name, token.name_length);
                 if (size_command != NULL) {
                     frame->delim_wait = TXC_DELIM_WAIT_EXPLICIT;
@@ -1241,7 +1398,7 @@ tex_core_status txc_parse(
                 const txc_math_symbol *symbol = txc_math_symbol_find(token.name, token.name_length);
                 if (symbol != NULL) {
                     txc_math_glyph glyph = {symbol->atom_class, symbol->codepoint, symbol->style};
-                    txc_construct construct = {&glyph, NULL, NULL, NULL, NULL};
+                    txc_construct construct = {&glyph, NULL, NULL, NULL, NULL, NULL};
                     status = txc_deliver(arena, frame, &construct, glyph.atom_class, token.range, error);
                     if (status != TEX_CORE_STATUS_OK) {
                         return status;

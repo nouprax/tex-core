@@ -128,7 +128,11 @@
             "delim.punctClose",
             "error.missingRight",
             "error.unmatchedRight",
-            "error.missingDelimiter"
+            "error.missingDelimiter",
+            "radical.sign",
+            "radical.index",
+            "error.missingRadical",
+            "error.unclosedIndex"
         ],
         "orders": [
             "root.hbox",
@@ -1777,6 +1781,182 @@
                     "mode.mathInline",
                     "outcome.error",
                     "error.missingDelimiter"
+                ],
+                "orders": []
+            }
+        },
+        {
+            "name": "math-sqrt",
+            "input": "math-sqrt.tex",
+            "expected": "math-sqrt.tree",
+            "compileOptions": {
+                "mode": "mathInline"
+            },
+            "outcome": "tree",
+            "coverage": {
+                "kinds": [
+                    "hbox",
+                    "glyph",
+                    "kern",
+                    "rule"
+                ],
+                "states": [
+                    "mode.mathInline",
+                    "outcome.tree",
+                    "children.populated",
+                    "atom.lower",
+                    "atom.digit",
+                    "atom.bin",
+                    "glyph.style.upright",
+                    "glyph.style.italic",
+                    "glyph.italic.zero",
+                    "glyph.descent.positive",
+                    "bin.kept",
+                    "space.interAtom.medium",
+                    "kern.boundaryRange",
+                    "radical.sign",
+                    "measure.zero"
+                ],
+                "orders": [
+                    "root.hbox",
+                    "children.sourceOrder"
+                ]
+            }
+        },
+        {
+            "name": "math-sqrt-display",
+            "input": "math-sqrt-display.tex",
+            "expected": "math-sqrt-display.tree",
+            "compileOptions": {
+                "mode": "mathDisplay"
+            },
+            "outcome": "tree",
+            "coverage": {
+                "kinds": [
+                    "hbox",
+                    "glyph",
+                    "kern",
+                    "rule"
+                ],
+                "states": [
+                    "mode.mathDisplay",
+                    "outcome.tree",
+                    "children.populated",
+                    "atom.digit",
+                    "glyph.style.upright",
+                    "glyph.italic.zero",
+                    "fraction.dfrac",
+                    "fraction.display",
+                    "kern.nullDelimiter",
+                    "radical.sign",
+                    "delim.sizeFace",
+                    "measure.zero",
+                    "measure.negative"
+                ],
+                "orders": [
+                    "root.hbox"
+                ]
+            }
+        },
+        {
+            "name": "math-sqrt-index",
+            "input": "math-sqrt-index.tex",
+            "expected": "math-sqrt-index.tree",
+            "compileOptions": {
+                "mode": "mathInline"
+            },
+            "outcome": "tree",
+            "coverage": {
+                "kinds": [
+                    "hbox",
+                    "glyph",
+                    "kern",
+                    "rule"
+                ],
+                "states": [
+                    "mode.mathInline",
+                    "outcome.tree",
+                    "children.populated",
+                    "atom.lower",
+                    "atom.digit",
+                    "glyph.style.upright",
+                    "glyph.style.italic",
+                    "glyph.italic.zero",
+                    "radical.sign",
+                    "radical.index",
+                    "size.scriptscript",
+                    "measure.zero",
+                    "measure.negative"
+                ],
+                "orders": [
+                    "root.hbox"
+                ]
+            }
+        },
+        {
+            "name": "math-sqrt-script",
+            "input": "math-sqrt-script.tex",
+            "expected": "math-sqrt-script.tree",
+            "compileOptions": {
+                "mode": "mathInline"
+            },
+            "outcome": "tree",
+            "coverage": {
+                "kinds": [
+                    "hbox",
+                    "glyph",
+                    "rule"
+                ],
+                "states": [
+                    "mode.mathInline",
+                    "outcome.tree",
+                    "children.populated",
+                    "atom.lower",
+                    "glyph.style.italic",
+                    "glyph.italic.zero",
+                    "script.sup",
+                    "size.script",
+                    "radical.sign",
+                    "measure.zero"
+                ],
+                "orders": [
+                    "root.hbox",
+                    "children.sourceOrder"
+                ]
+            }
+        },
+        {
+            "name": "error-missing-radical",
+            "input": "error-missing-radical.tex",
+            "expected": "error-missing-radical.tree",
+            "compileOptions": {
+                "mode": "mathInline"
+            },
+            "outcome": "error",
+            "coverage": {
+                "kinds": [],
+                "states": [
+                    "mode.mathInline",
+                    "outcome.error",
+                    "error.missingRadical"
+                ],
+                "orders": []
+            }
+        },
+        {
+            "name": "error-radical-index",
+            "input": "error-radical-index.tex",
+            "expected": "error-radical-index.tree",
+            "compileOptions": {
+                "mode": "mathInline"
+            },
+            "outcome": "error",
+            "coverage": {
+                "kinds": [],
+                "states": [
+                    "mode.mathInline",
+                    "outcome.error",
+                    "error.unclosedIndex"
                 ],
                 "orders": []
             }
