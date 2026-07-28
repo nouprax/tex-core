@@ -25,6 +25,7 @@ struct tex_core_node {
      * points: the text size or a script size. */
     uint32_t codepoint;
     tex_core_style style;
+    tex_core_family family;
     txc_scaled size;
     tex_core_range range;
     const struct tex_core_node **children;

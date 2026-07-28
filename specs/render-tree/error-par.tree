@@ -1,2 +1,2 @@
-render-error 3
+render-error 4
 error status=unsupported src=1..3 message=unsupported paragraph break

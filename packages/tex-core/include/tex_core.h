@@ -121,7 +121,13 @@ typedef enum tex_core_node_kind {
 
 typedef enum tex_core_style { TEX_CORE_STYLE_UPRIGHT = 0, TEX_CORE_STYLE_ITALIC = 1 } tex_core_style;
 
-typedef enum tex_core_family { TEX_CORE_FAMILY_MAIN = 0 } tex_core_family;
+typedef enum tex_core_family {
+    TEX_CORE_FAMILY_MAIN = 0,
+    TEX_CORE_FAMILY_SIZE1 = 1,
+    TEX_CORE_FAMILY_SIZE2 = 2,
+    TEX_CORE_FAMILY_SIZE3 = 3,
+    TEX_CORE_FAMILY_SIZE4 = 4
+} tex_core_family;
 
 /* Resolved geometry in points, relative to the parent's reference point on
  * the baseline. Kern nodes use `width` only; `italic` is the italic

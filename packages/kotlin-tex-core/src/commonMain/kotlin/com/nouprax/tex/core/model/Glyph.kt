@@ -15,6 +15,18 @@ public enum class GlyphStyle {
 public enum class GlyphFamily {
     /** The default face pair embedded in the engine. */
     MAIN,
+
+    /** The first delimiter size-variant face. */
+    SIZE1,
+
+    /** The second delimiter size-variant face. */
+    SIZE2,
+
+    /** The third delimiter size-variant face. */
+    SIZE3,
+
+    /** The fourth delimiter size-variant face. */
+    SIZE4,
 }
 
 /**

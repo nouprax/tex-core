@@ -4,15 +4,36 @@
 
 #include "metrics.inc"
 
-const txc_metric *txc_metric_find(tex_core_style style, uint32_t codepoint) {
+const txc_metric *txc_metric_find(tex_core_family family, tex_core_style style, uint32_t codepoint) {
     const txc_metric *table;
     size_t count;
-    if (style == TEX_CORE_STYLE_ITALIC) {
-        table = TXC_METRICS_ITALIC;
-        count = sizeof(TXC_METRICS_ITALIC) / sizeof(TXC_METRICS_ITALIC[0]);
-    } else {
-        table = TXC_METRICS_UPRIGHT;
-        count = sizeof(TXC_METRICS_UPRIGHT) / sizeof(TXC_METRICS_UPRIGHT[0]);
+    switch (family) {
+    case TEX_CORE_FAMILY_SIZE1:
+        table = TXC_METRICS_SIZE1;
+        count = sizeof(TXC_METRICS_SIZE1) / sizeof(TXC_METRICS_SIZE1[0]);
+        break;
+    case TEX_CORE_FAMILY_SIZE2:
+        table = TXC_METRICS_SIZE2;
+        count = sizeof(TXC_METRICS_SIZE2) / sizeof(TXC_METRICS_SIZE2[0]);
+        break;
+    case TEX_CORE_FAMILY_SIZE3:
+        table = TXC_METRICS_SIZE3;
+        count = sizeof(TXC_METRICS_SIZE3) / sizeof(TXC_METRICS_SIZE3[0]);
+        break;
+    case TEX_CORE_FAMILY_SIZE4:
+        table = TXC_METRICS_SIZE4;
+        count = sizeof(TXC_METRICS_SIZE4) / sizeof(TXC_METRICS_SIZE4[0]);
+        break;
+    case TEX_CORE_FAMILY_MAIN:
+    default:
+        if (style == TEX_CORE_STYLE_ITALIC) {
+            table = TXC_METRICS_ITALIC;
+            count = sizeof(TXC_METRICS_ITALIC) / sizeof(TXC_METRICS_ITALIC[0]);
+        } else {
+            table = TXC_METRICS_UPRIGHT;
+            count = sizeof(TXC_METRICS_UPRIGHT) / sizeof(TXC_METRICS_UPRIGHT[0]);
+        }
+        break;
     }
 
     size_t low = 0;

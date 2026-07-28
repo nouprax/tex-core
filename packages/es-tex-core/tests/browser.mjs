@@ -32,7 +32,7 @@ const html = `<!doctype html><meta charset="utf-8"><title>RUNNING</title><body i
     const glyph = tree.root.children[0];
     const valid = glyph.kind === 'glyph' &&
       glyph.style === 'italic' &&
-      tree.dump().startsWith('render-tree 3\\n') &&
+      tree.dump().startsWith('render-tree 4\\n') &&
       tree.dump() === api.Document.compile('x', { mode: 'mathInline' }).dump() &&
       !('memory' in api) && !('native' in api);
     document.title = valid ? 'PASS' : 'FAIL';

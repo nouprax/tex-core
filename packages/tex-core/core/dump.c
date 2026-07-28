@@ -49,6 +49,22 @@ static bool txc_buffer_range(txc_buffer *buffer, tex_core_range range) {
     return txc_buffer_text(buffer, formatted);
 }
 
+static const char *txc_family_label(tex_core_family family) {
+    switch (family) {
+    case TEX_CORE_FAMILY_SIZE1:
+        return " family=size1";
+    case TEX_CORE_FAMILY_SIZE2:
+        return " family=size2";
+    case TEX_CORE_FAMILY_SIZE3:
+        return " family=size3";
+    case TEX_CORE_FAMILY_SIZE4:
+        return " family=size4";
+    case TEX_CORE_FAMILY_MAIN:
+        break;
+    }
+    return " family=main";
+}
+
 static bool txc_dump_node(txc_buffer *buffer, const txc_node *node, unsigned depth) {
     for (unsigned level = 0; level < depth; level++) {
         if (!txc_buffer_text(buffer, "  ")) {
@@ -78,8 +94,9 @@ static bool txc_dump_node(txc_buffer *buffer, const txc_node *node, unsigned dep
         return txc_buffer_text(buffer, "glyph") && txc_buffer_measure(buffer, "x", node->x) &&
                txc_buffer_measure(buffer, "y", node->y) && txc_buffer_text(buffer, codepoint) &&
                txc_buffer_text(buffer, node->style == TEX_CORE_STYLE_ITALIC ? " style=italic" : " style=upright") &&
-               txc_buffer_text(buffer, " family=main") && txc_buffer_measure(buffer, "size", node->size) &&
-               txc_buffer_measure(buffer, "width", node->width) && txc_buffer_measure(buffer, "ascent", node->ascent) &&
+               txc_buffer_text(buffer, txc_family_label(node->family)) &&
+               txc_buffer_measure(buffer, "size", node->size) && txc_buffer_measure(buffer, "width", node->width) &&
+               txc_buffer_measure(buffer, "ascent", node->ascent) &&
                txc_buffer_measure(buffer, "descent", node->descent) &&
                txc_buffer_measure(buffer, "italic", node->italic) && txc_buffer_range(buffer, node->range) &&
                txc_buffer_text(buffer, "\n");
@@ -105,7 +122,7 @@ static bool txc_dump_node(txc_buffer *buffer, const txc_node *node, unsigned dep
 
 tex_core_status txc_dump(const txc_node *root, char **dump, size_t *length) {
     txc_buffer buffer = {NULL, 0, 0};
-    if (!txc_buffer_text(&buffer, "render-tree 3\n") || !txc_dump_node(&buffer, root, 0)) {
+    if (!txc_buffer_text(&buffer, "render-tree 4\n") || !txc_dump_node(&buffer, root, 0)) {
         txc_free(buffer.data);
         return TEX_CORE_STATUS_ALLOCATION_FAILED;
     }
