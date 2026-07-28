@@ -40,7 +40,10 @@ const parameterOrder = [
     "num2",
     "denom1",
     "denom2",
-    "axisHeight"
+    "axisHeight",
+    "delim1",
+    "delim2",
+    "num3"
 ];
 
 const fixed = (value) => {
@@ -101,6 +104,24 @@ ${table("Main-Regular")}
 /* Math-Italic: the math letter face. */
 static const txc_metric TXC_METRICS_ITALIC[] = {
 ${table("Math-Italic")}
+};
+
+/* Size1-Size4: the delimiter size-variant faces and the extensible
+ * assembly pieces. */
+static const txc_metric TXC_METRICS_SIZE1[] = {
+${table("Size1-Regular")}
+};
+
+static const txc_metric TXC_METRICS_SIZE2[] = {
+${table("Size2-Regular")}
+};
+
+static const txc_metric TXC_METRICS_SIZE3[] = {
+${table("Size3-Regular")}
+};
+
+static const txc_metric TXC_METRICS_SIZE4[] = {
+${table("Size4-Regular")}
 };
 
 /* Style parameters (the TeXbook Appendix G sigmas and xis, via KaTeX

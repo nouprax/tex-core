@@ -52,17 +52,51 @@ typedef struct txc_list {
     size_t count;
 } txc_list;
 
+/* How a delimiter grows past its text-size glyph (the Computer Modern
+ * successor chains, mirrored from KaTeX's delimiter sequences): NEVER
+ * stops at its largest size-face glyph, LARGE tries the size faces and
+ * then the piece assembly, ALWAYS goes straight from the small glyph to
+ * the assembly. */
+typedef enum txc_delimiter_ladder {
+    TXC_LADDER_NEVER = 0,
+    TXC_LADDER_LARGE = 1,
+    TXC_LADDER_ALWAYS = 2
+} txc_delimiter_ladder;
+
+/* One resolved delimiter: the main-family text glyph, the growth ladder,
+ * and the extensible pieces (0 marks an absent piece; `middle` is only
+ * the braces' waist). `small` 0 is the null delimiter `.`. */
+typedef struct txc_delimiter {
+    uint32_t small;
+    txc_delimiter_ladder ladder;
+    uint32_t top;
+    uint32_t repeat;
+    uint32_t bottom;
+    uint32_t middle;
+    tex_core_family piece_family;
+} txc_delimiter;
+
 /* One noad field (TeXbook chapter 17): an atom's nucleus, superscript, or
- * subscript is empty, a single character, a braced sub-list, or a
- * fraction construct. */
+ * subscript is empty, a single character, a braced sub-list, a fraction
+ * construct, a fixed-size delimiter, or a \left/\right fence. */
 typedef enum txc_field_kind {
     TXC_FIELD_EMPTY = 0,
     TXC_FIELD_CHAR = 1,
     TXC_FIELD_LIST = 2,
-    TXC_FIELD_FRACTION = 3
+    TXC_FIELD_FRACTION = 3,
+    TXC_FIELD_DELIMITER = 4,
+    TXC_FIELD_FENCED = 5
 } txc_field_kind;
 
 struct txc_fraction;
+struct txc_fenced;
+
+/* An explicit-size delimiter (\bigl … \Biggr): the delimiter and the
+ * plain TeX size step 1-4 (\big through \Bigg). */
+typedef struct txc_sized_delimiter {
+    txc_delimiter delimiter;
+    int size;
+} txc_sized_delimiter;
 
 typedef struct txc_field {
     txc_field_kind kind;
@@ -73,13 +107,28 @@ typedef struct txc_field {
     txc_list list;
     /* TXC_FIELD_FRACTION only. */
     struct txc_fraction *fraction;
+    /* TXC_FIELD_DELIMITER only. */
+    txc_sized_delimiter sized;
+    /* TXC_FIELD_FENCED only. */
+    struct txc_fenced *fenced;
     /* The field's own source construct: the character or symbol command,
      * the braced group including its braces, the fraction command through
-     * its last argument, or — for a script field — the script mark
-     * through the end of its argument. Empty fields have an empty range
-     * at the attachment point. */
+     * its last argument, the size command through its delimiter, \left
+     * through the \right delimiter, or — for a script field — the script
+     * mark through the end of its argument. Empty fields have an empty
+     * range at the attachment point. */
     tex_core_range range;
 } txc_field;
+
+/* A \left/\right fence: both delimiters with their own token ranges and
+ * the enclosed sub-list. */
+typedef struct txc_fenced {
+    txc_delimiter left;
+    tex_core_range left_range;
+    txc_delimiter right;
+    tex_core_range right_range;
+    txc_list list;
+} txc_fenced;
 
 /* The style a fraction command forces on its own layout: \frac follows
  * the surrounding style, \dfrac and \tfrac force display and text style
@@ -92,11 +141,13 @@ typedef enum txc_fraction_style {
 
 /* A generalized fraction (TeXbook chapter 17 fraction noads): numerator
  * over denominator, both mandatory. `command` is the fraction command's
- * own token — the source the bar is attributed to. */
+ * own token — the source the bar is attributed to. A binomial (`binom`)
+ * has no bar and wraps the pair in delim1/delim2-sized parentheses. */
 typedef struct txc_fraction {
     txc_field num;
     txc_field den;
     txc_fraction_style style;
+    bool binom;
     tex_core_range command;
 } txc_fraction;
 

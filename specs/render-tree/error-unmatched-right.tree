@@ -1,0 +1,2 @@
+render-error 4
+error status=unsupported src=1..7 message=unmatched \right

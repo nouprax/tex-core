@@ -112,7 +112,7 @@ extension RenderNode {
             y: frame.y,
             codepoint: Unicode.Scalar(native.codepoint) ?? Unicode.Scalar(UInt8(0)),
             style: native.style == TEX_CORE_STYLE_ITALIC ? .italic : .upright,
-            family: .main,
+            family: RenderNode.family(of: native.family),
             size: native.size,
             width: frame.width,
             ascent: frame.ascent,
@@ -120,6 +120,16 @@ extension RenderNode {
             italic: frame.italic,
             src: src
         )
+    }
+
+    private static func family(of native: tex_core_family) -> GlyphFamily {
+        switch native {
+        case TEX_CORE_FAMILY_SIZE1: .size1
+        case TEX_CORE_FAMILY_SIZE2: .size2
+        case TEX_CORE_FAMILY_SIZE3: .size3
+        case TEX_CORE_FAMILY_SIZE4: .size4
+        default: .main
+        }
     }
 
     private static func copyBox(_ node: OpaquePointer, _ frame: tex_core_frame, _ src: SourceRange) -> HBox {

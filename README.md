@@ -27,20 +27,22 @@ two projects remain independently consumable.
 
 **Pre-release; the infrastructure phases (1–10) of the setup plan are
 complete and the engine is climbing milestone M1 (math core).** The C
-engine, its render-tree contract (schemaVersion 3), the Swift, Kotlin
+engine, its render-tree contract (schemaVersion 4), the Swift, Kotlin
 Multiplatform, and ES/WASM bindings, the fail-closed CI quality gates, and
 the release workflows are all in place. `Document.compile` covers ordinary
 text atoms with explicit spacing in document mode and, in the math modes,
 classed math atoms — the ASCII math characters plus the M1 symbol-command
 set (Greek letters, binary operators, relations, arrows, letter-like and
 delimiter symbols) — with braced groups, superscripts and subscripts set
-at TeX's script sizes per Appendix G, and fractions (`\frac`, `\dfrac`,
-`\tfrac`) built by Appendix G rule 15 with a real `rule` bar node, laid
-out with TeX's inter-atom spacing over embedded Computer Modern metrics,
-with byte-identical canonical dumps on every platform. The rest of the
-M1–M4 surface (radicals, big operators, `\left`/`\right`, accents, style
-switches, text galley, domain notations) lands before `1.0.0`. Nothing
-usable is published yet.
+at TeX's script sizes per Appendix G, fractions and binomials (`\frac`,
+`\dfrac`, `\tfrac`, `\binom` family) built by Appendix G rule 15, and
+variable-size delimiters (`\left`/`\right`, the `\big` family) grown
+through the Computer Modern size faces into piece assemblies per rule 19,
+laid out with TeX's inter-atom spacing over embedded Computer Modern
+metrics, with byte-identical canonical dumps on every platform. The rest
+of the M1–M4 surface (radicals, big operators, accents, style switches,
+text galley, domain notations) lands before `1.0.0`. Nothing usable is
+published yet.
 
 Build and test the C core:
 

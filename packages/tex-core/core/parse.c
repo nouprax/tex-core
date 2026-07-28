@@ -281,17 +281,128 @@ static const txc_math_symbol *txc_math_symbol_find(const uint8_t *name, size_t n
 }
 
 /* Fraction commands (milestone M1): \frac follows the surrounding style,
- * \dfrac and \tfrac force display and text style. */
+ * \dfrac and \tfrac force display and text style; the \binom family is
+ * the barless fraction wrapped in sized parentheses. */
 typedef struct txc_fraction_command {
     const char *name;
     txc_fraction_style style;
+    bool binom;
 } txc_fraction_command;
 
 static const txc_fraction_command TXC_FRACTION_COMMANDS[] = {
-    {"dfrac", TXC_FRACTION_STYLE_DISPLAY},
-    {"frac", TXC_FRACTION_STYLE_AUTO},
-    {"tfrac", TXC_FRACTION_STYLE_TEXT},
+    {"binom", TXC_FRACTION_STYLE_AUTO, true},
+    {"dbinom", TXC_FRACTION_STYLE_DISPLAY, true},
+    {"dfrac", TXC_FRACTION_STYLE_DISPLAY, false},
+    {"frac", TXC_FRACTION_STYLE_AUTO, false},
+    {"tbinom", TXC_FRACTION_STYLE_TEXT, true},
+    {"tfrac", TXC_FRACTION_STYLE_TEXT, false},
 };
+
+/* The plain TeX delimiter set (\delcode assignments plus the delimiter
+ * control words): each row maps a source spelling to its main-family
+ * text glyph, its growth ladder, and its extensible pieces. Piece data
+ * mirrors the Computer Modern recipes as vendored from KaTeX
+ * (Size1 pieces for verticals and arrows, Size4 corners elsewhere;
+ * `middle` only for the brace waists). */
+#define TXC_NO_PIECE 0
+
+typedef struct txc_delimiter_row {
+    const char *name;   /* command spelling, or NULL for a character */
+    uint32_t character; /* source character, or 0 for a command */
+    txc_delimiter delimiter;
+} txc_delimiter_row;
+
+static const txc_delimiter_row TXC_DELIMITERS[] = {
+    {NULL, '.', {0, TXC_LADDER_NEVER, 0, 0, 0, 0, TEX_CORE_FAMILY_MAIN}},
+    {NULL, '(', {0x0028, TXC_LADDER_LARGE, 0x239B, 0x239C, 0x239D, TXC_NO_PIECE, TEX_CORE_FAMILY_SIZE4}},
+    {NULL, ')', {0x0029, TXC_LADDER_LARGE, 0x239E, 0x239F, 0x23A0, TXC_NO_PIECE, TEX_CORE_FAMILY_SIZE4}},
+    {NULL, '[', {0x005B, TXC_LADDER_LARGE, 0x23A1, 0x23A2, 0x23A3, TXC_NO_PIECE, TEX_CORE_FAMILY_SIZE4}},
+    {NULL, ']', {0x005D, TXC_LADDER_LARGE, 0x23A4, 0x23A5, 0x23A6, TXC_NO_PIECE, TEX_CORE_FAMILY_SIZE4}},
+    {NULL, '<', {0x27E8, TXC_LADDER_NEVER, 0, 0, 0, 0, TEX_CORE_FAMILY_MAIN}},
+    {NULL, '>', {0x27E9, TXC_LADDER_NEVER, 0, 0, 0, 0, TEX_CORE_FAMILY_MAIN}},
+    {NULL, '/', {0x002F, TXC_LADDER_NEVER, 0, 0, 0, 0, TEX_CORE_FAMILY_MAIN}},
+    {NULL, '|', {0x2223, TXC_LADDER_ALWAYS, 0x2223, 0x2223, 0x2223, TXC_NO_PIECE, TEX_CORE_FAMILY_SIZE1}},
+    {"lbrace", 0, {0x007B, TXC_LADDER_LARGE, 0x23A7, 0x23AA, 0x23A9, 0x23A8, TEX_CORE_FAMILY_SIZE4}},
+    {"{", 0, {0x007B, TXC_LADDER_LARGE, 0x23A7, 0x23AA, 0x23A9, 0x23A8, TEX_CORE_FAMILY_SIZE4}},
+    {"rbrace", 0, {0x007D, TXC_LADDER_LARGE, 0x23AB, 0x23AA, 0x23AD, 0x23AC, TEX_CORE_FAMILY_SIZE4}},
+    {"}", 0, {0x007D, TXC_LADDER_LARGE, 0x23AB, 0x23AA, 0x23AD, 0x23AC, TEX_CORE_FAMILY_SIZE4}},
+    {"lbrack", 0, {0x005B, TXC_LADDER_LARGE, 0x23A1, 0x23A2, 0x23A3, TXC_NO_PIECE, TEX_CORE_FAMILY_SIZE4}},
+    {"rbrack", 0, {0x005D, TXC_LADDER_LARGE, 0x23A4, 0x23A5, 0x23A6, TXC_NO_PIECE, TEX_CORE_FAMILY_SIZE4}},
+    {"langle", 0, {0x27E8, TXC_LADDER_NEVER, 0, 0, 0, 0, TEX_CORE_FAMILY_MAIN}},
+    {"rangle", 0, {0x27E9, TXC_LADDER_NEVER, 0, 0, 0, 0, TEX_CORE_FAMILY_MAIN}},
+    {"lfloor", 0, {0x230A, TXC_LADDER_LARGE, 0x23A2, 0x23A2, 0x23A3, TXC_NO_PIECE, TEX_CORE_FAMILY_SIZE4}},
+    {"rfloor", 0, {0x230B, TXC_LADDER_LARGE, 0x23A5, 0x23A5, 0x23A6, TXC_NO_PIECE, TEX_CORE_FAMILY_SIZE4}},
+    {"lceil", 0, {0x2308, TXC_LADDER_LARGE, 0x23A1, 0x23A2, 0x23A2, TXC_NO_PIECE, TEX_CORE_FAMILY_SIZE4}},
+    {"rceil", 0, {0x2309, TXC_LADDER_LARGE, 0x23A4, 0x23A5, 0x23A5, TXC_NO_PIECE, TEX_CORE_FAMILY_SIZE4}},
+    {"vert", 0, {0x2223, TXC_LADDER_ALWAYS, 0x2223, 0x2223, 0x2223, TXC_NO_PIECE, TEX_CORE_FAMILY_SIZE1}},
+    {"Vert", 0, {0x2225, TXC_LADDER_ALWAYS, 0x2225, 0x2225, 0x2225, TXC_NO_PIECE, TEX_CORE_FAMILY_SIZE1}},
+    {"|", 0, {0x2225, TXC_LADDER_ALWAYS, 0x2225, 0x2225, 0x2225, TXC_NO_PIECE, TEX_CORE_FAMILY_SIZE1}},
+    {"backslash", 0, {0x005C, TXC_LADDER_NEVER, 0, 0, 0, 0, TEX_CORE_FAMILY_MAIN}},
+    {"\\", 0, {0x005C, TXC_LADDER_NEVER, 0, 0, 0, 0, TEX_CORE_FAMILY_MAIN}},
+    {"uparrow", 0, {0x2191, TXC_LADDER_ALWAYS, 0x2191, 0x23D0, 0x23D0, TXC_NO_PIECE, TEX_CORE_FAMILY_SIZE1}},
+    {"downarrow", 0, {0x2193, TXC_LADDER_ALWAYS, 0x23D0, 0x23D0, 0x2193, TXC_NO_PIECE, TEX_CORE_FAMILY_SIZE1}},
+    {"updownarrow", 0, {0x2195, TXC_LADDER_ALWAYS, 0x2191, 0x23D0, 0x2193, TXC_NO_PIECE, TEX_CORE_FAMILY_SIZE1}},
+    {"Uparrow", 0, {0x21D1, TXC_LADDER_ALWAYS, 0x21D1, 0x2016, 0x2016, TXC_NO_PIECE, TEX_CORE_FAMILY_SIZE1}},
+    {"Downarrow", 0, {0x21D3, TXC_LADDER_ALWAYS, 0x2016, 0x2016, 0x21D3, TXC_NO_PIECE, TEX_CORE_FAMILY_SIZE1}},
+    {"Updownarrow", 0, {0x21D5, TXC_LADDER_ALWAYS, 0x21D1, 0x2016, 0x21D3, TXC_NO_PIECE, TEX_CORE_FAMILY_SIZE1}},
+};
+
+static const txc_delimiter *txc_delimiter_character(uint32_t codepoint) {
+    for (size_t index = 0; index < sizeof(TXC_DELIMITERS) / sizeof(TXC_DELIMITERS[0]); index++) {
+        if (TXC_DELIMITERS[index].name == NULL && TXC_DELIMITERS[index].character == codepoint) {
+            return &TXC_DELIMITERS[index].delimiter;
+        }
+    }
+    return NULL;
+}
+
+static const txc_delimiter *txc_delimiter_command(const uint8_t *name, size_t name_length) {
+    for (size_t index = 0; index < sizeof(TXC_DELIMITERS) / sizeof(TXC_DELIMITERS[0]); index++) {
+        const txc_delimiter_row *row = &TXC_DELIMITERS[index];
+        if (row->name != NULL && strlen(row->name) == name_length && memcmp(row->name, name, name_length) == 0) {
+            return &row->delimiter;
+        }
+    }
+    return NULL;
+}
+
+/* Explicit-size delimiter commands: plain TeX's \big family. The class
+ * follows the suffix (l Open, m Rel, r Close, bare Ord); the size step
+ * selects the fixed rule-19 target. */
+typedef struct txc_size_command {
+    const char *name;
+    txc_atom_class atom_class;
+    int size;
+} txc_size_command;
+
+static const txc_size_command TXC_SIZE_COMMANDS[] = {
+    {"Big", TXC_ATOM_ORD, 2},
+    {"Bigg", TXC_ATOM_ORD, 4},
+    {"Biggl", TXC_ATOM_OPEN, 4},
+    {"Biggm", TXC_ATOM_REL, 4},
+    {"Biggr", TXC_ATOM_CLOSE, 4},
+    {"Bigl", TXC_ATOM_OPEN, 2},
+    {"Bigm", TXC_ATOM_REL, 2},
+    {"Bigr", TXC_ATOM_CLOSE, 2},
+    {"big", TXC_ATOM_ORD, 1},
+    {"bigg", TXC_ATOM_ORD, 3},
+    {"biggl", TXC_ATOM_OPEN, 3},
+    {"biggm", TXC_ATOM_REL, 3},
+    {"biggr", TXC_ATOM_CLOSE, 3},
+    {"bigl", TXC_ATOM_OPEN, 1},
+    {"bigm", TXC_ATOM_REL, 1},
+    {"bigr", TXC_ATOM_CLOSE, 1},
+};
+
+static const txc_size_command *txc_size_find(const uint8_t *name, size_t name_length) {
+    for (size_t index = 0; index < sizeof(TXC_SIZE_COMMANDS) / sizeof(TXC_SIZE_COMMANDS[0]); index++) {
+        const txc_size_command *command = &TXC_SIZE_COMMANDS[index];
+        if (strlen(command->name) == name_length && memcmp(command->name, name, name_length) == 0) {
+            return command;
+        }
+    }
+    return NULL;
+}
 
 static const txc_fraction_command *txc_fraction_find(const uint8_t *name, size_t name_length) {
     for (size_t index = 0; index < sizeof(TXC_FRACTION_COMMANDS) / sizeof(TXC_FRACTION_COMMANDS[0]); index++) {
@@ -407,25 +518,34 @@ typedef struct txc_math_glyph {
     tex_core_style style;
 } txc_math_glyph;
 
-/* Fills one field from a delivered construct: a character glyph, a closed
- * group list, or a completed fraction. */
-static void txc_field_fill(
-    txc_field *field,
-    const txc_math_glyph *glyph,
-    const txc_list *group,
-    txc_fraction *fraction,
-    tex_core_range range
-) {
-    if (glyph != NULL) {
+/* One parsed construct on its way into a field or a new atom: exactly
+ * one member is set. */
+typedef struct txc_construct {
+    const txc_math_glyph *glyph;
+    const txc_list *group;
+    txc_fraction *fraction;
+    const txc_sized_delimiter *sized;
+    txc_fenced *fenced;
+} txc_construct;
+
+/* Fills one field from a delivered construct. */
+static void txc_field_fill(txc_field *field, const txc_construct *construct, tex_core_range range) {
+    if (construct->glyph != NULL) {
         field->kind = TXC_FIELD_CHAR;
-        field->codepoint = glyph->codepoint;
-        field->style = glyph->style;
-    } else if (group != NULL) {
+        field->codepoint = construct->glyph->codepoint;
+        field->style = construct->glyph->style;
+    } else if (construct->group != NULL) {
         field->kind = TXC_FIELD_LIST;
-        field->list = *group;
-    } else {
+        field->list = *construct->group;
+    } else if (construct->fraction != NULL) {
         field->kind = TXC_FIELD_FRACTION;
-        field->fraction = fraction;
+        field->fraction = construct->fraction;
+    } else if (construct->sized != NULL) {
+        field->kind = TXC_FIELD_DELIMITER;
+        field->sized = *construct->sized;
+    } else {
+        field->kind = TXC_FIELD_FENCED;
+        field->fenced = construct->fenced;
     }
     field->range = range;
 }
@@ -461,7 +581,21 @@ static bool txc_math_classify(uint32_t codepoint, txc_math_glyph *glyph) {
  * pushes a frame that closes back into its parent as a group atom's
  * nucleus or as a script field. Frames live in the arena, so nesting
  * depth is bounded by memory, not by the C stack. */
-typedef enum txc_frame_role { TXC_FRAME_ROOT = 0, TXC_FRAME_GROUP = 1, TXC_FRAME_SCRIPT = 2 } txc_frame_role;
+typedef enum txc_frame_role {
+    TXC_FRAME_ROOT = 0,
+    TXC_FRAME_GROUP = 1,
+    TXC_FRAME_SCRIPT = 2,
+    TXC_FRAME_FENCED = 3
+} txc_frame_role;
+
+/* Which construct the next delimiter token completes: a \left push, a
+ * \right pop, or an explicit-size atom. */
+typedef enum txc_delim_wait {
+    TXC_DELIM_WAIT_NONE = 0,
+    TXC_DELIM_WAIT_LEFT = 1,
+    TXC_DELIM_WAIT_RIGHT = 2,
+    TXC_DELIM_WAIT_EXPLICIT = 3
+} txc_delim_wait;
 
 /* Which script a pending `^`/`_` will fill. */
 typedef enum txc_pending { TXC_PENDING_NONE = 0, TXC_PENDING_SUP = 1, TXC_PENDING_SUB = 2 } txc_pending;
@@ -491,6 +625,17 @@ typedef struct txc_frame {
     txc_item *fraction_target;
     txc_pending fraction_script;
     size_t fraction_mark;
+    /* The delimiter token this frame is waiting for, if any, and the
+     * command that asked for it. EXPLICIT carries the atom class and the
+     * \big size step. */
+    txc_delim_wait delim_wait;
+    tex_core_range delim_command;
+    txc_atom_class delim_class;
+    int delim_size;
+    /* FENCED frames: the \left command token and its delimiter. */
+    tex_core_range fence_command;
+    txc_delimiter fence_left;
+    tex_core_range fence_left_range;
     struct txc_frame *parent;
 } txc_frame;
 
@@ -512,6 +657,16 @@ static void txc_frame_init(txc_frame *frame, txc_frame_role role, txc_frame *par
     frame->fraction_target = NULL;
     frame->fraction_script = TXC_PENDING_NONE;
     frame->fraction_mark = 0;
+    frame->delim_wait = TXC_DELIM_WAIT_NONE;
+    frame->delim_command.begin = 0;
+    frame->delim_command.end = 0;
+    frame->delim_class = TXC_ATOM_ORD;
+    frame->delim_size = 0;
+    frame->fence_command.begin = 0;
+    frame->fence_command.end = 0;
+    frame->fence_left = TXC_DELIMITERS[0].delimiter;
+    frame->fence_left_range.begin = 0;
+    frame->fence_left_range.end = 0;
     frame->parent = parent;
 }
 
@@ -537,16 +692,17 @@ static const char *txc_argument_noun(const txc_frame *frame) {
 static void txc_fraction_complete(txc_frame *frame, size_t end) {
     txc_fraction *fraction = frame->fraction;
     tex_core_range range = {fraction->command.begin, end};
+    txc_construct construct = {NULL, NULL, fraction, NULL, NULL};
     if (frame->fraction_item != NULL) {
         txc_item *item = frame->fraction_item;
-        txc_field_fill(&item->nucleus, NULL, NULL, fraction, range);
+        txc_field_fill(&item->nucleus, &construct, range);
         txc_field_reset(&item->sup, end);
         txc_field_reset(&item->sub, end);
         item->range = range;
     } else {
         txc_item *target = frame->fraction_target;
         txc_field *field = txc_script_field(target, frame->fraction_script);
-        txc_field_fill(field, NULL, NULL, fraction, range);
+        txc_field_fill(field, &construct, range);
         field->range.begin = frame->fraction_mark;
         target->range.end = end;
         if (frame->fraction_script == TXC_PENDING_SUB && target->sup.kind == TXC_FIELD_EMPTY) {
@@ -559,22 +715,23 @@ static void txc_fraction_complete(txc_frame *frame, size_t end) {
     frame->fraction_target = NULL;
 }
 
-/* Delivers one parsed construct — a character, a symbol command, or a
- * closed group list — into the frame: as the next fraction argument when
- * one is being collected, as the pending script field when one is
- * pending, or as a new atom. `range` is the construct's own range; script
- * fields extend it back to their mark. */
+/* Delivers one parsed construct — a character, a symbol command, a
+ * closed group list, a sized delimiter, or a closed fence — into the
+ * frame: as the next fraction argument when one is being collected, as
+ * the pending script field when one is pending, or as a new atom of
+ * `atom_class`. `range` is the construct's own range; script fields
+ * extend it back to their mark. */
 static tex_core_status txc_deliver(
     txc_arena *arena,
     txc_frame *frame,
-    const txc_math_glyph *glyph,
-    const txc_list *group,
+    const txc_construct *construct,
+    txc_atom_class atom_class,
     tex_core_range range,
     tex_core_error *error
 ) {
     if (frame->fraction != NULL) {
         txc_field *field = frame->fraction_denominator ? &frame->fraction->den : &frame->fraction->num;
-        txc_field_fill(field, glyph, group, NULL, range);
+        txc_field_fill(field, construct, range);
         if (frame->fraction_denominator) {
             txc_fraction_complete(frame, range.end);
         } else {
@@ -585,7 +742,7 @@ static tex_core_status txc_deliver(
     if (frame->pending != TXC_PENDING_NONE) {
         txc_item *item = frame->pending_target;
         txc_field *field = txc_script_field(item, frame->pending);
-        txc_field_fill(field, glyph, group, NULL, range);
+        txc_field_fill(field, construct, range);
         field->range.begin = frame->pending_mark;
         item->range.end = range.end;
         if (frame->pending == TXC_PENDING_SUB && item->sup.kind == TXC_FIELD_EMPTY) {
@@ -595,7 +752,8 @@ static tex_core_status txc_deliver(
         frame->pending_target = NULL;
         return TEX_CORE_STATUS_OK;
     }
-    if (glyph != NULL) {
+    if (construct->glyph != NULL) {
+        const txc_math_glyph *glyph = construct->glyph;
         if (txc_append_atom(arena, &frame->list, glyph->atom_class, glyph->codepoint, glyph->style, range) == NULL) {
             return txc_fail(error, TEX_CORE_STATUS_ALLOCATION_FAILED, NULL, "allocation failed");
         }
@@ -606,16 +764,67 @@ static tex_core_status txc_deliver(
         return txc_fail(error, TEX_CORE_STATUS_ALLOCATION_FAILED, NULL, "allocation failed");
     }
     item->kind = TXC_ITEM_ATOM;
-    item->atom_class = TXC_ATOM_ORD;
+    item->atom_class = atom_class;
     txc_field_reset(&item->nucleus, range.begin);
-    item->nucleus.kind = TXC_FIELD_LIST;
-    item->nucleus.list = *group;
-    item->nucleus.range = range;
+    txc_field_fill(&item->nucleus, construct, range);
     txc_field_reset(&item->sup, range.end);
     txc_field_reset(&item->sub, range.end);
     item->sub_first = false;
     item->range = range;
     return TEX_CORE_STATUS_OK;
+}
+
+/* Acts on the delimiter token a pending \left, \right, or explicit-size
+ * command was waiting for: push the fence frame, pop it into a fenced
+ * construct, or deliver the sized-delimiter atom. */
+static tex_core_status txc_delimiter_arrived(
+    txc_arena *arena,
+    txc_frame **frame_slot,
+    size_t *depth,
+    const txc_delimiter *delimiter,
+    tex_core_range range,
+    tex_core_error *error
+) {
+    txc_frame *frame = *frame_slot;
+    txc_delim_wait wait = frame->delim_wait;
+    frame->delim_wait = TXC_DELIM_WAIT_NONE;
+    if (wait == TXC_DELIM_WAIT_LEFT) {
+        if (*depth == TXC_GROUP_DEPTH_LIMIT) {
+            return txc_fail(error, TEX_CORE_STATUS_UNSUPPORTED, &frame->delim_command, "group nesting too deep");
+        }
+        txc_frame *inner = txc_arena_alloc(arena, sizeof(txc_frame));
+        if (inner == NULL) {
+            return txc_fail(error, TEX_CORE_STATUS_ALLOCATION_FAILED, NULL, "allocation failed");
+        }
+        txc_frame_init(inner, TXC_FRAME_FENCED, frame);
+        inner->open = frame->delim_command.begin;
+        inner->fence_command = frame->delim_command;
+        inner->fence_left = *delimiter;
+        inner->fence_left_range = range;
+        *frame_slot = inner;
+        *depth += 1;
+        return TEX_CORE_STATUS_OK;
+    }
+    if (wait == TXC_DELIM_WAIT_RIGHT) {
+        txc_fenced *fenced = txc_arena_alloc(arena, sizeof(txc_fenced));
+        if (fenced == NULL) {
+            return txc_fail(error, TEX_CORE_STATUS_ALLOCATION_FAILED, NULL, "allocation failed");
+        }
+        fenced->left = frame->fence_left;
+        fenced->left_range = frame->fence_left_range;
+        fenced->right = *delimiter;
+        fenced->right_range = range;
+        fenced->list = frame->list;
+        tex_core_range whole = {frame->open, range.end};
+        *frame_slot = frame->parent;
+        *depth -= 1;
+        txc_construct construct = {NULL, NULL, NULL, NULL, fenced};
+        return txc_deliver(arena, *frame_slot, &construct, TXC_ATOM_INNER, whole, error);
+    }
+    txc_sized_delimiter sized = {*delimiter, frame->delim_size};
+    tex_core_range whole = {frame->delim_command.begin, range.end};
+    txc_construct construct = {NULL, NULL, NULL, &sized, NULL};
+    return txc_deliver(arena, frame, &construct, frame->delim_class, whole, error);
 }
 
 tex_core_status txc_parse(
@@ -648,6 +857,9 @@ tex_core_status txc_parse(
 
         switch (token.kind) {
         case TXC_TOKEN_END:
+            if (frame->delim_wait != TXC_DELIM_WAIT_NONE) {
+                return txc_fail(error, TEX_CORE_STATUS_UNSUPPORTED, &frame->delim_command, "missing delimiter");
+            }
             if (frame->fraction != NULL) {
                 return txc_fail(
                     error,
@@ -666,6 +878,9 @@ tex_core_status txc_parse(
                     "missing %s argument",
                     txc_script_noun(frame->pending)
                 );
+            }
+            if (frame->role == TXC_FRAME_FENCED) {
+                return txc_fail(error, TEX_CORE_STATUS_UNSUPPORTED, &frame->fence_command, "missing \\right");
             }
             if (frame->role != TXC_FRAME_ROOT) {
                 tex_core_range open = {frame->open, frame->open + 1};
@@ -696,6 +911,17 @@ tex_core_status txc_parse(
         case TXC_TOKEN_CHARACTER: {
             uint32_t codepoint = token.codepoint;
             if (math) {
+                if (frame->delim_wait != TXC_DELIM_WAIT_NONE) {
+                    const txc_delimiter *delimiter = txc_delimiter_character(codepoint);
+                    if (delimiter == NULL) {
+                        return txc_fail(error, TEX_CORE_STATUS_UNSUPPORTED, &token.range, "missing delimiter");
+                    }
+                    status = txc_delimiter_arrived(arena, &frame, &depth, delimiter, token.range, error);
+                    if (status != TEX_CORE_STATUS_OK) {
+                        return status;
+                    }
+                    break;
+                }
                 if (codepoint == '{') {
                     /* Group nesting is bounded so that layout's recursion
                      * over nuclei and script fields has a proven stack
@@ -740,6 +966,9 @@ tex_core_status txc_parse(
                             txc_script_noun(frame->pending)
                         );
                     }
+                    if (frame->role == TXC_FRAME_FENCED) {
+                        return txc_fail(error, TEX_CORE_STATUS_UNSUPPORTED, &token.range, "missing \\right");
+                    }
                     if (frame->role == TXC_FRAME_ROOT) {
                         return txc_fail(error, TEX_CORE_STATUS_UNSUPPORTED, &token.range, "unmatched closing brace");
                     }
@@ -758,7 +987,8 @@ tex_core_status txc_parse(
                         }
                     } else {
                         tex_core_range range = {closed->open, token.range.end};
-                        status = txc_deliver(arena, frame, NULL, &closed->list, range, error);
+                        txc_construct construct = {NULL, &closed->list, NULL, NULL, NULL};
+                        status = txc_deliver(arena, frame, &construct, TXC_ATOM_ORD, range, error);
                         if (status != TEX_CORE_STATUS_OK) {
                             return status;
                         }
@@ -819,7 +1049,8 @@ tex_core_status txc_parse(
                 if (!txc_reserved(codepoint)) {
                     txc_math_glyph glyph;
                     if (txc_math_classify(codepoint, &glyph)) {
-                        status = txc_deliver(arena, frame, &glyph, NULL, token.range, error);
+                        txc_construct construct = {&glyph, NULL, NULL, NULL, NULL};
+                        status = txc_deliver(arena, frame, &construct, glyph.atom_class, token.range, error);
                         if (status != TEX_CORE_STATUS_OK) {
                             return status;
                         }
@@ -852,6 +1083,17 @@ tex_core_status txc_parse(
         }
 
         case TXC_TOKEN_CONTROL: {
+            if (math && frame->delim_wait != TXC_DELIM_WAIT_NONE) {
+                const txc_delimiter *delimiter = txc_delimiter_command(token.name, token.name_length);
+                if (delimiter == NULL) {
+                    return txc_fail(error, TEX_CORE_STATUS_UNSUPPORTED, &token.range, "missing delimiter");
+                }
+                status = txc_delimiter_arrived(arena, &frame, &depth, delimiter, token.range, error);
+                if (status != TEX_CORE_STATUS_OK) {
+                    return status;
+                }
+                break;
+            }
             const txc_spacing_command *command = txc_spacing(token.name, token.name_length);
             if (command != NULL) {
                 if (frame->fraction != NULL) {
@@ -906,6 +1148,7 @@ tex_core_status txc_parse(
                         return txc_fail(error, TEX_CORE_STATUS_ALLOCATION_FAILED, NULL, "allocation failed");
                     }
                     fraction->style = fraction_command->style;
+                    fraction->binom = fraction_command->binom;
                     fraction->command = token.range;
                     txc_field_reset(&fraction->num, token.range.end);
                     txc_field_reset(&fraction->den, token.range.end);
@@ -938,10 +1181,68 @@ tex_core_status txc_parse(
                     }
                     break;
                 }
+                if (token.name_length == 4 && memcmp(token.name, "left", 4) == 0) {
+                    if (frame->fraction != NULL) {
+                        return txc_fail(
+                            error,
+                            TEX_CORE_STATUS_UNSUPPORTED,
+                            &token.range,
+                            "missing %s argument",
+                            txc_argument_noun(frame)
+                        );
+                    }
+                    if (frame->pending != TXC_PENDING_NONE) {
+                        return txc_fail(
+                            error,
+                            TEX_CORE_STATUS_UNSUPPORTED,
+                            &token.range,
+                            "missing %s argument",
+                            txc_script_noun(frame->pending)
+                        );
+                    }
+                    frame->delim_wait = TXC_DELIM_WAIT_LEFT;
+                    frame->delim_command = token.range;
+                    break;
+                }
+                if (token.name_length == 5 && memcmp(token.name, "right", 5) == 0) {
+                    if (frame->fraction != NULL) {
+                        return txc_fail(
+                            error,
+                            TEX_CORE_STATUS_UNSUPPORTED,
+                            &token.range,
+                            "missing %s argument",
+                            txc_argument_noun(frame)
+                        );
+                    }
+                    if (frame->pending != TXC_PENDING_NONE) {
+                        return txc_fail(
+                            error,
+                            TEX_CORE_STATUS_UNSUPPORTED,
+                            &token.range,
+                            "missing %s argument",
+                            txc_script_noun(frame->pending)
+                        );
+                    }
+                    if (frame->role != TXC_FRAME_FENCED) {
+                        return txc_fail(error, TEX_CORE_STATUS_UNSUPPORTED, &token.range, "unmatched \\right");
+                    }
+                    frame->delim_wait = TXC_DELIM_WAIT_RIGHT;
+                    frame->delim_command = token.range;
+                    break;
+                }
+                const txc_size_command *size_command = txc_size_find(token.name, token.name_length);
+                if (size_command != NULL) {
+                    frame->delim_wait = TXC_DELIM_WAIT_EXPLICIT;
+                    frame->delim_command = token.range;
+                    frame->delim_class = size_command->atom_class;
+                    frame->delim_size = size_command->size;
+                    break;
+                }
                 const txc_math_symbol *symbol = txc_math_symbol_find(token.name, token.name_length);
                 if (symbol != NULL) {
                     txc_math_glyph glyph = {symbol->atom_class, symbol->codepoint, symbol->style};
-                    status = txc_deliver(arena, frame, &glyph, NULL, token.range, error);
+                    txc_construct construct = {&glyph, NULL, NULL, NULL, NULL};
+                    status = txc_deliver(arena, frame, &construct, glyph.atom_class, token.range, error);
                     if (status != TEX_CORE_STATUS_OK) {
                         return status;
                     }
