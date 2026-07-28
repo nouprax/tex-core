@@ -76,13 +76,19 @@ if [ "$os" = "darwin" ]; then
     find "$prefix" -type f \( -name '*.dylib' -o -path '*/bin/*' \) | while IFS= read -r binary; do
         minos=$(vtool -show-build "$binary" 2>/dev/null | awk '/minos/ { print $2; exit }')
         [ -n "$minos" ] || { echo "vtool reported no minos for $binary" >&2; exit 1; }
-        case "$minos" in
-            "$MACOS_DEPLOYMENT_TARGET" | "${MACOS_DEPLOYMENT_TARGET%%.*}" | "${MACOS_DEPLOYMENT_TARGET%%.*}".*) ;;
-            *)
-                echo "$binary requires macOS $minos, above the supported minimum $MACOS_DEPLOYMENT_TARGET" >&2
-                exit 1
-                ;;
-        esac
+        # Numeric comparison on major and minor: 15.1 must fail against a
+        # 15.0 floor, so a glob on the major version is not enough.
+        minos_major=${minos%%.*}
+        minos_minor=${minos#*.}
+        minos_minor=${minos_minor%%.*}
+        floor_major=${MACOS_DEPLOYMENT_TARGET%%.*}
+        floor_minor=${MACOS_DEPLOYMENT_TARGET#*.}
+        floor_minor=${floor_minor%%.*}
+        if [ "$minos_major" -gt "$floor_major" ] ||
+            { [ "$minos_major" -eq "$floor_major" ] && [ "${minos_minor:-0}" -gt "$floor_minor" ]; }; then
+            echo "$binary requires macOS $minos, above the supported minimum $MACOS_DEPLOYMENT_TARGET" >&2
+            exit 1
+        fi
     done
 fi
 
@@ -170,18 +176,30 @@ if command -v pkg-config >/dev/null 2>&1; then
         "$temporary/pkg-config-consumer"
 
     # The static contract: tex-core-static.pc must define
-    # TEX_CORE_STATIC_DEFINE and the archive must link and run standalone.
-    read -r -a static_cflags <<<"$(
+    # TEX_CORE_STATIC_DEFINE and its own --libs must produce a
+    # self-contained binary — with the shared library installed alongside,
+    # a -l flag would resolve to it and silently undo the static link, so
+    # the built consumer is checked for a libtex-core runtime dependency.
+    read -r -a static_flags <<<"$(
         PKG_CONFIG_PATH="$installed/lib/pkgconfig" \
-            pkg-config --cflags tex-core-static
+            pkg-config --cflags --libs tex-core-static
     )"
-    case " ${static_cflags[*]} " in
+    case " ${static_flags[*]} " in
         *" -DTEX_CORE_STATIC_DEFINE "*) ;;
         *) echo "tex-core-static.pc does not define TEX_CORE_STATIC_DEFINE" >&2; exit 1 ;;
     esac
     cc "$root/packages/tex-core/tests/consumers/c/main.c" \
         -o "$temporary/static-consumer" \
-        "${static_cflags[@]}" "$installed/lib/libtex-core.a"
+        "${static_flags[@]}"
+    if [ "$os" = "darwin" ]; then
+        shared_dependencies=$(otool -L "$temporary/static-consumer" | grep -c 'libtex-core' || true)
+    else
+        shared_dependencies=$(ldd "$temporary/static-consumer" 2>/dev/null | grep -c 'libtex-core' || true)
+    fi
+    if [ "$shared_dependencies" -ne 0 ]; then
+        echo "the tex-core-static consumer links the shared library at runtime" >&2
+        exit 1
+    fi
     "$temporary/static-consumer"
 fi
 

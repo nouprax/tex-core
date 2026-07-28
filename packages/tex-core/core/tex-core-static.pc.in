@@ -12,5 +12,8 @@ includedir=${prefix}/@CMAKE_INSTALL_INCLUDEDIR@
 Name: tex-core-static
 Description: Self-contained LaTeX to platform-neutral render-tree compiler (static archive)
 Version: @TEX_CORE_VERSION@
-Libs: -L${libdir} -ltex-core
+# The archive is named by path, not -ltex-core: with the shared library
+# installed alongside, -l would resolve to it and silently undo the
+# static link.
+Libs: ${libdir}/libtex-core.a
 Cflags: -I${includedir} -DTEX_CORE_STATIC_DEFINE
