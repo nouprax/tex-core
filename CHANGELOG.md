@@ -6,6 +6,29 @@ not promised to remain compatible between releases.
 
 ## Unreleased
 
+- Open milestone M2 with the math alignment environments of the matrix
+  family: `\begin{matrix}` through `\begin{Vmatrix}` parse rows of
+  cells split on `&` and `\\` (trailing `\\` contributes no row, empty
+  bodies have zero rows, ragged rows and empty cells are legal), and
+  lay them out over LaTeX's array geometry — columns take their widest
+  cell with centered entries `2\arraycolsep` apart, rows floor at the
+  `\@arstrut` (550500/235932 sp) and pitch their baselines
+  `\baselineskip` apart with the `\lineskip` fallback, the stack
+  centers on the math axis exactly as `\vcenter`, and the delimited
+  variants grow their fences through the rule-19 ladder. Cells are
+  their own inline math lists set in text style whatever the
+  surrounding style, faces rewrite through cells, and scripts attach
+  to the environment's atom. LaTeX's `\\*` no-page-break terminator is
+  consumed exactly as LaTeX renders it, environment names accept the
+  starred spelling so `\begin{align*}` reports itself, and amsmath's
+  ten-column `\c@MaxMatrixCols` bound holds. Misuse is pinned as
+  structured errors (`unsupported environment`, `missing environment
+  name`, `mismatched`/`unmatched \end`, `missing \end`, `misplaced
+  alignment tab`, `misplaced \\`, `extra alignment tab`, and
+  `unsupported row spacing` for the `\\[dim]` optional argument until
+  dimensions land). Grammar and layout grow inside schemaVersion 5 —
+  no node kinds or fields change, so bindings and existing goldens are
+  untouched; the corpus gains 23 cases (81 -> 104).
 - Close the independent M1 exit audit (#29–#69) in one hardening pass.
   Engine: internal geometry widens to 64-bit scaled points, so long
   single-line documents no longer overflow (a 64 KiB document produced

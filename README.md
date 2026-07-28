@@ -26,7 +26,8 @@ two projects remain independently consumable.
 ## Status
 
 **Pre-release; the infrastructure phases (1–10) of the setup plan and
-milestone M1 (math core) are complete; M2 (math environments) is next.**
+milestone M1 (math core) are complete; M2 (math environments) is
+underway.**
 The C
 engine, its render-tree contract (schemaVersion 5), the Swift, Kotlin
 Multiplatform, and ES/WASM bindings, the fail-closed CI quality gates, and
@@ -47,9 +48,14 @@ style switches and `\text` (`\mathrm` through `\mathtt` over the
 bold/italic/calligraphic/double-struck/sans/typewriter faces), laid out
 with TeX's inter-atom spacing over embedded Computer Modern metrics,
 with byte-identical canonical dumps on every platform. That completes
-the M1 math-core surface; the remaining M2–M4 surface (text galley,
-domain notations) lands before `1.0.0`. Nothing usable is published
-yet.
+the M1 math-core surface. M2 (math environments) has begun: the
+`\begin`/`\end` alignment environments of the matrix family (`matrix`
+through `Vmatrix`) set centered cells over LaTeX's array geometry —
+`\@arstrut` row floors, `\baselineskip`/`\lineskip` row pitch,
+`2\arraycolsep` column gaps, the stack `\vcenter`-ed on the math axis,
+the delimited variants fenced per rule 19. The remaining M2–M4 surface
+(`cases`/`aligned`, extensibles, text galley, domain notations) lands
+before `1.0.0`. Nothing usable is published yet.
 
 Build and test the C core:
 

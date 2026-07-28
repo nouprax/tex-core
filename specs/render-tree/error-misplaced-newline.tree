@@ -1,0 +1,2 @@
+render-error 5
+error status=unsupported src=1..3 message=misplaced \\

@@ -428,7 +428,9 @@ typedef enum txc_command_kind {
     TXC_COMMAND_LEFT = 8,
     TXC_COMMAND_RIGHT = 9,
     TXC_COMMAND_LIMITS = 10,
-    TXC_COMMAND_NOLIMITS = 11
+    TXC_COMMAND_NOLIMITS = 11,
+    TXC_COMMAND_BEGIN = 12,
+    TXC_COMMAND_END = 13
 } txc_command_kind;
 
 typedef struct txc_command_entry {
@@ -484,6 +486,7 @@ static const txc_command_entry TXC_COMMANDS[] = {
     {"asymp", TXC_COMMAND_SYMBOL, 131},
     {"backslash", TXC_COMMAND_SYMBOL, 66},
     {"bar", TXC_COMMAND_ACCENT, 1},
+    {"begin", TXC_COMMAND_BEGIN, 0},
     {"beta", TXC_COMMAND_SYMBOL, 1},
     {"big", TXC_COMMAND_SIZE, 8},
     {"bigcap", TXC_COMMAND_BIG_OP, 0},
@@ -542,6 +545,7 @@ static const txc_command_entry TXC_COMMANDS[] = {
     {"downarrow", TXC_COMMAND_SYMBOL, 158},
     {"ell", TXC_COMMAND_SYMBOL, 40},
     {"emptyset", TXC_COMMAND_SYMBOL, 48},
+    {"end", TXC_COMMAND_END, 0},
     {"epsilon", TXC_COMMAND_SYMBOL, 4},
     {"equiv", TXC_COMMAND_SYMBOL, 107},
     {"eta", TXC_COMMAND_SYMBOL, 7},
@@ -812,6 +816,61 @@ static const txc_delimiter *txc_delimiter_command(const uint8_t *name, size_t na
     return NULL;
 }
 
+/* Math alignment environments (milestone M2): the amsmath matrix family.
+ * Each row names the environment and the fence pair its amsmath
+ * definition wraps around the array — matrix is bare, the others are
+ * \left<delim> matrix \right<delim>. Delimiter values mirror the
+ * TXC_DELIMITERS rows for the same spellings. */
+typedef struct txc_environment_row {
+    const char *name;
+    bool delimited;
+    txc_delimiter left;
+    txc_delimiter right;
+} txc_environment_row;
+
+static const txc_environment_row TXC_ENVIRONMENTS[] = {
+    {"Bmatrix",
+     true,
+     {0x007B, TXC_LADDER_LARGE, 0x23A7, 0x23AA, 0x23A9, 0x23A8, TEX_CORE_FAMILY_SIZE4},
+     {0x007D, TXC_LADDER_LARGE, 0x23AB, 0x23AA, 0x23AD, 0x23AC, TEX_CORE_FAMILY_SIZE4}},
+    {"Vmatrix",
+     true,
+     {0x2225, TXC_LADDER_ALWAYS, 0x2225, 0x2225, 0x2225, TXC_NO_PIECE, TEX_CORE_FAMILY_SIZE1},
+     {0x2225, TXC_LADDER_ALWAYS, 0x2225, 0x2225, 0x2225, TXC_NO_PIECE, TEX_CORE_FAMILY_SIZE1}},
+    {"bmatrix",
+     true,
+     {0x005B, TXC_LADDER_LARGE, 0x23A1, 0x23A2, 0x23A3, TXC_NO_PIECE, TEX_CORE_FAMILY_SIZE4},
+     {0x005D, TXC_LADDER_LARGE, 0x23A4, 0x23A5, 0x23A6, TXC_NO_PIECE, TEX_CORE_FAMILY_SIZE4}},
+    {"matrix",
+     false,
+     {0, TXC_LADDER_NEVER, 0, 0, 0, 0, TEX_CORE_FAMILY_MAIN},
+     {0, TXC_LADDER_NEVER, 0, 0, 0, 0, TEX_CORE_FAMILY_MAIN}},
+    {"pmatrix",
+     true,
+     {0x0028, TXC_LADDER_LARGE, 0x239B, 0x239C, 0x239D, TXC_NO_PIECE, TEX_CORE_FAMILY_SIZE4},
+     {0x0029, TXC_LADDER_LARGE, 0x239E, 0x239F, 0x23A0, TXC_NO_PIECE, TEX_CORE_FAMILY_SIZE4}},
+    {"vmatrix",
+     true,
+     {0x2223, TXC_LADDER_ALWAYS, 0x2223, 0x2223, 0x2223, TXC_NO_PIECE, TEX_CORE_FAMILY_SIZE1},
+     {0x2223, TXC_LADDER_ALWAYS, 0x2223, 0x2223, 0x2223, TXC_NO_PIECE, TEX_CORE_FAMILY_SIZE1}},
+};
+
+/* amsmath's \c@MaxMatrixCols: the matrix preamble repeats ten centered
+ * columns, so the tenth alignment tab of a row — which would open an
+ * eleventh column — is a structured error, exactly where amsmath stops
+ * accepting. */
+#define TXC_MAX_MATRIX_COLUMNS 10
+
+static const txc_environment_row *txc_environment_find(const uint8_t *name, size_t name_length) {
+    for (size_t index = 0; index < sizeof(TXC_ENVIRONMENTS) / sizeof(TXC_ENVIRONMENTS[0]); index++) {
+        const txc_environment_row *row = &TXC_ENVIRONMENTS[index];
+        if (strlen(row->name) == name_length && memcmp(row->name, name, name_length) == 0) {
+            return row;
+        }
+    }
+    return NULL;
+}
+
 /* Explicit-size delimiter commands: plain TeX's \big family. The class
  * follows the suffix (l Open, m Rel, r Close, bare Ord); the size step
  * selects the fixed rule-19 target. */
@@ -865,6 +924,8 @@ static const char *txc_command_payload_name(const txc_command_entry *entry) {
     case TXC_COMMAND_RIGHT:
     case TXC_COMMAND_LIMITS:
     case TXC_COMMAND_NOLIMITS:
+    case TXC_COMMAND_BEGIN:
+    case TXC_COMMAND_END:
         return entry->index == 0 ? entry->name : NULL;
     }
 #undef TXC_PAYLOAD_NAME
@@ -1019,6 +1080,7 @@ typedef struct txc_construct {
     txc_fenced *fenced;
     txc_radical *radical;
     txc_accent *accent;
+    txc_array *array;
 } txc_construct;
 
 /* Fills one field from a delivered construct. */
@@ -1043,6 +1105,9 @@ static void txc_field_fill(txc_field *field, const txc_construct *construct, tex
     } else if (construct->accent != NULL) {
         field->kind = TXC_FIELD_ACCENT;
         field->accent = construct->accent;
+    } else if (construct->array != NULL) {
+        field->kind = TXC_FIELD_ARRAY;
+        field->array = construct->array;
     } else {
         field->kind = TXC_FIELD_FENCED;
         field->fenced = construct->fenced;
@@ -1087,7 +1152,8 @@ typedef enum txc_frame_role {
     TXC_FRAME_GROUP = 1,
     TXC_FRAME_SCRIPT = 2,
     TXC_FRAME_FENCED = 3,
-    TXC_FRAME_INDEX = 4
+    TXC_FRAME_INDEX = 4,
+    TXC_FRAME_CELL = 5
 } txc_frame_role;
 
 /* Which construct the next delimiter token completes: a \left push, a
@@ -1168,6 +1234,21 @@ typedef struct txc_frame {
     tex_core_range fence_command;
     txc_delimiter fence_left;
     tex_core_range fence_left_range;
+    /* CELL frames: the environment in progress. The frame's own list is
+     * the current cell; completed cells and rows accumulate here. `open`
+     * holds the \begin token's start, `env_begin` the whole \begin{...}
+     * run, and `env_cell_start` the byte where the current cell's content
+     * begins (after \begin{...}, `&`, or `\\`) — the anchor an empty
+     * cell's range collapses to. */
+    const txc_environment_row *env;
+    tex_core_range env_begin;
+    txc_array_row *env_rows;
+    txc_array_row *env_rows_tail;
+    size_t env_row_count;
+    txc_array_cell *env_cells;
+    txc_array_cell *env_cells_tail;
+    size_t env_cell_count;
+    size_t env_cell_start;
     struct txc_frame *parent;
 } txc_frame;
 
@@ -1208,6 +1289,16 @@ static void txc_frame_init(txc_frame *frame, txc_frame_role role, txc_frame *par
     frame->fence_left = TXC_DELIMITERS[0].delimiter;
     frame->fence_left_range.begin = 0;
     frame->fence_left_range.end = 0;
+    frame->env = NULL;
+    frame->env_begin.begin = 0;
+    frame->env_begin.end = 0;
+    frame->env_rows = NULL;
+    frame->env_rows_tail = NULL;
+    frame->env_row_count = 0;
+    frame->env_cells = NULL;
+    frame->env_cells_tail = NULL;
+    frame->env_cell_count = 0;
+    frame->env_cell_start = 0;
     frame->parent = parent;
 }
 
@@ -1484,13 +1575,138 @@ static tex_core_status txc_delimiter_arrived(
         tex_core_range whole = {frame->open, range.end};
         *frame_slot = frame->parent;
         *depth -= 1;
-        txc_construct construct = {NULL, NULL, NULL, NULL, fenced, NULL, NULL};
+        txc_construct construct = {NULL, NULL, NULL, NULL, fenced, NULL, NULL, NULL};
         return txc_deliver(arena, *frame_slot, &construct, TXC_ATOM_INNER, whole, error);
     }
     txc_sized_delimiter sized = {*delimiter, frame->delim_size};
     tex_core_range whole = {frame->delim_command.begin, range.end};
-    txc_construct construct = {NULL, NULL, NULL, &sized, NULL, NULL, NULL};
+    txc_construct construct = {NULL, NULL, NULL, &sized, NULL, NULL, NULL, NULL};
     return txc_deliver(arena, frame, &construct, frame->delim_class, whole, error);
+}
+
+/* Scans an environment name argument after \begin or \end: optional
+ * blanks, `{`, one or more ASCII letters with an optional trailing `*`
+ * (the starred-environment spelling, so \begin{align*} reports its own
+ * name), `}`. On success `name` borrows the source bytes and `whole`
+ * extends `command` through the closing brace. Anything else is the
+ * structured error `missing environment name` at the offending token —
+ * or at the command itself at end of input, exactly like the
+ * missing-argument errors. */
+static tex_core_status txc_environment_name(
+    txc_scanner *scanner,
+    const uint8_t *source,
+    tex_core_range command,
+    const uint8_t **name,
+    size_t *name_length,
+    tex_core_range *whole,
+    tex_core_error *error
+) {
+    txc_token token;
+    for (;;) {
+        tex_core_status status = txc_scan(scanner, &token, error);
+        if (status != TEX_CORE_STATUS_OK) {
+            return status;
+        }
+        if (token.kind != TXC_TOKEN_SPACE) {
+            break;
+        }
+    }
+    if (token.kind == TXC_TOKEN_END) {
+        return txc_fail(error, TEX_CORE_STATUS_UNSUPPORTED, &command, "missing environment name");
+    }
+    if (token.kind != TXC_TOKEN_CHARACTER || token.codepoint != '{') {
+        return txc_fail(error, TEX_CORE_STATUS_UNSUPPORTED, &token.range, "missing environment name");
+    }
+    size_t begin = 0;
+    size_t length = 0;
+    for (;;) {
+        tex_core_status status = txc_scan(scanner, &token, error);
+        if (status != TEX_CORE_STATUS_OK) {
+            return status;
+        }
+        if (token.kind == TXC_TOKEN_CHARACTER && txc_letter_codepoint(token.codepoint)) {
+            if (length == 0) {
+                begin = token.range.begin;
+            }
+            length += 1;
+            continue;
+        }
+        if (token.kind == TXC_TOKEN_CHARACTER && token.codepoint == '*' && length > 0) {
+            length += 1;
+            tex_core_status status = txc_scan(scanner, &token, error);
+            if (status != TEX_CORE_STATUS_OK) {
+                return status;
+            }
+        }
+        break;
+    }
+    if (token.kind == TXC_TOKEN_END) {
+        return txc_fail(error, TEX_CORE_STATUS_UNSUPPORTED, &command, "missing environment name");
+    }
+    if (token.kind != TXC_TOKEN_CHARACTER || token.codepoint != '}' || length == 0) {
+        return txc_fail(error, TEX_CORE_STATUS_UNSUPPORTED, &token.range, "missing environment name");
+    }
+    *name = source + begin;
+    *name_length = length;
+    whole->begin = command.begin;
+    whole->end = token.range.end;
+    return TEX_CORE_STATUS_OK;
+}
+
+/* Closes the current cell — the environment frame's own list — into the
+ * row in progress. The cell's range spans its constructs, or collapses
+ * to the point where content would have started. */
+static tex_core_status txc_environment_cell(txc_arena *arena, txc_frame *frame, tex_core_error *error) {
+    txc_array_cell *cell = txc_arena_alloc(arena, sizeof(txc_array_cell));
+    if (cell == NULL) {
+        return txc_fail(error, TEX_CORE_STATUS_ALLOCATION_FAILED, NULL, "allocation failed");
+    }
+    cell->list = frame->list;
+    if (frame->list.count > 0) {
+        cell->range.begin = frame->list.head->range.begin;
+        cell->range.end = frame->list.tail->range.end;
+    } else {
+        cell->range.begin = frame->env_cell_start;
+        cell->range.end = frame->env_cell_start;
+    }
+    cell->next = NULL;
+    if (frame->env_cells_tail != NULL) {
+        frame->env_cells_tail->next = cell;
+    } else {
+        frame->env_cells = cell;
+    }
+    frame->env_cells_tail = cell;
+    frame->env_cell_count += 1;
+    frame->list.head = NULL;
+    frame->list.tail = NULL;
+    frame->list.count = 0;
+    return TEX_CORE_STATUS_OK;
+}
+
+/* Closes the current cell and the row in progress. */
+static tex_core_status txc_environment_row_close(txc_arena *arena, txc_frame *frame, tex_core_error *error) {
+    tex_core_status status = txc_environment_cell(arena, frame, error);
+    if (status != TEX_CORE_STATUS_OK) {
+        return status;
+    }
+    txc_array_row *row = txc_arena_alloc(arena, sizeof(txc_array_row));
+    if (row == NULL) {
+        return txc_fail(error, TEX_CORE_STATUS_ALLOCATION_FAILED, NULL, "allocation failed");
+    }
+    row->cells = frame->env_cells;
+    row->cell_count = frame->env_cell_count;
+    row->next = NULL;
+    if (frame->env_rows_tail != NULL) {
+        frame->env_rows_tail->next = row;
+    } else {
+        frame->env_rows = row;
+    }
+    frame->env_rows_tail = row;
+    frame->env_row_count += 1;
+    frame->env_cells = NULL;
+    frame->env_cells_tail = NULL;
+    frame->env_cell_count = 0;
+    return TEX_CORE_STATUS_OK;
 }
 
 tex_core_status txc_parse(
@@ -1552,6 +1768,15 @@ tex_core_status txc_parse(
             if (frame->role == TXC_FRAME_FENCED) {
                 return txc_fail(error, TEX_CORE_STATUS_UNSUPPORTED, &frame->fence_command, "missing \\right");
             }
+            if (frame->role == TXC_FRAME_CELL) {
+                return txc_fail(
+                    error,
+                    TEX_CORE_STATUS_UNSUPPORTED,
+                    &frame->env_begin,
+                    "missing \\end{%s}",
+                    frame->env->name
+                );
+            }
             if (frame->role != TXC_FRAME_ROOT) {
                 tex_core_range open = {frame->open, frame->open + 1};
                 return txc_fail(error, TEX_CORE_STATUS_UNSUPPORTED, &open, "unclosed group");
@@ -1588,7 +1813,7 @@ tex_core_status txc_parse(
                 frame = frame->parent;
                 depth -= 1;
                 tex_core_range whole = {closed->open, token.range.end};
-                txc_construct construct = {NULL, &closed->list, NULL, NULL, NULL, NULL, NULL};
+                txc_construct construct = {NULL, &closed->list, NULL, NULL, NULL, NULL, NULL, NULL};
                 status = txc_deliver(arena, frame, &construct, TXC_ATOM_ORD, whole, error);
                 if (status != TEX_CORE_STATUS_OK) {
                     return status;
@@ -1717,6 +1942,15 @@ tex_core_status txc_parse(
                     if (frame->role == TXC_FRAME_INDEX) {
                         return txc_fail(error, TEX_CORE_STATUS_UNSUPPORTED, &token.range, "unclosed radical index");
                     }
+                    if (frame->role == TXC_FRAME_CELL) {
+                        return txc_fail(
+                            error,
+                            TEX_CORE_STATUS_UNSUPPORTED,
+                            &token.range,
+                            "missing \\end{%s}",
+                            frame->env->name
+                        );
+                    }
                     if (frame->role == TXC_FRAME_ROOT) {
                         return txc_fail(error, TEX_CORE_STATUS_UNSUPPORTED, &token.range, "unmatched closing brace");
                     }
@@ -1735,7 +1969,7 @@ tex_core_status txc_parse(
                         }
                     } else {
                         tex_core_range range = {closed->open, token.range.end};
-                        txc_construct construct = {NULL, &closed->list, NULL, NULL, NULL, NULL, NULL};
+                        txc_construct construct = {NULL, &closed->list, NULL, NULL, NULL, NULL, NULL, NULL};
                         status = txc_deliver(arena, frame, &construct, TXC_ATOM_ORD, range, error);
                         if (status != TEX_CORE_STATUS_OK) {
                             return status;
@@ -1795,10 +2029,45 @@ tex_core_status txc_parse(
                     frame->pending_mark = token.range.begin;
                     break;
                 }
+                if (codepoint == '&') {
+                    /* An alignment tab ends the current cell; anywhere
+                     * but directly inside an environment cell it is a
+                     * structured error, as TeX's misplaced-tab complaint. */
+                    if (frame->collect.kind != TXC_COLLECT_NONE) {
+                        return txc_fail(
+                            error,
+                            TEX_CORE_STATUS_UNSUPPORTED,
+                            &token.range,
+                            "missing %s argument",
+                            txc_argument_noun(frame)
+                        );
+                    }
+                    if (frame->pending != TXC_PENDING_NONE) {
+                        return txc_fail(
+                            error,
+                            TEX_CORE_STATUS_UNSUPPORTED,
+                            &token.range,
+                            "missing %s argument",
+                            txc_script_noun(frame->pending)
+                        );
+                    }
+                    if (frame->role != TXC_FRAME_CELL) {
+                        return txc_fail(error, TEX_CORE_STATUS_UNSUPPORTED, &token.range, "misplaced alignment tab");
+                    }
+                    if (frame->env_cell_count + 1 == TXC_MAX_MATRIX_COLUMNS) {
+                        return txc_fail(error, TEX_CORE_STATUS_UNSUPPORTED, &token.range, "extra alignment tab");
+                    }
+                    status = txc_environment_cell(arena, frame, error);
+                    if (status != TEX_CORE_STATUS_OK) {
+                        return status;
+                    }
+                    frame->env_cell_start = token.range.end;
+                    break;
+                }
                 if (!txc_reserved(codepoint)) {
                     txc_math_glyph glyph;
                     if (txc_math_classify(codepoint, &glyph)) {
-                        txc_construct construct = {&glyph, NULL, NULL, NULL, NULL, NULL, NULL};
+                        txc_construct construct = {&glyph, NULL, NULL, NULL, NULL, NULL, NULL, NULL};
                         status = txc_deliver(arena, frame, &construct, glyph.atom_class, token.range, error);
                         if (status != TEX_CORE_STATUS_OK) {
                             return status;
@@ -1878,6 +2147,64 @@ tex_core_status txc_parse(
              * the text surface (milestone M3) arrives, exactly like
              * TeX's missing-$ complaint. */
             if (math && !frame->text_mode) {
+                if (token.name_length == 1 && token.name[0] == '\\') {
+                    /* A row terminator ends the current cell and row;
+                     * anywhere but directly inside an environment cell it
+                     * is a structured error, like a misplaced \cr. */
+                    if (frame->collect.kind != TXC_COLLECT_NONE) {
+                        return txc_fail(
+                            error,
+                            TEX_CORE_STATUS_UNSUPPORTED,
+                            &token.range,
+                            "missing %s argument",
+                            txc_argument_noun(frame)
+                        );
+                    }
+                    if (frame->pending != TXC_PENDING_NONE) {
+                        return txc_fail(
+                            error,
+                            TEX_CORE_STATUS_UNSUPPORTED,
+                            &token.range,
+                            "missing %s argument",
+                            txc_script_noun(frame->pending)
+                        );
+                    }
+                    if (frame->role != TXC_FRAME_CELL) {
+                        return txc_fail(error, TEX_CORE_STATUS_UNSUPPORTED, &token.range, "misplaced \\\\");
+                    }
+                    status = txc_environment_row_close(arena, frame, error);
+                    if (status != TEX_CORE_STATUS_OK) {
+                        return status;
+                    }
+                    frame->env_cell_start = token.range.end;
+                    /* LaTeX's \\ scans ahead past blanks: a `*` is the
+                     * no-page-break form — meaningless before pagination,
+                     * consumed so the output matches LaTeX exactly — and
+                     * a `[` opens the optional row-space dimension, which
+                     * stays a structured error until dimensions land. */
+                    txc_scanner lookahead = scanner;
+                    txc_token peek;
+                    do {
+                        status = txc_scan(&lookahead, &peek, error);
+                        if (status != TEX_CORE_STATUS_OK) {
+                            return status;
+                        }
+                    } while (peek.kind == TXC_TOKEN_SPACE);
+                    if (peek.kind == TXC_TOKEN_CHARACTER && peek.codepoint == '*') {
+                        scanner = lookahead;
+                        frame->env_cell_start = peek.range.end;
+                        do {
+                            status = txc_scan(&lookahead, &peek, error);
+                            if (status != TEX_CORE_STATUS_OK) {
+                                return status;
+                            }
+                        } while (peek.kind == TXC_TOKEN_SPACE);
+                    }
+                    if (peek.kind == TXC_TOKEN_CHARACTER && peek.codepoint == '[') {
+                        return txc_fail(error, TEX_CORE_STATUS_UNSUPPORTED, &peek.range, "unsupported row spacing");
+                    }
+                    break;
+                }
                 const txc_command_entry *entry = txc_command_lookup(token.name, token.name_length);
                 if (entry != NULL && entry->kind == TXC_COMMAND_FRACTION) {
                     const txc_fraction_command *fraction_command = &TXC_FRACTION_COMMANDS[entry->index];
@@ -1959,6 +2286,142 @@ tex_core_status txc_parse(
                     frame->delim_command = token.range;
                     break;
                 }
+                if (entry != NULL && entry->kind == TXC_COMMAND_BEGIN) {
+                    /* \begin is not a legal script or command argument —
+                     * undelimited arguments are a character, a symbol
+                     * command, or a braced group, exactly as for \left. */
+                    if (frame->collect.kind != TXC_COLLECT_NONE) {
+                        return txc_fail(
+                            error,
+                            TEX_CORE_STATUS_UNSUPPORTED,
+                            &token.range,
+                            "missing %s argument",
+                            txc_argument_noun(frame)
+                        );
+                    }
+                    if (frame->pending != TXC_PENDING_NONE) {
+                        return txc_fail(
+                            error,
+                            TEX_CORE_STATUS_UNSUPPORTED,
+                            &token.range,
+                            "missing %s argument",
+                            txc_script_noun(frame->pending)
+                        );
+                    }
+                    const uint8_t *name;
+                    size_t name_length;
+                    tex_core_range whole;
+                    status = txc_environment_name(&scanner, source, token.range, &name, &name_length, &whole, error);
+                    if (status != TEX_CORE_STATUS_OK) {
+                        return status;
+                    }
+                    const txc_environment_row *environment = txc_environment_find(name, name_length);
+                    if (environment == NULL) {
+                        char label[64];
+                        txc_command_label(name, name_length, label, sizeof(label));
+                        return txc_fail(
+                            error,
+                            TEX_CORE_STATUS_UNSUPPORTED,
+                            &whole,
+                            "unsupported environment %s",
+                            label
+                        );
+                    }
+                    /* Environments count toward the same nesting bound as
+                     * braces and fences. */
+                    if (depth == TXC_GROUP_DEPTH_LIMIT) {
+                        return txc_fail(error, TEX_CORE_STATUS_UNSUPPORTED, &whole, "group nesting too deep");
+                    }
+                    txc_frame *inner = txc_arena_alloc(arena, sizeof(txc_frame));
+                    if (inner == NULL) {
+                        return txc_fail(error, TEX_CORE_STATUS_ALLOCATION_FAILED, NULL, "allocation failed");
+                    }
+                    txc_frame_init(inner, TXC_FRAME_CELL, frame);
+                    inner->styled = frame->styled;
+                    inner->face_family = frame->face_family;
+                    inner->open = token.range.begin;
+                    inner->env = environment;
+                    inner->env_begin = whole;
+                    inner->env_cell_start = whole.end;
+                    frame = inner;
+                    depth += 1;
+                    break;
+                }
+                if (entry != NULL && entry->kind == TXC_COMMAND_END) {
+                    if (frame->collect.kind != TXC_COLLECT_NONE) {
+                        return txc_fail(
+                            error,
+                            TEX_CORE_STATUS_UNSUPPORTED,
+                            &token.range,
+                            "missing %s argument",
+                            txc_argument_noun(frame)
+                        );
+                    }
+                    if (frame->pending != TXC_PENDING_NONE) {
+                        return txc_fail(
+                            error,
+                            TEX_CORE_STATUS_UNSUPPORTED,
+                            &token.range,
+                            "missing %s argument",
+                            txc_script_noun(frame->pending)
+                        );
+                    }
+                    const uint8_t *name;
+                    size_t name_length;
+                    tex_core_range whole;
+                    status = txc_environment_name(&scanner, source, token.range, &name, &name_length, &whole, error);
+                    if (status != TEX_CORE_STATUS_OK) {
+                        return status;
+                    }
+                    char label[64];
+                    txc_command_label(name, name_length, label, sizeof(label));
+                    /* \end acts only directly inside an environment cell,
+                     * exactly as \right acts only inside its fence. */
+                    if (frame->role != TXC_FRAME_CELL) {
+                        return txc_fail(error, TEX_CORE_STATUS_UNSUPPORTED, &whole, "unmatched \\end{%s}", label);
+                    }
+                    if (strlen(frame->env->name) != name_length || memcmp(frame->env->name, name, name_length) != 0) {
+                        return txc_fail(error, TEX_CORE_STATUS_UNSUPPORTED, &whole, "mismatched \\end{%s}", label);
+                    }
+                    /* A trailing \\ contributes no row: the final row is
+                     * dropped when nothing at all followed the last
+                     * terminator — TeX's \crcr exactly. An environment
+                     * whose whole body is blank has zero rows. */
+                    if (frame->env_cell_count > 0 || frame->list.count > 0) {
+                        status = txc_environment_row_close(arena, frame, error);
+                        if (status != TEX_CORE_STATUS_OK) {
+                            return status;
+                        }
+                    }
+                    txc_array *array = txc_arena_alloc(arena, sizeof(txc_array));
+                    if (array == NULL) {
+                        return txc_fail(error, TEX_CORE_STATUS_ALLOCATION_FAILED, NULL, "allocation failed");
+                    }
+                    const txc_environment_row *environment = frame->env;
+                    array->delimited = environment->delimited;
+                    array->left = environment->left;
+                    array->right = environment->right;
+                    array->begin = frame->env_begin;
+                    array->end = whole;
+                    array->rows = frame->env_rows;
+                    array->row_count = frame->env_row_count;
+                    tex_core_range range = {frame->open, whole.end};
+                    frame = frame->parent;
+                    depth -= 1;
+                    txc_construct construct = {NULL, NULL, NULL, NULL, NULL, NULL, NULL, array};
+                    status = txc_deliver(
+                        arena,
+                        frame,
+                        &construct,
+                        environment->delimited ? TXC_ATOM_INNER : TXC_ATOM_ORD,
+                        range,
+                        error
+                    );
+                    if (status != TEX_CORE_STATUS_OK) {
+                        return status;
+                    }
+                    break;
+                }
                 {
                     const txc_big_op *big_op =
                         entry != NULL && entry->kind == TXC_COMMAND_BIG_OP ? &TXC_BIG_OPS[entry->index] : NULL;
@@ -2026,7 +2489,7 @@ tex_core_status txc_parse(
                         }
                         if (frame->collect.kind != TXC_COLLECT_NONE || frame->pending != TXC_PENDING_NONE) {
                             txc_list wrapped = {op, op, 1};
-                            txc_construct construct = {NULL, &wrapped, NULL, NULL, NULL, NULL, NULL};
+                            txc_construct construct = {NULL, &wrapped, NULL, NULL, NULL, NULL, NULL, NULL};
                             status = txc_deliver(arena, frame, &construct, TXC_ATOM_ORD, token.range, error);
                             if (status != TEX_CORE_STATUS_OK) {
                                 return status;
@@ -2164,7 +2627,7 @@ tex_core_status txc_parse(
                 if (entry != NULL && entry->kind == TXC_COMMAND_SYMBOL) {
                     const txc_math_symbol *symbol = &TXC_MATH_SYMBOLS[entry->index];
                     txc_math_glyph glyph = {symbol->atom_class, symbol->codepoint, symbol->style, TEX_CORE_FAMILY_MAIN};
-                    txc_construct construct = {&glyph, NULL, NULL, NULL, NULL, NULL, NULL};
+                    txc_construct construct = {&glyph, NULL, NULL, NULL, NULL, NULL, NULL, NULL};
                     status = txc_deliver(arena, frame, &construct, glyph.atom_class, token.range, error);
                     if (status != TEX_CORE_STATUS_OK) {
                         return status;
