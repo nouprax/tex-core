@@ -6,6 +6,18 @@ not promised to remain compatible between releases.
 
 ## Unreleased
 
+- Continue milestone M1 (math core) with big operators and function
+  names: the \sum family and the integrals are Op atoms drawn from the
+  Size1 face (Size2 in display style) at the text em, centered on the
+  math axis, their italic correction tucking a \nolimits subscript
+  under the slant (tex.web make_op); the \sin through \Pr names are
+  upright letter-run Op atoms (\limsup/\liminf keep their inner thin
+  space). Scripts place as limits — the rule 13a assembly over the new
+  bigOpSpacing1-5 parameters, one box with the spacing5 pads — in
+  display style for sums and the \lim family, never for integrals and
+  \sin, with \limits/\nolimits overriding and `misplaced \limits`
+  pinned as a structured error. Corpus 62 -> 70 cases; schema unchanged
+  at version 4, no binding code changes.
 - Continue milestone M1 (math core) with radicals: `\sqrt` takes one
   mandatory argument after LaTeX's optional bracket index, is one Ord
   atom, and is a legal script argument. Layout is TeXbook Appendix G

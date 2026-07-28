@@ -47,7 +47,12 @@ typedef enum txc_parameter {
     TXC_PARAMETER_DELIM1 = 15,
     TXC_PARAMETER_DELIM2 = 16,
     TXC_PARAMETER_NUM3 = 17,
-    TXC_PARAMETER_COUNT = 18
+    TXC_PARAMETER_BIG_OP_SPACING1 = 18,
+    TXC_PARAMETER_BIG_OP_SPACING2 = 19,
+    TXC_PARAMETER_BIG_OP_SPACING3 = 20,
+    TXC_PARAMETER_BIG_OP_SPACING4 = 21,
+    TXC_PARAMETER_BIG_OP_SPACING5 = 22,
+    TXC_PARAMETER_COUNT = 23
 } txc_parameter;
 
 /* Returns the metrics for a codepoint in a face, or NULL when the
