@@ -617,7 +617,20 @@ static void txc_test_delimiters(txc_test *test) {
     box = tex_core_node_child(tex_core_render_tree_root(tree), 0);
     txc_check_size(test, tex_core_node_child_count(box), 4, "binom children");
     txc_check_int(test, tex_core_node_glyph(tex_core_node_child(box, 0)).family, TEX_CORE_FAMILY_SIZE1, "binom paren");
-    txc_check(test, tex_core_node_frame(tex_core_node_child(box, 1)).y == txc_expected_points(0.444), "binom num3");
+    /* Both parens share the command's source, so the right one precedes
+     * the parts in child (source) order and is placed by x alone. */
+    txc_check_int(
+        test,
+        tex_core_node_glyph(tex_core_node_child(box, 1)).family,
+        TEX_CORE_FAMILY_SIZE1,
+        "binom right paren follows in source order"
+    );
+    txc_check(
+        test,
+        tex_core_node_frame(tex_core_node_child(box, 1)).x > tex_core_node_frame(tex_core_node_child(box, 3)).x,
+        "binom right paren sits past the parts"
+    );
+    txc_check(test, tex_core_node_frame(tex_core_node_child(box, 2)).y == txc_expected_points(0.444), "binom num3");
     tex_core_render_tree_free(tree);
 }
 

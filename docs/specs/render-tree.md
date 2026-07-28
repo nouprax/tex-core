@@ -170,9 +170,11 @@ over parentheses): the shifts start at `num1`/`num3` (display/other) and
 seven rule thicknesses in display style (three otherwise) both parts move
 apart by half the shortfall, `half()` rounding up. No `rule` appears; the
 null-delimiter kerns are replaced by real parenthesis delimiters sized to
-`delim1` (display) or `delim2` (other styles) of the fraction's size, so
-the fraction box's children are: left delimiter, numerator box,
-denominator box, right delimiter.
+`delim1` (display) or `delim2` (other styles) of the fraction's size.
+Both delimiters carry the command token's source, which precedes the
+arguments — so child order is: left delimiter, right delimiter,
+numerator box, denominator box, with the right delimiter placed after
+the parts by `x` alone.
 
 ## Delimiters
 
