@@ -537,7 +537,7 @@ static tex_core_status txc_delimiter_node(
         }
     }
 
-    txc_node *node;
+    txc_node *node = NULL;
     if (chosen != NULL) {
         node = txc_arena_alloc(arena, sizeof(txc_node));
         if (node == NULL) {
