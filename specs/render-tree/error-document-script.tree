@@ -1,2 +1,2 @@
-render-error 4
+render-error 5
 error status=unsupported src=1..2 message=unsupported character U+005E

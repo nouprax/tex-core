@@ -1,0 +1,2 @@
+render-error 5
+error status=unsupported src=0..7 message=missing style argument

@@ -1,9 +1,9 @@
 # Render-tree contract
 
-Status: schemaVersion 4 (milestone M1 delimiters change-set: the size
-families, `\left`/`\right`, explicit delimiter sizes, and `\binom`);
-schemaVersion 3 (fractions) and 2 (scripts) landed 2026-07-27;
-schemaVersion 1 was frozen with Phase 3 on 2026-07-20.
+Status: schemaVersion 5 (milestone M1 style-switches change-set: the
+style faces and `\text`); schemaVersion 4 (delimiters), 3 (fractions),
+and 2 (scripts) landed 2026-07-27; schemaVersion 1 was frozen with Phase
+3 on 2026-07-20.
 
 This document is the language-neutral public render-tree contract implemented
 by the C engine and, as they land, the Swift, Kotlin, and ES bindings
@@ -71,11 +71,16 @@ Field types:
 - `codepoint` — Unicode scalar value.
 - `style` — `upright | italic`. Bold and the remaining faces arrive with
   the 1.0.0 milestones as schema changes.
-- `family` — `main | size1 | size2 | size3 | size4`. The size families
-  are the delimiter size-variant faces (Computer Modern cmex, vendored
-  as KaTeX Size1–Size4): their glyphs are always upright, and their
-  `size` is always the 10 pt text em — TeX's extension fonts do not
-  shrink inside scripts. Additional families arrive as schema changes.
+- `family` — `main | size1 | size2 | size3 | size4 | bold | textit |
+  cal | bb | sans | mono`. The size families are the delimiter
+  size-variant faces (Computer Modern cmex, vendored as KaTeX
+  Size1–Size4): their glyphs are always upright, and their `size` is
+  always the 10 pt text em — TeX's extension fonts do not shrink inside
+  scripts. The style faces (`bold` Main-Bold, `textit` Main-Italic,
+  `cal` Caligraphic, `bb` AMS double-struck, `sans` SansSerif, `mono`
+  Typewriter) carry the letter and digit runs of the style switches;
+  their `style` is always `upright` — the slant of `textit` is the
+  face's own nature. Additional families arrive as schema changes.
 
 Math inter-atom spacing: in the math modes every atom carries one of TeX's
 classes (Ord, Op, Bin, Rel, Open, Close, Punct, Inner — TeXbook chapter
@@ -299,6 +304,28 @@ text-size glyph, then the size faces, the first at least as wide as the
 nucleus, capped at `size4`. Child order is source order: the accent
 glyph (its `src` is the command token), then the nucleus box.
 
+## Style switches and text
+
+`\mathrm \mathbf \mathit \mathcal \mathbb \mathsf \mathtt` take
+one argument exactly as an accent does (`missing style argument`
+pinned) and rewrite the letter and digit characters inside it — through
+every nested construct — onto their face: `main`, `bold`, `textit`,
+`cal`, `bb`, `sans`, or `mono`, always upright. Everything else in the
+argument (operators, relations, symbol commands, the shape of every
+construct) is untouched, exactly as TeX's variable-family mathcodes.
+Faces without a glyph reject it as `unsupported character` — the
+calligraphic and double-struck faces carry what Computer Modern
+carries. A style switch is a legal script argument, and its atom is the
+argument's own construct with the command's source range.
+
+`\text` takes one argument (`missing text argument`); a braced
+argument is document-rule content at the current size — letters,
+digits, period, comma, explicit spacing commands, and blanks as
+interword spaces, everything else a structured error until the M3 text
+surface — published as the group's box with no atom classes inside. A
+bare character argument is upright main, exactly `\mathrm`. `\text`
+content inside a style switch keeps its own faces.
+
 ## Source ranges
 
 Every node records the byte range of the source it came from, for caret
@@ -332,11 +359,11 @@ and is pinned by the corpus error cases in the corpus error-record form
 
 ## Versioning and change protocol
 
-The schema carries `schemaVersion` 4, printed in the dump schema line and
-frozen in the manifest; version 4 widened `family` to the size faces and
-added delimiters, version 3 added the `rule` node kind and fractions,
-version 2 added `x`/`y` to `hbox`, nested boxes, and per-glyph script
-sizes. Any intentional change to grammar, layout, metrics,
+The schema carries `schemaVersion` 5, printed in the dump schema line
+and frozen in the manifest; version 5 widened `family` to the style
+faces, version 4 widened it to the size faces and added delimiters,
+version 3 added the `rule` node kind and fractions, version 2 added
+`x`/`y` to `hbox`, nested boxes, and per-glyph script sizes. Any intentional change to grammar, layout, metrics,
 schema, or dump — including widening `style`/`family`, adding node kinds or
 fields, or resolving glue — is a public behavior change under plan §5.5:
 one reviewed commit updates this contract, the engine, all shipped

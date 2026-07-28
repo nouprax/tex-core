@@ -12,7 +12,7 @@ public final class Main {
             throw new IllegalStateException("Document.compile returned an empty galley");
         }
         String dump = tree.dump();
-        if (!dump.startsWith("render-tree 4\n")) {
+        if (!dump.startsWith("render-tree 5\n")) {
             throw new IllegalStateException("native payload returned an unexpected tree: " + dump);
         }
     }

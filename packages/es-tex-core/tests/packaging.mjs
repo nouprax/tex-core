@@ -64,7 +64,7 @@ try {
                     "import * as api from '@nouprax/es-tex-core';",
                     "const tree = api.Document.compile('x', { mode: 'mathInline' });",
                     "if (tree.root.children[0].kind !== 'glyph') process.exit(2);",
-                    "if (!tree.dump().startsWith('render-tree 4\\n')) process.exit(3);",
+                    "if (!tree.dump().startsWith('render-tree 5\\n')) process.exit(3);",
                     "if ('memory' in api || 'native' in api) process.exit(4);",
                     "const deep = await import('@nouprax/es-tex-core/dist/wire.js').then(() => true, () => false);",
                     "if (deep) process.exit(5);",

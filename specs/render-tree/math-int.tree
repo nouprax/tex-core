@@ -1,4 +1,4 @@
-render-tree 4
+render-tree 5
 hbox x=0.0pt y=0.0pt width=13.50418pt ascent=16.00134pt descent=9.10822pt src=0..9
   glyph x=0.0pt y=0.01122pt cp=U+222B style=upright family=size2 size=10.0pt width=5.55557pt ascent=13.6pt descent=8.62244pt italic=4.44443pt src=0..4
   hbox x=5.55557pt y=-9.10822pt width=4.20016pt ascent=3.0139pt descent=0.0pt src=4..6

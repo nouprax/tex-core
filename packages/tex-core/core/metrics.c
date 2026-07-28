@@ -24,6 +24,30 @@ const txc_metric *txc_metric_find(tex_core_family family, tex_core_style style, 
         table = TXC_METRICS_SIZE4;
         count = sizeof(TXC_METRICS_SIZE4) / sizeof(TXC_METRICS_SIZE4[0]);
         break;
+    case TEX_CORE_FAMILY_BOLD:
+        table = TXC_METRICS_BOLD;
+        count = sizeof(TXC_METRICS_BOLD) / sizeof(TXC_METRICS_BOLD[0]);
+        break;
+    case TEX_CORE_FAMILY_TEXTIT:
+        table = TXC_METRICS_TEXTIT;
+        count = sizeof(TXC_METRICS_TEXTIT) / sizeof(TXC_METRICS_TEXTIT[0]);
+        break;
+    case TEX_CORE_FAMILY_CAL:
+        table = TXC_METRICS_CAL;
+        count = sizeof(TXC_METRICS_CAL) / sizeof(TXC_METRICS_CAL[0]);
+        break;
+    case TEX_CORE_FAMILY_BB:
+        table = TXC_METRICS_BB;
+        count = sizeof(TXC_METRICS_BB) / sizeof(TXC_METRICS_BB[0]);
+        break;
+    case TEX_CORE_FAMILY_SANS:
+        table = TXC_METRICS_SANS;
+        count = sizeof(TXC_METRICS_SANS) / sizeof(TXC_METRICS_SANS[0]);
+        break;
+    case TEX_CORE_FAMILY_MONO:
+        table = TXC_METRICS_MONO;
+        count = sizeof(TXC_METRICS_MONO) / sizeof(TXC_METRICS_MONO[0]);
+        break;
     case TEX_CORE_FAMILY_MAIN:
     default:
         if (style == TEX_CORE_STYLE_ITALIC) {

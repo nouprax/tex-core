@@ -36,6 +36,18 @@ function decodeFamily(family: number): GlyphFamily {
             return "size3";
         case 4:
             return "size4";
+        case 5:
+            return "bold";
+        case 6:
+            return "textit";
+        case 7:
+            return "cal";
+        case 8:
+            return "bb";
+        case 9:
+            return "sans";
+        case 10:
+            return "mono";
         default:
             return "main";
     }

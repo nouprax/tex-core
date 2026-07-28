@@ -106,6 +106,12 @@ private class WireReader(
                             2 -> GlyphFamily.SIZE2
                             3 -> GlyphFamily.SIZE3
                             4 -> GlyphFamily.SIZE4
+                            5 -> GlyphFamily.BOLD
+                            6 -> GlyphFamily.TEXTIT
+                            7 -> GlyphFamily.CAL
+                            8 -> GlyphFamily.BB
+                            9 -> GlyphFamily.SANS
+                            10 -> GlyphFamily.MONO
                             else -> GlyphFamily.MAIN
                         },
                     size = size,

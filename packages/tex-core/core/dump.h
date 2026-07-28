@@ -1,7 +1,7 @@
 /* Canonical render-tree dump. The output is byte-deterministic: integer
  * scaled-point geometry printed with txc_scaled_format, no floating point,
  * no locale, no pointers. The dump grammar is frozen by
- * docs/specs/render-tree-dump.md; the schema line is `render-tree 4`. */
+ * docs/specs/render-tree-dump.md; the schema line is `render-tree 5`. */
 
 #ifndef TXC_DUMP_H
 #define TXC_DUMP_H
