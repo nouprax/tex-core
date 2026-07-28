@@ -757,15 +757,16 @@ tasks.register("verifyKotlinNativePackaging") {
                     .start()
             val output = process.inputStream.readBytes().decodeToString()
             check(process.waitFor() == 0) { "vtool failed for $payload:\n$output" }
+            // Numeric comparison on major and minor: 15.1 must fail against
+            // the 15.0 floor, so extracting the major alone is not enough.
             val minos =
-                Regex("minos\\s+(\\d+)")
-                    .find(output)
-                    ?.groupValues
-                    ?.get(1)
-                    ?.toInt()
+                Regex("minos\\s+(\\d+)(?:\\.(\\d+))?").find(output)
                     ?: error("vtool reported no minos for $payload")
-            check(minos <= 15) {
-                "JVM native payload requires macOS $minos, above the supported minimum macOS 15"
+            val minosMajor = minos.groupValues[1].toInt()
+            val minosMinor = minos.groupValues[2].ifEmpty { "0" }.toInt()
+            check(minosMajor < 15 || (minosMajor == 15 && minosMinor == 0)) {
+                "JVM native payload requires macOS $minosMajor.$minosMinor, " +
+                    "above the supported minimum macOS 15.0"
             }
         }
     }
