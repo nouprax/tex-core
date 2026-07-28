@@ -208,6 +208,34 @@ static void txc_kern_init(txc_node *node, txc_scaled x, txc_scaled width, tex_co
     node->child_count = 0;
 }
 
+static void txc_glyph_init(
+    txc_node *node,
+    uint32_t codepoint,
+    tex_core_family family,
+    const txc_metric *metric,
+    txc_scaled em,
+    tex_core_range range
+);
+
+/* Initializes a horizontal box node over `children`; the caller fills
+ * width, ascent, and descent. */
+static void txc_box_init(txc_node *box, tex_core_range range, const txc_node **children, size_t child_count) {
+    box->kind = TEX_CORE_NODE_HBOX;
+    box->x = 0;
+    box->y = 0;
+    box->codepoint = 0;
+    box->style = TEX_CORE_STYLE_UPRIGHT;
+    box->family = TEX_CORE_FAMILY_MAIN;
+    box->size = 0;
+    box->width = 0;
+    box->ascent = 0;
+    box->descent = 0;
+    box->italic = 0;
+    box->range = range;
+    box->children = children;
+    box->child_count = child_count;
+}
+
 static tex_core_status txc_fraction_box(
     txc_arena *arena,
     const txc_fraction *fraction,
@@ -313,20 +341,8 @@ txc_clean_box(txc_arena *arena, const txc_field *field, int style, txc_node **ou
         if (box == NULL || children == NULL || glyph == NULL) {
             return txc_alloc_fail(error);
         }
-        glyph->kind = TEX_CORE_NODE_GLYPH;
-        glyph->x = 0;
-        glyph->y = 0;
-        glyph->codepoint = field->codepoint;
+        txc_glyph_init(glyph, field->codepoint, field->family, metric, em, field->range);
         glyph->style = field->style;
-        glyph->family = field->family;
-        glyph->size = em;
-        glyph->width = txc_em(metric->width, em);
-        glyph->ascent = txc_em(metric->height, em);
-        glyph->descent = txc_em(metric->depth, em);
-        glyph->italic = txc_em(metric->italic, em);
-        glyph->range = field->range;
-        glyph->children = NULL;
-        glyph->child_count = 0;
         children[0] = glyph;
         box->kind = TEX_CORE_NODE_HBOX;
         box->x = 0;
@@ -476,20 +492,10 @@ static tex_core_status txc_delimiter_assembly(
         children[index++] = piece;
     }
 
-    box->kind = TEX_CORE_NODE_HBOX;
-    box->x = 0;
-    box->y = 0;
-    box->codepoint = 0;
-    box->style = TEX_CORE_STYLE_UPRIGHT;
-    box->family = TEX_CORE_FAMILY_MAIN;
-    box->size = 0;
+    txc_box_init(box, range, children, index);
     box->width = width;
     box->ascent = total;
     box->descent = 0;
-    box->italic = 0;
-    box->range = range;
-    box->children = children;
-    box->child_count = index;
     *out = box;
     return TEX_CORE_STATUS_OK;
 }
@@ -606,20 +612,10 @@ static tex_core_status txc_delimiter_boxed(
         return txc_alloc_fail(error);
     }
     children[0] = node;
-    box->kind = TEX_CORE_NODE_HBOX;
-    box->x = 0;
-    box->y = 0;
-    box->codepoint = 0;
-    box->style = TEX_CORE_STYLE_UPRIGHT;
-    box->family = TEX_CORE_FAMILY_MAIN;
-    box->size = 0;
+    txc_box_init(box, range, children, 1);
     box->width = node->width;
     box->ascent = txc_max(node->y + node->ascent, 0);
     box->descent = txc_max(node->descent - node->y, 0);
-    box->italic = 0;
-    box->range = range;
-    box->children = children;
-    box->child_count = 1;
     *out = box;
     return TEX_CORE_STATUS_OK;
 }
@@ -787,20 +783,10 @@ static tex_core_status txc_fraction_box(
         descent = txc_max(descent, txc_max(left->descent - left->y, right->descent - right->y));
     }
 
-    box->kind = TEX_CORE_NODE_HBOX;
-    box->x = 0;
-    box->y = 0;
-    box->codepoint = 0;
-    box->style = TEX_CORE_STYLE_UPRIGHT;
-    box->family = TEX_CORE_FAMILY_MAIN;
-    box->size = 0;
+    txc_box_init(box, range, children, child_count);
     box->width = left->width + width + right->width;
     box->ascent = ascent;
     box->descent = descent;
-    box->italic = 0;
-    box->range = range;
-    box->children = children;
-    box->child_count = child_count;
 
     *out = box;
     return TEX_CORE_STATUS_OK;
@@ -898,20 +884,10 @@ static tex_core_status txc_fenced_box(
         descent = txc_max(descent, node->descent - node->y);
     }
 
-    box->kind = TEX_CORE_NODE_HBOX;
-    box->x = 0;
-    box->y = 0;
-    box->codepoint = 0;
-    box->style = TEX_CORE_STYLE_UPRIGHT;
-    box->family = TEX_CORE_FAMILY_MAIN;
-    box->size = 0;
+    txc_box_init(box, range, children, index);
     box->width = cursor;
     box->ascent = ascent;
     box->descent = descent;
-    box->italic = 0;
-    box->range = range;
-    box->children = children;
-    box->child_count = index;
 
     *out = box;
     return TEX_CORE_STATUS_OK;
@@ -1053,20 +1029,10 @@ static tex_core_status txc_radical_box(
         descent = txc_max(descent, index_box->descent - index_box->y);
     }
 
-    box->kind = TEX_CORE_NODE_HBOX;
-    box->x = 0;
-    box->y = 0;
-    box->codepoint = 0;
-    box->style = TEX_CORE_STYLE_UPRIGHT;
-    box->family = TEX_CORE_FAMILY_MAIN;
-    box->size = 0;
+    txc_box_init(box, range, children, index);
     box->width = content_x + radicand->width;
     box->ascent = ascent;
     box->descent = descent;
-    box->italic = 0;
-    box->range = range;
-    box->children = children;
-    box->child_count = index;
 
     *out = box;
     return TEX_CORE_STATUS_OK;
@@ -1145,20 +1111,10 @@ static tex_core_status txc_accent_box(
     children[0] = glyph;
     children[1] = nucleus;
 
-    box->kind = TEX_CORE_NODE_HBOX;
-    box->x = 0;
-    box->y = 0;
-    box->codepoint = 0;
-    box->style = TEX_CORE_STYLE_UPRIGHT;
-    box->family = TEX_CORE_FAMILY_MAIN;
-    box->size = 0;
+    txc_box_init(box, range, children, 2);
     box->width = nucleus->width;
     box->ascent = txc_max(nucleus->ascent, glyph->y + glyph->ascent);
     box->descent = nucleus->descent;
-    box->italic = 0;
-    box->range = range;
-    box->children = children;
-    box->child_count = 2;
     *out = box;
     return TEX_CORE_STATUS_OK;
 }
@@ -1262,20 +1218,9 @@ static tex_core_status txc_atom(
         if (glyph == NULL) {
             return txc_alloc_fail(error);
         }
-        glyph->kind = TEX_CORE_NODE_GLYPH;
-        glyph->x = *cursor;
-        glyph->y = 0;
-        glyph->codepoint = item->nucleus.codepoint;
+        txc_glyph_init(glyph, item->nucleus.codepoint, item->nucleus.family, metric, em, item->nucleus.range);
         glyph->style = item->nucleus.style;
-        glyph->family = item->nucleus.family;
-        glyph->size = em;
-        glyph->width = txc_em(metric->width, em);
-        glyph->ascent = txc_em(metric->height, em);
-        glyph->descent = txc_em(metric->depth, em);
-        glyph->italic = txc_em(metric->italic, em);
-        glyph->range = item->nucleus.range;
-        glyph->children = NULL;
-        glyph->child_count = 0;
+        glyph->x = *cursor;
         children[(*index)++] = glyph;
         nucleus_width = glyph->width;
         delta = glyph->italic;
@@ -1604,20 +1549,10 @@ static tex_core_status txc_mlist(
         descent = txc_max(descent, node->descent - node->y);
     }
 
-    hbox->kind = TEX_CORE_NODE_HBOX;
-    hbox->x = 0;
-    hbox->y = 0;
-    hbox->codepoint = 0;
-    hbox->style = TEX_CORE_STYLE_UPRIGHT;
-    hbox->family = TEX_CORE_FAMILY_MAIN;
-    hbox->size = 0;
+    txc_box_init(hbox, range, children, index);
     hbox->width = cursor;
     hbox->ascent = ascent;
     hbox->descent = descent;
-    hbox->italic = 0;
-    hbox->range = range;
-    hbox->children = children;
-    hbox->child_count = index;
 
     *out = hbox;
     return TEX_CORE_STATUS_OK;
