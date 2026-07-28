@@ -1649,6 +1649,17 @@ tex_core_status txc_parse(
                 {
                     const txc_accent_command *accent_command = txc_accent_find(token.name, token.name_length);
                     if (accent_command != NULL) {
+                        /* A bare accent command is not a legal argument:
+                         * nested accents need braces (\hat{\bar{x}}). */
+                        if (frame->fraction != NULL || frame->radical != NULL || frame->accent != NULL) {
+                            return txc_fail(
+                                error,
+                                TEX_CORE_STATUS_UNSUPPORTED,
+                                &token.range,
+                                "missing %s argument",
+                                txc_argument_noun(frame)
+                            );
+                        }
                         txc_accent *accent = txc_arena_alloc(arena, sizeof(txc_accent));
                         if (accent == NULL) {
                             return txc_fail(error, TEX_CORE_STATUS_ALLOCATION_FAILED, NULL, "allocation failed");
