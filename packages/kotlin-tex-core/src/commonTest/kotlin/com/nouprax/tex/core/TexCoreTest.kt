@@ -63,11 +63,11 @@ class TexCoreTest {
     fun unsupportedInputThrowsStructuredError() {
         val failure =
             assertFailsWith<CompileException> {
-                Document.compile("\\sqrt x", CompileOptions(CompileMode.MATH_INLINE))
+                Document.compile("\\foo x", CompileOptions(CompileMode.MATH_INLINE))
             }
         assertEquals(CompileStatus.UNSUPPORTED, failure.status)
-        assertEquals(SourceRange(0, 5), failure.range)
-        assertEquals("unsupported command \\sqrt", failure.errorMessage)
+        assertEquals(SourceRange(0, 4), failure.range)
+        assertEquals("unsupported command \\foo", failure.errorMessage)
     }
 
     @Test

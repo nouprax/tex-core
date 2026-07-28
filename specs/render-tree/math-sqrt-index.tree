@@ -1,0 +1,11 @@
+render-tree 4
+hbox x=0.0pt y=0.0pt width=13.7709pt ascent=7.6027pt descent=2.3973pt src=0..12
+  hbox x=0.0pt y=0.0pt width=13.7709pt ascent=7.6027pt descent=2.3973pt src=0..11
+    glyph x=-0.27786pt y=-0.39732pt cp=U+221A style=upright family=main size=10.0pt width=8.33344pt ascent=8.00003pt descent=1.99997pt italic=0.0pt src=0..5
+    rule x=8.05557pt y=7.20277pt width=5.71533pt ascent=0.39993pt descent=0.0pt src=0..5
+    kern x=0.0pt width=2.77771pt src=5..5
+    hbox x=2.77771pt y=3.12328pt width=2.5pt ascent=3.2222pt descent=0.0pt src=5..8
+      glyph x=0.0pt y=0.0pt cp=U+0033 style=upright family=main size=5.0pt width=2.5pt ascent=3.2222pt descent=0.0pt italic=0.0pt src=6..7
+    kern x=5.27771pt width=-5.55557pt src=8..8
+    hbox x=8.05557pt y=0.0pt width=5.71533pt ascent=4.30557pt descent=0.0pt src=8..11
+      glyph x=0.0pt y=0.0pt cp=U+0078 style=italic family=main size=10.0pt width=5.71533pt ascent=4.30557pt descent=0.0pt italic=0.0pt src=9..10

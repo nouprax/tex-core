@@ -23,6 +23,8 @@ static int txc_sub_style(int style) { return 2 * (style / 4) + TXC_STYLE_SCRIPT 
 
 static int txc_num_style(int style) { return style + 2 - 2 * (style / 6); }
 
+static int txc_cramped_style(int style) { return 2 * (style / 2) + 1; }
+
 static int txc_denom_style(int style) { return 2 * (style / 2) + 1 + 2 - 2 * (style / 6); }
 
 /* TeX's half(): odd scaled values round up (tex.web section 100). */
@@ -234,6 +236,15 @@ static tex_core_status txc_fenced_box(
     tex_core_error *error
 );
 
+static tex_core_status txc_radical_box(
+    txc_arena *arena,
+    const txc_radical *radical,
+    int style,
+    tex_core_range range,
+    txc_node **out,
+    tex_core_error *error
+);
+
 /* The rule-19 target of one \big size step. */
 static txc_scaled txc_big_target(int size) {
     return txc_delimiter_target(TXC_BIG_HEIGHTS[size - 1] - txc_param(TXC_PARAMETER_AXIS_HEIGHT, TXC_MATHSIZE_TEXT));
@@ -254,6 +265,9 @@ txc_clean_box(txc_arena *arena, const txc_field *field, int style, txc_node **ou
     }
     if (field->kind == TXC_FIELD_FENCED) {
         return txc_fenced_box(arena, field->fenced, style, field->range, out, error);
+    }
+    if (field->kind == TXC_FIELD_RADICAL) {
+        return txc_radical_box(arena, field->radical, style, field->range, out, error);
     }
     if (field->kind == TXC_FIELD_DELIMITER) {
         return txc_delimiter_boxed(
@@ -888,6 +902,161 @@ static tex_core_status txc_fenced_box(
     return TEX_CORE_STATUS_OK;
 }
 
+/* LaTeX's index raise (\r@@t): 0.6 of the radical box's ascent minus
+ * descent, as the 16.16 fraction 39322; and the \mkern amounts flanking
+ * the index, 5 mu and -10 mu of the current size's quad. */
+#define TXC_RADICAL_RAISE 39322
+#define TXC_RADICAL_KERN_BEFORE 18204
+#define TXC_RADICAL_KERN_AFTER 36409
+
+/* Builds a radical's box, TeXbook Appendix G rule 11 (tex.web's
+ * make_radical, section 737): the radicand is a clean box in the cramped
+ * style, the clearance is one rule thickness plus a quarter of the
+ * x-height in display style (a quarter rule thickness otherwise), the
+ * sign grows through the delimiter ladder — stopping at the size4 glyph,
+ * as the vendored faces publish no radical assembly pieces — half of any
+ * excess joins the clearance, and the bar sits over the radicand flush
+ * with the sign's top. The optional LaTeX index is set in uncramped
+ * scriptscript style, raised 0.6 of the sign box's ascent minus descent,
+ * between 5 mu and -10 mu kerns. */
+static tex_core_status txc_radical_box(
+    txc_arena *arena,
+    const txc_radical *radical,
+    int style,
+    tex_core_range range,
+    txc_node **out,
+    tex_core_error *error
+) {
+    static const txc_delimiter sign_delimiter = {0x221A, TXC_LADDER_NEVER, 0, 0, 0, 0, TEX_CORE_FAMILY_MAIN};
+
+    txc_node *radicand;
+    tex_core_status status = txc_clean_box(arena, &radical->argument, txc_cramped_style(style), &radicand, error);
+    if (status != TEX_CORE_STATUS_OK) {
+        return status;
+    }
+
+    txc_mathsize size = txc_style_size(style);
+    txc_scaled thickness = txc_param(TXC_PARAMETER_RULE_THICKNESS, size);
+    txc_scaled clearance =
+        style < TXC_STYLE_TEXT ? thickness + txc_param(TXC_PARAMETER_X_HEIGHT, size) / 4 : thickness + thickness / 4;
+    txc_scaled target = radicand->ascent + radicand->descent + clearance + thickness;
+
+    txc_node *sign;
+    status = txc_delimiter_node(arena, &sign_delimiter, style, target, radical->command, &sign, error);
+    if (status != TEX_CORE_STATUS_OK) {
+        return status;
+    }
+    txc_scaled excess = (sign->ascent + sign->descent) - target;
+    if (excess > 0) {
+        clearance += txc_half(excess);
+    }
+
+    txc_scaled bar_bottom = radicand->ascent + clearance;
+    txc_scaled bar_top = bar_bottom + thickness;
+    sign->y = bar_top - sign->ascent;
+
+    /* The index is laid out against the sign-and-bar box's extents. */
+    txc_scaled base_ascent = bar_top;
+    txc_scaled base_descent = txc_max(radicand->descent, sign->descent - sign->y);
+
+    bool has_index = radical->index.kind != TXC_FIELD_EMPTY;
+    txc_node *index_box = NULL;
+    txc_scaled kern_before = 0;
+    txc_scaled kern_after = 0;
+    txc_scaled raise = 0;
+    if (has_index) {
+        status = txc_mlist(arena, &radical->index.list, 6, true, radical->index.range, &index_box, error);
+        if (status != TEX_CORE_STATUS_OK) {
+            return status;
+        }
+        kern_before = txc_em(TXC_RADICAL_KERN_BEFORE, txc_quad(size));
+        kern_after = txc_em(TXC_RADICAL_KERN_AFTER, txc_quad(size));
+        raise = txc_em(TXC_RADICAL_RAISE, base_ascent - base_descent);
+        index_box->x = kern_before;
+        index_box->y = raise;
+    }
+
+    /* LaTeX's -10 mu deliberately tucks the sign under the raised
+     * index, so the lead may be negative and the sign may start left of
+     * the previous advance. */
+    txc_scaled lead = has_index ? kern_before + index_box->width - kern_after : 0;
+    sign->x = lead;
+    txc_scaled content_x = lead + sign->width;
+
+    txc_node *rule = txc_arena_alloc(arena, sizeof(txc_node));
+    txc_node *box = txc_arena_alloc(arena, sizeof(txc_node));
+    size_t child_count = has_index ? 6 : 3;
+    const txc_node **children = txc_arena_alloc(arena, child_count * sizeof(*children));
+    txc_node *before = NULL;
+    txc_node *after = NULL;
+    if (has_index) {
+        before = txc_arena_alloc(arena, sizeof(txc_node));
+        after = txc_arena_alloc(arena, sizeof(txc_node));
+    }
+    if (rule == NULL || box == NULL || children == NULL || (has_index && (before == NULL || after == NULL))) {
+        return txc_alloc_fail(error);
+    }
+
+    rule->kind = TEX_CORE_NODE_RULE;
+    rule->x = content_x;
+    rule->y = bar_bottom;
+    rule->codepoint = 0;
+    rule->style = TEX_CORE_STYLE_UPRIGHT;
+    rule->family = TEX_CORE_FAMILY_MAIN;
+    rule->size = 0;
+    rule->width = radicand->width;
+    rule->ascent = thickness;
+    rule->descent = 0;
+    rule->italic = 0;
+    rule->range = radical->command;
+    rule->children = NULL;
+    rule->child_count = 0;
+
+    radicand->x = content_x;
+    radicand->y = 0;
+
+    /* Child order is source order: the sign and the bar carry the
+     * command token, the index kerns anchor at the bracket edges. */
+    size_t index = 0;
+    children[index++] = sign;
+    children[index++] = rule;
+    if (has_index) {
+        tex_core_range before_edge = {radical->index.range.begin, radical->index.range.begin};
+        txc_kern_init(before, 0, kern_before, before_edge);
+        tex_core_range after_edge = {radical->index.range.end, radical->index.range.end};
+        txc_kern_init(after, kern_before + index_box->width, -kern_after, after_edge);
+        children[index++] = before;
+        children[index++] = index_box;
+        children[index++] = after;
+    }
+    children[index++] = radicand;
+
+    txc_scaled ascent = base_ascent;
+    txc_scaled descent = base_descent;
+    if (has_index) {
+        ascent = txc_max(ascent, index_box->y + index_box->ascent);
+        descent = txc_max(descent, index_box->descent - index_box->y);
+    }
+
+    box->kind = TEX_CORE_NODE_HBOX;
+    box->x = 0;
+    box->y = 0;
+    box->codepoint = 0;
+    box->style = TEX_CORE_STYLE_UPRIGHT;
+    box->family = TEX_CORE_FAMILY_MAIN;
+    box->size = 0;
+    box->width = content_x + radicand->width;
+    box->ascent = ascent;
+    box->descent = descent;
+    box->italic = 0;
+    box->range = range;
+    box->children = children;
+    box->child_count = index;
+
+    *out = box;
+    return TEX_CORE_STATUS_OK;
+}
+
 /* Nodes one atom contributes to its list: the nucleus rendering plus one
  * box per script. Shared by the counting and building passes. */
 static size_t txc_atom_nodes(const txc_item *item) {
@@ -963,6 +1132,9 @@ static tex_core_status txc_atom(
             break;
         case TXC_FIELD_FENCED:
             status = txc_fenced_box(arena, item->nucleus.fenced, style, item->nucleus.range, &box, error);
+            break;
+        case TXC_FIELD_RADICAL:
+            status = txc_radical_box(arena, item->nucleus.radical, style, item->nucleus.range, &box, error);
             break;
         case TXC_FIELD_DELIMITER:
             status = txc_delimiter_boxed(
