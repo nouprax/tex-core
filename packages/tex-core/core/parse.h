@@ -32,6 +32,12 @@ typedef enum txc_atom_class {
     TXC_ATOM_INNER = 7
 } txc_atom_class;
 
+/* When a big operator or limit-taking function name places its scripts
+ * as limits above and below: in display style only (the TeX default for
+ * sums and \lim), always (\limits), or never (integrals, \sin, and
+ * \nolimits). */
+typedef enum txc_op_limits { TXC_LIMITS_DISPLAY = 0, TXC_LIMITS_NEVER = 1, TXC_LIMITS_ALWAYS = 2 } txc_op_limits;
+
 /* Explicit spacing amounts. WORD is the interword space; the math spaces
  * are the classic mu-based commands resolved against the style's quad. */
 typedef enum txc_space {
@@ -175,6 +181,8 @@ typedef struct txc_item {
     txc_field sup;
     txc_field sub;
     bool sub_first;
+    /* TXC_ATOM_OP only: how the scripts place as limits. */
+    txc_op_limits op_limits;
     /* TXC_ITEM_SPACE only. */
     txc_space space;
     /* The whole construct: nucleus through the last script. */

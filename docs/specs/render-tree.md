@@ -257,6 +257,32 @@ Child order is source order: sign, bar, then for an indexed radical the
 5 mu kern, the index box, and the -10 mu kern (the kerns anchor at the
 bracket edges), then the radicand box.
 
+## Operators
+
+The big operators (`\sum`, `\prod`, `\coprod`, `\int`, `\oint`, and
+the `\big...` set-operator family) are Op atoms whose glyph comes from
+the `size1` face — `size2` in display style — always at the text em and
+vertically centered on the math axis (tex.web's `make_op`); its italic
+correction is the script delta, so a `\nolimits` integral tucks its
+subscript under the slant. The function names (`\sin` through `\Pr`)
+are Op atoms whose nucleus is the upright letter run at the current
+size; `\limsup` and `\liminf` carry their inner thin space.
+
+Scripts on an Op atom place as limits — the TeXbook rule 13a assembly —
+in display style for the sums and the `\lim` family, never for the
+integrals and the `\sin` family; `\limits` and `\nolimits` directly
+after an Op atom override its default and extend its source range, and
+anywhere else they are the structured error `misplaced \limits`/
+`misplaced \nolimits`. A limits assembly is one hbox: the operator
+centered in the common width, the superscript box centered above
+(nudged half the italic correction right) behind the `bigOpSpacing3`/
+`bigOpSpacing1` clearance, the subscript box centered below (nudged
+half left) behind `bigOpSpacing4`/`bigOpSpacing2`, and the assembly's
+ascent and descent gain the `bigOpSpacing5` pads — the one hbox whose
+extent deliberately exceeds its children's maxima. Its children keep
+source order: operator, then the script boxes in written order. Without
+limits the scripts attach exactly as on any box nucleus.
+
 ## Source ranges
 
 Every node records the byte range of the source it came from, for caret

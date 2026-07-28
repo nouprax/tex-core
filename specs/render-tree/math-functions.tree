@@ -1,0 +1,17 @@
+render-tree 4
+hbox x=0.0pt y=0.0pt width=51.72745pt ascent=6.94443pt descent=1.94443pt src=0..14
+  hbox x=0.0pt y=0.0pt width=12.27798pt ascent=6.67862pt descent=0.0pt src=0..4
+    glyph x=0.0pt y=0.0pt cp=U+0073 style=upright family=main size=10.0pt width=3.94455pt ascent=4.30557pt descent=0.0pt italic=0.0pt src=0..4
+    glyph x=3.94455pt y=0.0pt cp=U+0069 style=upright family=main size=10.0pt width=2.77786pt ascent=6.67862pt descent=0.0pt italic=0.0pt src=0..4
+    glyph x=6.72241pt y=0.0pt cp=U+006E style=upright family=main size=10.0pt width=5.55557pt ascent=4.30557pt descent=0.0pt italic=0.0pt src=0..4
+  kern x=12.27798pt width=1.66672pt src=4..5
+  glyph x=13.9447pt y=0.0pt cp=U+0078 style=italic family=main size=10.0pt width=5.71533pt ascent=4.30557pt descent=0.0pt italic=0.0pt src=5..6
+  kern x=19.66003pt width=2.22229pt src=6..6
+  glyph x=21.88232pt y=0.0pt cp=U+002B style=upright family=main size=10.0pt width=7.77786pt ascent=5.83328pt descent=0.83328pt italic=0.0pt src=6..7
+  kern x=29.66019pt width=2.22229pt src=7..7
+  hbox x=31.88248pt y=0.0pt width=12.91672pt ascent=6.94443pt descent=1.94443pt src=7..11
+    glyph x=0.0pt y=0.0pt cp=U+006C style=upright family=main size=10.0pt width=2.77786pt ascent=6.94443pt descent=0.0pt italic=0.0pt src=7..11
+    glyph x=2.77786pt y=0.0pt cp=U+006F style=upright family=main size=10.0pt width=5.0pt ascent=4.30557pt descent=0.0pt italic=0.0pt src=7..11
+    glyph x=7.77786pt y=0.0pt cp=U+0067 style=upright family=main size=10.0pt width=5.0pt ascent=4.30557pt descent=1.94443pt italic=0.13885pt src=7..11
+  kern x=44.7992pt width=1.66672pt src=11..12
+  glyph x=46.46591pt y=0.0pt cp=U+0079 style=italic family=main size=10.0pt width=4.9028pt ascent=4.30557pt descent=1.94443pt italic=0.35873pt src=12..13
