@@ -125,10 +125,13 @@ typedef struct txc_sized_delimiter {
 typedef struct txc_field {
     txc_field_kind kind;
     /* TXC_FIELD_CHAR only. `family` is main except under a style
-     * switch, which rewrites letter and digit characters in place. */
+     * switch, which rewrites letter and digit characters in place;
+     * `text_face` marks a bare \text character, which an outer style
+     * switch leaves alone like all \text content. */
     uint32_t codepoint;
     tex_core_style style;
     tex_core_family family;
+    bool text_face;
     /* TXC_FIELD_LIST and TXC_FIELD_TEXT. */
     txc_list list;
     /* TXC_FIELD_FRACTION only. */
