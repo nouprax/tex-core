@@ -35,8 +35,8 @@ enum RenderTreeResourceGenerator {
         } catch {
             throw GeneratorFailure.invalidManifest(String(describing: error))
         }
-        guard manifest.schemaVersion == 4, !manifest.cases.isEmpty else {
-            throw GeneratorFailure.invalidManifest("schemaVersion 4 requires at least one case")
+        guard manifest.schemaVersion == 5, !manifest.cases.isEmpty else {
+            throw GeneratorFailure.invalidManifest("schemaVersion 5 requires at least one case")
         }
         guard Set(manifest.cases.map(\.name)).count == manifest.cases.count else {
             throw GeneratorFailure.invalidManifest("case names must be unique")

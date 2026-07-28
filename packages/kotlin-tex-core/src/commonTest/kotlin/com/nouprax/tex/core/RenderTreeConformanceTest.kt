@@ -70,6 +70,6 @@ class RenderTreeConformanceTest {
                 CompileStatus.ALLOCATION_FAILED -> "allocation-failed"
             }
         val src = failure.range?.let { "${it.begin}..${it.end}" } ?: "none"
-        return "render-error 4\nerror status=$status src=$src message=${failure.errorMessage}\n"
+        return "render-error 5\nerror status=$status src=$src message=${failure.errorMessage}\n"
     }
 }

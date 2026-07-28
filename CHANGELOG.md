@@ -6,6 +6,22 @@ not promised to remain compatible between releases.
 
 ## Unreleased
 
+- Complete the milestone M1 surface with the style switches and \text,
+  moving the render-tree contract to schemaVersion 5: the glyph
+  `family` widens to the style faces (`bold`, `textit`, `cal`, `bb`,
+  `sans`, `mono` — Main-Bold, Main-Italic, Caligraphic, AMS,
+  SansSerif, and Typewriter letter/digit runs vendored from KaTeX).
+  \mathrm through \mathtt take one argument like an accent and
+  rewrite its letters and digits in place through every nested
+  construct, leaving every other atom and shape untouched — faces
+  without a glyph (calligraphic or double-struck lowercase) stay
+  structured unsupported-character errors. \text sets a braced
+  argument by document rules at the current size (blanks become
+  interword kerns, the math surface stays rejected until M3), scales
+  in scripts, and keeps its own faces under an outer style switch.
+  New pinned errors: `missing style argument`, `missing text
+  argument`. Corpus 74 -> 80 cases, and all four bindings widen
+  `GlyphFamily` again and replay byte-exactly.
 - Continue milestone M1 (math core) with math accents: \hat \check
   \tilde \acute \grave \dot \ddot \breve \bar \vec take one
   argument like a radical (`missing accent argument` pinned), the

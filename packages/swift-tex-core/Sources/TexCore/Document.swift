@@ -122,14 +122,15 @@ extension RenderNode {
         )
     }
 
+    /// The native family values in enum order (the contract's family
+    /// inventory); anything out of range reads as main.
+    private static let families: [GlyphFamily] = [
+        .main, .size1, .size2, .size3, .size4, .bold, .textit, .cal, .bb, .sans, .mono
+    ]
+
     private static func family(of native: tex_core_family) -> GlyphFamily {
-        switch native {
-        case TEX_CORE_FAMILY_SIZE1: .size1
-        case TEX_CORE_FAMILY_SIZE2: .size2
-        case TEX_CORE_FAMILY_SIZE3: .size3
-        case TEX_CORE_FAMILY_SIZE4: .size4
-        default: .main
-        }
+        let index = Int(native.rawValue)
+        return index < families.count ? families[index] : .main
     }
 
     private static func copyBox(_ node: OpaquePointer, _ frame: tex_core_frame, _ src: SourceRange) -> HBox {

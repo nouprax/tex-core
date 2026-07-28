@@ -1,5 +1,5 @@
 {
-    "schemaVersion": 4,
+    "schemaVersion": 5,
     "contract": "docs/specs/render-tree.md",
     "dumpGrammar": "docs/specs/render-tree-dump.md",
     "format": {
@@ -141,7 +141,11 @@
             "accent.over",
             "accent.wide",
             "accent.raised",
-            "error.missingAccent"
+            "error.missingAccent",
+            "style.face",
+            "style.scoped",
+            "text.words",
+            "error.missingStyle"
         ],
         "orders": [
             "root.hbox",
@@ -2355,6 +2359,180 @@
                     "mode.mathInline",
                     "outcome.error",
                     "error.missingAccent"
+                ],
+                "orders": []
+            }
+        },
+        {
+            "name": "math-styles",
+            "input": "math-styles.tex",
+            "expected": "math-styles.tree",
+            "compileOptions": {
+                "mode": "mathInline"
+            },
+            "outcome": "tree",
+            "coverage": {
+                "kinds": [
+                    "hbox",
+                    "glyph",
+                    "kern"
+                ],
+                "states": [
+                    "mode.mathInline",
+                    "outcome.tree",
+                    "children.populated",
+                    "atom.lower",
+                    "atom.digit",
+                    "atom.bin",
+                    "glyph.style.upright",
+                    "glyph.style.italic",
+                    "glyph.italic.zero",
+                    "bin.kept",
+                    "space.interAtom.medium",
+                    "kern.boundaryRange",
+                    "style.face",
+                    "style.scoped",
+                    "measure.zero"
+                ],
+                "orders": [
+                    "root.hbox",
+                    "children.sourceOrder"
+                ]
+            }
+        },
+        {
+            "name": "math-styles-faces",
+            "input": "math-styles-faces.tex",
+            "expected": "math-styles-faces.tree",
+            "compileOptions": {
+                "mode": "mathInline"
+            },
+            "outcome": "tree",
+            "coverage": {
+                "kinds": [
+                    "hbox",
+                    "glyph",
+                    "kern"
+                ],
+                "states": [
+                    "mode.mathInline",
+                    "outcome.tree",
+                    "children.populated",
+                    "atom.bin",
+                    "glyph.style.upright",
+                    "glyph.italic.zero",
+                    "bin.kept",
+                    "space.interAtom.medium",
+                    "kern.boundaryRange",
+                    "style.face",
+                    "measure.zero"
+                ],
+                "orders": [
+                    "root.hbox",
+                    "children.sourceOrder"
+                ]
+            }
+        },
+        {
+            "name": "math-text",
+            "input": "math-text.tex",
+            "expected": "math-text.tree",
+            "compileOptions": {
+                "mode": "mathInline"
+            },
+            "outcome": "tree",
+            "coverage": {
+                "kinds": [
+                    "hbox",
+                    "glyph",
+                    "kern"
+                ],
+                "states": [
+                    "mode.mathInline",
+                    "outcome.tree",
+                    "children.populated",
+                    "atom.lower",
+                    "glyph.style.upright",
+                    "glyph.style.italic",
+                    "glyph.italic.zero",
+                    "script.sup",
+                    "size.script",
+                    "text.words",
+                    "measure.zero"
+                ],
+                "orders": [
+                    "root.hbox",
+                    "children.sourceOrder"
+                ]
+            }
+        },
+        {
+            "name": "math-styles-nested",
+            "input": "math-styles-nested.tex",
+            "expected": "math-styles-nested.tree",
+            "compileOptions": {
+                "mode": "mathInline"
+            },
+            "outcome": "tree",
+            "coverage": {
+                "kinds": [
+                    "hbox",
+                    "glyph",
+                    "kern",
+                    "rule"
+                ],
+                "states": [
+                    "mode.mathInline",
+                    "outcome.tree",
+                    "children.populated",
+                    "glyph.style.upright",
+                    "glyph.italic.zero",
+                    "fraction.frac",
+                    "fraction.groupArgument",
+                    "radical.sign",
+                    "kern.nullDelimiter",
+                    "style.face",
+                    "size.script",
+                    "measure.zero",
+                    "measure.negative"
+                ],
+                "orders": [
+                    "root.hbox"
+                ]
+            }
+        },
+        {
+            "name": "error-missing-style",
+            "input": "error-missing-style.tex",
+            "expected": "error-missing-style.tree",
+            "compileOptions": {
+                "mode": "mathInline"
+            },
+            "outcome": "error",
+            "coverage": {
+                "kinds": [],
+                "states": [
+                    "mode.mathInline",
+                    "outcome.error",
+                    "error.missingStyle"
+                ],
+                "orders": []
+            }
+        },
+        {
+            "name": "error-text-surface",
+            "input": "error-text-surface.tex",
+            "expected": "error-text-surface.tree",
+            "compileOptions": {
+                "mode": "mathInline"
+            },
+            "outcome": "error",
+            "coverage": {
+                "kinds": [],
+                "states": [
+                    "mode.mathInline",
+                    "outcome.error",
+                    "error.unsupportedCharacter"
                 ],
                 "orders": []
             }

@@ -65,7 +65,7 @@ const valueChecks = {
     size: measure,
     cp: /^U\+[0-9A-F]{4,6}$/,
     style: /^(upright|italic)$/,
-    family: /^(main|size[1-4])$/,
+    family: /^(main|size[1-4]|bold|textit|cal|bb|sans|mono)$/,
     src: rangeValue
 };
 
@@ -601,7 +601,26 @@ const stateValidators = {
         )
     ),
     "error.missingAccent": ({ outcome, tree }) =>
-        outcome === "error" && / message=missing accent argument\n$/.test(tree)
+        outcome === "error" && / message=missing accent argument\n$/.test(tree),
+    "style.face": ({ outcome, tree }) => outcome === "tree" && / family=(bold|textit|cal|bb|sans|mono) /.test(tree),
+    // A style rewrite touches letters and digits only: the styled case
+    // must keep at least one main-family glyph from the untouched
+    // surroundings.
+    "style.scoped": ({ outcome, source, tree }) =>
+        outcome === "tree" &&
+        /\\math(bf|bb|cal|sf|tt|it|rm)/.test(source ?? "") &&
+        / family=(bold|textit|cal|bb|sans|mono) /.test(tree) &&
+        / style=upright family=main /.test(tree),
+    // \text content: an upright main word with an interword kern whose
+    // source is the blank between the words.
+    "text.words": ({ outcome, source, tree }) =>
+        outcome === "tree" &&
+        /\\text\{[^}]* [^}]*\}/.test(source ?? "") &&
+        [...tree.matchAll(/^ +kern .*width=3\.33328pt src=(\d+)\.\.(\d+)$/gm)].some(
+            (match) => Number(match[2]) > Number(match[1])
+        ),
+    "error.missingStyle": ({ outcome, tree }) =>
+        outcome === "error" && / message=missing (style|text) argument\n$/.test(tree)
 };
 const orderValidators = {
     "root.hbox": ({ outcome, tree }) =>
@@ -613,7 +632,7 @@ const orderValidators = {
     }
 };
 
-if (manifest.schemaVersion !== 4) failures.push("manifest schemaVersion must be 4");
+if (manifest.schemaVersion !== 5) failures.push("manifest schemaVersion must be 5");
 if (manifest.contract !== "docs/specs/render-tree.md" || manifest.dumpGrammar !== "docs/specs/render-tree-dump.md") {
     failures.push("manifest contract paths drifted from the repository specifications");
 }
