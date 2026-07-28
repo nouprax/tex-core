@@ -85,11 +85,13 @@ typedef enum txc_field_kind {
     TXC_FIELD_LIST = 2,
     TXC_FIELD_FRACTION = 3,
     TXC_FIELD_DELIMITER = 4,
-    TXC_FIELD_FENCED = 5
+    TXC_FIELD_FENCED = 5,
+    TXC_FIELD_RADICAL = 6
 } txc_field_kind;
 
 struct txc_fraction;
 struct txc_fenced;
+struct txc_radical;
 
 /* An explicit-size delimiter (\bigl … \Biggr): the delimiter and the
  * plain TeX size step 1-4 (\big through \Bigg). */
@@ -111,6 +113,8 @@ typedef struct txc_field {
     txc_sized_delimiter sized;
     /* TXC_FIELD_FENCED only. */
     struct txc_fenced *fenced;
+    /* TXC_FIELD_RADICAL only. */
+    struct txc_radical *radical;
     /* The field's own source construct: the character or symbol command,
      * the braced group including its braces, the fraction command through
      * its last argument, the size command through its delimiter, \left
@@ -119,6 +123,15 @@ typedef struct txc_field {
      * range at the attachment point. */
     tex_core_range range;
 } txc_field;
+
+/* A radical (\sqrt): the mandatory radicand and the optional index of
+ * the LaTeX bracket form. `command` is the \sqrt token — the source the
+ * sign and the bar are attributed to. */
+typedef struct txc_radical {
+    txc_field index;
+    txc_field argument;
+    tex_core_range command;
+} txc_radical;
 
 /* A \left/\right fence: both delimiters with their own token ranges and
  * the enclosed sub-list. */

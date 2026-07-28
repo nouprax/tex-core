@@ -60,13 +60,13 @@ import TexCore
     @Test("unsupported input throws the structured fail-fast error")
     func unsupported() {
         do {
-            _ = try Document.compile("\\sqrt x", options: CompileOptions(mode: .mathInline))
+            _ = try Document.compile("\\foo x", options: CompileOptions(mode: .mathInline))
             Issue.record("compile unexpectedly succeeded")
         } catch let error as CompileError {
             #expect(error.status == .unsupported)
-            #expect(error.range == SourceRange(begin: 0, end: 5))
-            #expect(error.message == "unsupported command \\sqrt")
-            #expect(error.description == "unsupported command \\sqrt (bytes 0..5)")
+            #expect(error.range == SourceRange(begin: 0, end: 4))
+            #expect(error.message == "unsupported command \\foo")
+            #expect(error.description == "unsupported command \\foo (bytes 0..4)")
         } catch {
             Issue.record("unexpected error type: \(error)")
         }

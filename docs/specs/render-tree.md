@@ -228,6 +228,35 @@ for `r`, Rel for `m`, and Ord for the bare forms; the published node is
 the same centered glyph or assembly, and scripts attach to it like to
 any atom.
 
+## Radicals
+
+`\sqrt` is a math-mode command taking one mandatory argument (a
+character, a symbol command, a sized delimiter, or a braced group) after
+an optional LaTeX index: a `[` directly after the command opens the
+index, which runs to the matching `]` — braces nest inside it, anywhere
+else `[` stays an ordinary Open atom. A missing argument is the
+structured error `missing radical argument` (the offending token, or the
+command at end of input); an unterminated index is `unclosed radical
+index` at its `[`. A radical is one Ord atom and a legal script argument.
+
+Layout is TeXbook Appendix G rule 11 (tex.web's `make_radical`): the
+radicand is a clean box in the cramped current style; the clearance is
+one `defaultRuleThickness` plus a quarter of the x-height in display
+style, a quarter thickness otherwise; the sign runs the delimiter ladder
+against radicand height + depth + clearance + thickness — stopping at
+the `size4` glyph, exactly like the ladders without published assembly
+pieces — and half of any excess joins the clearance. The bar is a `rule`
+of the current thickness whose bottom sits the clearance above the
+radicand, flush with the sign's ink top; sign and bar carry the command
+token's source. The index is laid out in uncramped scriptscript style,
+raised 0.6 (the 16.16 fraction 39322) of the sign-and-bar box's ascent
+minus descent, between kerns of 5 mu and -10 mu of the current size's
+quad (LaTeX's `\r@@t` exactly — the negative kern deliberately tucks
+the sign under the raised index, so the sign's `x` may be negative).
+Child order is source order: sign, bar, then for an indexed radical the
+5 mu kern, the index box, and the -10 mu kern (the kerns anchor at the
+bracket edges), then the radicand box.
+
 ## Source ranges
 
 Every node records the byte range of the source it came from, for caret
