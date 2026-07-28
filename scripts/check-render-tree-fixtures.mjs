@@ -515,7 +515,14 @@ const stateValidators = {
     ),
     "error.missingRight": ({ outcome, tree }) => outcome === "error" && / message=missing \\right\n$/.test(tree),
     "error.unmatchedRight": ({ outcome, tree }) => outcome === "error" && / message=unmatched \\right\n$/.test(tree),
-    "error.missingDelimiter": ({ outcome, tree }) => outcome === "error" && / message=missing delimiter\n$/.test(tree)
+    "error.missingDelimiter": ({ outcome, tree }) => outcome === "error" && / message=missing delimiter\n$/.test(tree),
+    "radical.sign": ({ outcome, source, tree }) =>
+        outcome === "tree" && /\\sqrt/.test(source ?? "") && / cp=U\+221A /.test(tree) && /^ +rule /m.test(tree),
+    "radical.index": ({ outcome, source, tree }) =>
+        outcome === "tree" && /\\sqrt\[/.test(source ?? "") && / width=-/.test(tree),
+    "error.missingRadical": ({ outcome, tree }) =>
+        outcome === "error" && / message=missing radical argument\n$/.test(tree),
+    "error.unclosedIndex": ({ outcome, tree }) => outcome === "error" && / message=unclosed radical index\n$/.test(tree)
 };
 const orderValidators = {
     "root.hbox": ({ outcome, tree }) =>

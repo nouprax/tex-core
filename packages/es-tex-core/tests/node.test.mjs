@@ -35,15 +35,15 @@ test("api: repeated compiles are structurally identical", () => {
 test("errors: unsupported input throws the structured fail-fast error", () => {
     let failure;
     try {
-        Document.compile("\\sqrt x", { mode: "mathInline" });
+        Document.compile("\\foo x", { mode: "mathInline" });
     } catch (error) {
         failure = error;
     }
     assert.ok(failure instanceof CompileError);
     assert.equal(failure.status, "unsupported");
-    assert.deepEqual(failure.range, { begin: 0, end: 5 });
-    assert.equal(failure.errorMessage, "unsupported command \\sqrt");
-    assert.equal(failure.message, "unsupported command \\sqrt (bytes 0..5)");
+    assert.deepEqual(failure.range, { begin: 0, end: 4 });
+    assert.equal(failure.errorMessage, "unsupported command \\foo");
+    assert.equal(failure.message, "unsupported command \\foo (bytes 0..4)");
 });
 
 test("errors: invalid bytes throw the encoding error, never replace", () => {

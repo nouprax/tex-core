@@ -6,6 +6,21 @@ not promised to remain compatible between releases.
 
 ## Unreleased
 
+- Continue milestone M1 (math core) with radicals: `\sqrt` takes one
+  mandatory argument after LaTeX's optional bracket index, is one Ord
+  atom, and is a legal script argument. Layout is TeXbook Appendix G
+  rule 11 (tex.web's make_radical): the radicand is a clean box in the
+  cramped style, the clearance is a rule thickness plus a quarter
+  x-height in display style (a quarter thickness otherwise) and gains
+  half the sign's excess, the sign runs the delimiter ladder capped at
+  the size4 glyph (the vendored faces publish no radical assembly
+  pieces), and the bar is a rule flush with the sign's ink top. The
+  index sets in uncramped scriptscript style, raised 0.6 of the sign
+  box's ascent minus descent between 5 mu and -10 mu kerns, exactly as
+  LaTeX's \r@@t — the negative kern may pull the sign's x negative.
+  New pinned errors: `missing radical argument` and `unclosed radical
+  index`. The corpus grows to 62 cases; the schema is unchanged at
+  version 4, so no binding code changes.
 - Continue milestone M1 (math core) with variable-size delimiters, moving
   the render-tree contract to schemaVersion 4: `\left`/`\right` fences,
   the explicit-size family (`\bigl` through `\Biggr`, plain TeX's fixed

@@ -634,6 +634,57 @@ static void txc_test_delimiters(txc_test *test) {
     tex_core_render_tree_free(tree);
 }
 
+static void txc_test_radicals(txc_test *test) {
+    /* Rule 11 in text style: clearance starts at 1.25 thicknesses and
+     * gains half the sign's excess; the bar (one thickness thick) sits
+     * flush with the sign's ink top. */
+    tex_core_render_tree *tree = txc_compile(test, "\\sqrt{x+1}", TEX_CORE_MODE_MATH_INLINE, "sqrt");
+    const tex_core_node *box = tex_core_node_child(tex_core_render_tree_root(tree), 0);
+    txc_check_size(test, tex_core_node_child_count(box), 3, "sqrt children");
+    const tex_core_node *sign = tex_core_node_child(box, 0);
+    const tex_core_node *bar = tex_core_node_child(box, 1);
+    const tex_core_node *radicand = tex_core_node_child(box, 2);
+    txc_check_int(test, (long long)tex_core_node_glyph(sign).codepoint, 0x221A, "sqrt sign");
+    txc_check_int(test, tex_core_node_get_kind(bar), TEX_CORE_NODE_RULE, "sqrt bar is a rule");
+    txc_check(test, tex_core_node_frame(bar).ascent == txc_expected_points(0.04), "bar thickness");
+    tex_core_frame sign_frame = tex_core_node_frame(sign);
+    tex_core_frame bar_frame = tex_core_node_frame(bar);
+    txc_check(
+        test,
+        bar_frame.y + bar_frame.ascent == sign_frame.y + sign_frame.ascent,
+        "the bar top is flush with the sign top"
+    );
+    txc_check(test, bar_frame.width == tex_core_node_frame(radicand).width, "the bar spans the radicand");
+    tex_core_frame whole = tex_core_node_frame(box);
+    txc_check(test, whole.ascent == bar_frame.y + bar_frame.ascent, "box ascent is the bar top");
+    tex_core_render_tree_free(tree);
+
+    /* The optional index sets at 5pt, raised, with the -10mu tuck. */
+    tree = txc_compile(test, "\\sqrt[3]{x}", TEX_CORE_MODE_MATH_INLINE, "sqrt index");
+    box = tex_core_node_child(tex_core_render_tree_root(tree), 0);
+    txc_check_size(test, tex_core_node_child_count(box), 6, "indexed sqrt children");
+    const tex_core_node *index_box = tex_core_node_child(box, 3);
+    txc_check(test, tex_core_node_frame(index_box).y > 0.0, "index is raised");
+    txc_check(
+        test,
+        tex_core_node_glyph(tex_core_node_child(index_box, 0)).size == 5.0,
+        "index sets at scriptscript size"
+    );
+    txc_check(test, tex_core_node_frame(tex_core_node_child(box, 4)).width < 0.0, "the -10mu kern tucks the sign");
+    tex_core_render_tree_free(tree);
+
+    /* A tall radicand climbs the size faces. */
+    tree = txc_compile(test, "\\sqrt{\\dfrac{1}{2}}", TEX_CORE_MODE_MATH_DISPLAY, "sqrt tall");
+    box = tex_core_node_child(tex_core_render_tree_root(tree), 0);
+    txc_check_int(
+        test,
+        tex_core_node_glyph(tex_core_node_child(box, 0)).family,
+        TEX_CORE_FAMILY_SIZE3,
+        "tall sqrt sign from Size3"
+    );
+    tex_core_render_tree_free(tree);
+}
+
 int main(void) {
     txc_test test = {0, 0};
     txc_test_math_glyph(&test);
@@ -647,5 +698,6 @@ int main(void) {
     txc_test_symbol_commands(&test);
     txc_test_fractions(&test);
     txc_test_delimiters(&test);
+    txc_test_radicals(&test);
     return txc_test_finish(&test, "engine");
 }

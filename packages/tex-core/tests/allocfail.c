@@ -107,6 +107,9 @@ int main(void) {
     /* Fences allocate the construct, both delimiter nodes or assemblies,
      * and the spliced box; \binom adds the sized parentheses. */
     txc_sweep(&test, "\\left[\\binom{n}{k}\\right]+\\bigl(x\\bigr)", TEX_CORE_MODE_MATH_DISPLAY);
+    /* Radicals allocate the construct, the sign, the bar, the index box,
+     * and its flanking kerns. */
+    txc_sweep(&test, "\\sqrt[3]{x+1}+\\sqrt2", TEX_CORE_MODE_MATH_DISPLAY);
     txc_allocation_limit(-1);
     return txc_test_finish(&test, "allocfail");
 }
