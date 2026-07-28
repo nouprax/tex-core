@@ -1,4 +1,4 @@
-/* Embedded font metrics (plan decision D5): compiled-in static tables, no
+/* Embedded font metrics: compiled-in static tables, no
  * file I/O. Regenerate with scripts/generate-metrics.mjs. */
 
 #ifndef TXC_METRICS_H

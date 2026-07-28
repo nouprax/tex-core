@@ -744,16 +744,6 @@ static const txc_command_entry *txc_command_lookup(const uint8_t *name, size_t n
     return NULL;
 }
 
-bool txc_command_table_sorted(void) {
-    size_t count = sizeof(TXC_COMMANDS) / sizeof(TXC_COMMANDS[0]);
-    for (size_t index = 1; index < count; index++) {
-        if (strcmp(TXC_COMMANDS[index - 1].name, TXC_COMMANDS[index].name) >= 0) {
-            return false;
-        }
-    }
-    return true;
-}
-
 /* The plain TeX delimiter set (\delcode assignments plus the delimiter
  * control words): each row maps a source spelling to its main-family
  * text glyph, its growth ladder, and its extensible pieces. Piece data
@@ -850,6 +840,64 @@ static const txc_size_command TXC_SIZE_COMMANDS[] = {
     {"bigr", TXC_ATOM_CLOSE, 1},
 };
 
+/* One dispatch row's payload name, or NULL when the index is out of bounds
+ * for its class table. Payload-free classes (\left, \right, \sqrt,
+ * \limits, \nolimits) report the dispatch name itself for index 0. */
+static const char *txc_command_payload_name(const txc_command_entry *entry) {
+#define TXC_PAYLOAD_NAME(table) (entry->index < sizeof(table) / sizeof((table)[0]) ? (table)[entry->index].name : NULL)
+    switch (entry->kind) {
+    case TXC_COMMAND_SYMBOL:
+        return TXC_PAYLOAD_NAME(TXC_MATH_SYMBOLS);
+    case TXC_COMMAND_FRACTION:
+        return TXC_PAYLOAD_NAME(TXC_FRACTION_COMMANDS);
+    case TXC_COMMAND_BIG_OP:
+        return TXC_PAYLOAD_NAME(TXC_BIG_OPS);
+    case TXC_COMMAND_FUNCTION:
+        return TXC_PAYLOAD_NAME(TXC_FUNCTION_NAMES);
+    case TXC_COMMAND_STYLE:
+        return TXC_PAYLOAD_NAME(TXC_STYLE_COMMANDS);
+    case TXC_COMMAND_ACCENT:
+        return TXC_PAYLOAD_NAME(TXC_ACCENT_COMMANDS);
+    case TXC_COMMAND_SIZE:
+        return TXC_PAYLOAD_NAME(TXC_SIZE_COMMANDS);
+    case TXC_COMMAND_SQRT:
+    case TXC_COMMAND_LEFT:
+    case TXC_COMMAND_RIGHT:
+    case TXC_COMMAND_LIMITS:
+    case TXC_COMMAND_NOLIMITS:
+        return entry->index == 0 ? entry->name : NULL;
+    }
+#undef TXC_PAYLOAD_NAME
+    return NULL;
+}
+
+bool txc_command_table_sorted(void) {
+    size_t count = sizeof(TXC_COMMANDS) / sizeof(TXC_COMMANDS[0]);
+    for (size_t index = 0; index < count; index++) {
+        const txc_command_entry *entry = &TXC_COMMANDS[index];
+        if (index > 0 && strcmp(TXC_COMMANDS[index - 1].name, entry->name) >= 0) {
+            return false;
+        }
+        /* Every row must dispatch to the payload row of the same name, so
+         * inserting into or reordering a typed table cannot silently
+         * redirect an in-bounds index to different semantics. Alias rows
+         * (\le, \to, \gets, ...) share a payload deliberately: the check
+         * accepts a payload whose name differs only when the payload row's
+         * own name resolves back to this entry's class and index. */
+        const char *payload = txc_command_payload_name(entry);
+        if (payload == NULL) {
+            return false;
+        }
+        if (strcmp(payload, entry->name) != 0) {
+            const txc_command_entry *canonical = txc_command_lookup((const uint8_t *)payload, strlen(payload));
+            if (canonical == NULL || canonical->kind != entry->kind || canonical->index != entry->index) {
+                return false;
+            }
+        }
+    }
+    return true;
+}
+
 typedef struct txc_spacing_command {
     const char *name;
     txc_space space;
@@ -891,19 +939,19 @@ static txc_item *txc_append(txc_arena *arena, txc_list *list) {
     return item;
 }
 
+/* The one field initializer: zeroes the whole payload union alongside the
+ * tag, so every variant switch starts from fully defined state. */
 static void txc_field_reset(txc_field *field, size_t at) {
+    memset(field, 0, sizeof(*field));
     field->kind = TXC_FIELD_EMPTY;
-    field->codepoint = 0;
-    field->style = TEX_CORE_STYLE_UPRIGHT;
-    field->family = TEX_CORE_FAMILY_MAIN;
-    field->text_face = false;
-    field->list.head = NULL;
-    field->list.tail = NULL;
-    field->list.count = 0;
-    field->fraction = NULL;
     field->range.begin = at;
     field->range.end = at;
 }
+
+/* Compile-time guard on the tagged-union compaction: the payloads overlay
+ * one another, so a field stays a fraction of the former side-by-side
+ * layout and a parser item stays cache-friendly. */
+_Static_assert(sizeof(txc_field) <= 64, "txc_field payloads must overlay in a union");
 
 static txc_item *txc_append_atom(
     txc_arena *arena,
@@ -911,6 +959,7 @@ static txc_item *txc_append_atom(
     txc_atom_class atom_class,
     uint32_t codepoint,
     tex_core_style style,
+    tex_core_family family,
     tex_core_range range
 ) {
     txc_item *item = txc_append(arena, list);
@@ -921,9 +970,9 @@ static txc_item *txc_append_atom(
     item->atom_class = atom_class;
     txc_field_reset(&item->nucleus, range.begin);
     item->nucleus.kind = TXC_FIELD_CHAR;
-    item->nucleus.codepoint = codepoint;
-    item->nucleus.style = style;
-    item->nucleus.family = TEX_CORE_FAMILY_MAIN;
+    item->nucleus.character.codepoint = codepoint;
+    item->nucleus.character.style = style;
+    item->nucleus.character.family = family;
     item->nucleus.range = range;
     txc_field_reset(&item->sup, range.end);
     txc_field_reset(&item->sub, range.end);
@@ -951,11 +1000,13 @@ static void txc_command_label(const uint8_t *name, size_t name_length, char *buf
 
 /* One classified math glyph: the atom class, the rendered codepoint, and
  * the face. Used both for atom nuclei and for script character fields
- * (whose class is irrelevant — a field is not an atom). */
+ * (whose class is irrelevant — a field is not an atom). `family` is main
+ * until delivery stamps the innermost enclosing style switch's alphabet. */
 typedef struct txc_math_glyph {
     txc_atom_class atom_class;
     uint32_t codepoint;
     tex_core_style style;
+    tex_core_family family;
 } txc_math_glyph;
 
 /* One parsed construct on its way into a field or a new atom: exactly
@@ -974,9 +1025,9 @@ typedef struct txc_construct {
 static void txc_field_fill(txc_field *field, const txc_construct *construct, tex_core_range range) {
     if (construct->glyph != NULL) {
         field->kind = TXC_FIELD_CHAR;
-        field->codepoint = construct->glyph->codepoint;
-        field->style = construct->glyph->style;
-        field->family = TEX_CORE_FAMILY_MAIN;
+        field->character.codepoint = construct->glyph->codepoint;
+        field->character.style = construct->glyph->style;
+        field->character.family = construct->glyph->family;
     } else if (construct->group != NULL) {
         field->kind = TXC_FIELD_LIST;
         field->list = *construct->group;
@@ -1004,6 +1055,7 @@ static void txc_field_fill(txc_field *field, const txc_construct *construct, tex
  * upright, and the classed math characters. Returns false when the
  * character is outside the math surface. */
 static bool txc_math_classify(uint32_t codepoint, txc_math_glyph *glyph) {
+    glyph->family = TEX_CORE_FAMILY_MAIN;
     if (txc_letter_codepoint(codepoint)) {
         glyph->atom_class = TXC_ATOM_ORD;
         glyph->codepoint = codepoint;
@@ -1079,6 +1131,13 @@ typedef struct txc_collect {
 typedef struct txc_frame {
     txc_list list;
     txc_frame_role role;
+    /* The math alphabet the innermost enclosing style switch imposes on
+     * this frame's letters and digits, if any. Stamped onto glyphs as
+     * they are delivered, so an inner switch always wins over an outer
+     * one and no post-parse rewrite pass exists. \text frames are never
+     * styled — their content follows document rules. */
+    bool styled;
+    tex_core_family face_family;
     /* GROUP and SCRIPT: byte offset of the opening brace. */
     size_t open;
     /* SCRIPT: the scripted atom in the parent frame's list, whether the
@@ -1117,6 +1176,8 @@ static void txc_frame_init(txc_frame *frame, txc_frame_role role, txc_frame *par
     frame->list.tail = NULL;
     frame->list.count = 0;
     frame->role = role;
+    frame->styled = false;
+    frame->face_family = TEX_CORE_FAMILY_MAIN;
     frame->open = 0;
     frame->target = NULL;
     frame->script = TXC_PENDING_NONE;
@@ -1172,55 +1233,6 @@ static const char *txc_argument_noun(const txc_frame *frame) {
         return "radical";
     default:
         return frame->collect.second ? "denominator" : "numerator";
-    }
-}
-
-static void txc_face_field(txc_field *field, tex_core_family family);
-
-static void txc_face_list(const txc_list *list, tex_core_family family) {
-    for (txc_item *item = list->head; item != NULL; item = item->next) {
-        if (item->kind != TXC_ITEM_ATOM) {
-            continue;
-        }
-        txc_face_field(&item->nucleus, family);
-        txc_face_field(&item->sup, family);
-        txc_face_field(&item->sub, family);
-    }
-}
-
-/* Rewrites the letters and digits of a style argument onto `family`,
- * recursively through every field and sub-construct. \text content is
- * left alone — it is document material, not mathcode characters. */
-static void txc_face_field(txc_field *field, tex_core_family family) {
-    switch (field->kind) {
-    case TXC_FIELD_CHAR:
-        if (field->text_face) {
-            break;
-        }
-        if (txc_letter_codepoint(field->codepoint) || txc_digit_codepoint(field->codepoint)) {
-            field->family = family;
-            field->style = TEX_CORE_STYLE_UPRIGHT;
-        }
-        break;
-    case TXC_FIELD_LIST:
-        txc_face_list(&field->list, family);
-        break;
-    case TXC_FIELD_FRACTION:
-        txc_face_field(&field->fraction->num, family);
-        txc_face_field(&field->fraction->den, family);
-        break;
-    case TXC_FIELD_RADICAL:
-        txc_face_field(&field->radical->index, family);
-        txc_face_field(&field->radical->argument, family);
-        break;
-    case TXC_FIELD_ACCENT:
-        txc_face_field(&field->accent->argument, family);
-        break;
-    case TXC_FIELD_FENCED:
-        txc_face_list(&field->fenced->list, family);
-        break;
-    default:
-        break;
     }
 }
 
@@ -1308,6 +1320,31 @@ static tex_core_status txc_deliver(
     tex_core_range range,
     tex_core_error *error
 ) {
+    /* Stamp the active math alphabet onto letter and digit glyphs as they
+     * arrive: a style collector's own face for its immediate argument,
+     * otherwise the face the frame inherited from the innermost enclosing
+     * style-switch argument. Stamping at delivery makes style scope
+     * lexical — an outer switch can never overwrite an inner one — and
+     * resolves every glyph's face exactly once. */
+    txc_math_glyph faced;
+    txc_construct faced_construct;
+    if (construct->glyph != NULL) {
+        bool styled = frame->styled;
+        tex_core_family family = frame->face_family;
+        if (frame->collect.kind == TXC_COLLECT_STYLE) {
+            styled = frame->collect.face != TXC_FACE_TEXT;
+            family = styled ? TXC_FACE_FAMILIES[frame->collect.face] : family;
+        }
+        if (styled &&
+            (txc_letter_codepoint(construct->glyph->codepoint) || txc_digit_codepoint(construct->glyph->codepoint))) {
+            faced = *construct->glyph;
+            faced.family = family;
+            faced.style = TEX_CORE_STYLE_UPRIGHT;
+            faced_construct = *construct;
+            faced_construct.glyph = &faced;
+            construct = &faced_construct;
+        }
+    }
     if (frame->collect.kind != TXC_COLLECT_NONE) {
         txc_field staged;
         txc_field_reset(&staged, range.begin);
@@ -1337,6 +1374,8 @@ static tex_core_status txc_deliver(
             break;
         case TXC_COLLECT_STYLE:
         default:
+            /* Non-\text styles already stamped the delivery above; a
+             * braced argument's glyphs were stamped inside its frame. */
             txc_field_fill(&staged, construct, range);
             if (frame->collect.face == TXC_FACE_TEXT) {
                 /* A braced argument becomes document-rule text content;
@@ -1345,12 +1384,10 @@ static tex_core_status txc_deliver(
                 if (staged.kind == TXC_FIELD_LIST) {
                     staged.kind = TXC_FIELD_TEXT;
                 } else if (staged.kind == TXC_FIELD_CHAR) {
-                    staged.style = TEX_CORE_STYLE_UPRIGHT;
-                    staged.family = TEX_CORE_FAMILY_MAIN;
-                    staged.text_face = true;
+                    staged.character.style = TEX_CORE_STYLE_UPRIGHT;
+                    staged.character.family = TEX_CORE_FAMILY_MAIN;
+                    staged.character.text_face = true;
                 }
-            } else {
-                txc_face_field(&staged, TXC_FACE_FAMILIES[frame->collect.face]);
             }
             break;
         }
@@ -1372,7 +1409,15 @@ static tex_core_status txc_deliver(
     }
     if (construct->glyph != NULL) {
         const txc_math_glyph *glyph = construct->glyph;
-        if (txc_append_atom(arena, &frame->list, glyph->atom_class, glyph->codepoint, glyph->style, range) == NULL) {
+        if (txc_append_atom(
+                arena,
+                &frame->list,
+                glyph->atom_class,
+                glyph->codepoint,
+                glyph->style,
+                glyph->family,
+                range
+            ) == NULL) {
             return txc_fail(error, TEX_CORE_STATUS_ALLOCATION_FAILED, NULL, "allocation failed");
         }
         return TEX_CORE_STATUS_OK;
@@ -1416,6 +1461,8 @@ static tex_core_status txc_delimiter_arrived(
             return txc_fail(error, TEX_CORE_STATUS_ALLOCATION_FAILED, NULL, "allocation failed");
         }
         txc_frame_init(inner, TXC_FRAME_FENCED, frame);
+        inner->styled = frame->styled;
+        inner->face_family = frame->face_family;
         inner->open = frame->delim_command.begin;
         inner->fence_command = frame->delim_command;
         inner->fence_left = *delimiter;
@@ -1572,6 +1619,8 @@ tex_core_status txc_parse(
                         return txc_fail(error, TEX_CORE_STATUS_ALLOCATION_FAILED, NULL, "allocation failed");
                     }
                     txc_frame_init(inner, TXC_FRAME_INDEX, frame);
+                    inner->styled = frame->styled;
+                    inner->face_family = frame->face_family;
                     inner->open = token.range.begin;
                     frame = inner;
                     depth += 1;
@@ -1620,6 +1669,17 @@ tex_core_status txc_parse(
                     txc_frame_init(inner, TXC_FRAME_GROUP, frame);
                     inner->open = token.range.begin;
                     inner->text_mode = frame->collect.kind == TXC_COLLECT_STYLE && frame->collect.face == TXC_FACE_TEXT;
+                    /* The brace group scopes the face: a style switch's own
+                     * argument takes the switch's alphabet, any other group
+                     * inherits the enclosing face. */
+                    if (frame->collect.kind == TXC_COLLECT_STYLE) {
+                        inner->styled = frame->collect.face != TXC_FACE_TEXT;
+                        inner->face_family =
+                            inner->styled ? TXC_FACE_FAMILIES[frame->collect.face] : TEX_CORE_FAMILY_MAIN;
+                    } else {
+                        inner->styled = frame->styled;
+                        inner->face_family = frame->face_family;
+                    }
                     if (frame->pending != TXC_PENDING_NONE) {
                         inner->role = TXC_FRAME_SCRIPT;
                         inner->target = frame->pending_target;
@@ -1755,6 +1815,7 @@ tex_core_status txc_parse(
                             TXC_ATOM_ORD,
                             codepoint,
                             TEX_CORE_STYLE_UPRIGHT,
+                            TEX_CORE_FAMILY_MAIN,
                             token.range
                         ) == NULL) {
                         return txc_fail(error, TEX_CORE_STATUS_ALLOCATION_FAILED, NULL, "allocation failed");
@@ -1922,8 +1983,8 @@ tex_core_status txc_parse(
                         if (big_op != NULL) {
                             op->op_limits = big_op->limits;
                             op->nucleus.kind = TXC_FIELD_CHAR;
-                            op->nucleus.codepoint = big_op->codepoint;
-                            op->nucleus.style = TEX_CORE_STYLE_UPRIGHT;
+                            op->nucleus.character.codepoint = big_op->codepoint;
+                            op->nucleus.character.style = TEX_CORE_STYLE_UPRIGHT;
                             op->nucleus.range = token.range;
                         } else {
                             op->op_limits = function->limits;
@@ -1951,6 +2012,7 @@ tex_core_status txc_parse(
                                         TXC_ATOM_ORD,
                                         (uint32_t)(unsigned char)*letter,
                                         TEX_CORE_STYLE_UPRIGHT,
+                                        TEX_CORE_FAMILY_MAIN,
                                         token.range
                                     ) == NULL) {
                                     return txc_fail(
@@ -2101,7 +2163,7 @@ tex_core_status txc_parse(
                 }
                 if (entry != NULL && entry->kind == TXC_COMMAND_SYMBOL) {
                     const txc_math_symbol *symbol = &TXC_MATH_SYMBOLS[entry->index];
-                    txc_math_glyph glyph = {symbol->atom_class, symbol->codepoint, symbol->style};
+                    txc_math_glyph glyph = {symbol->atom_class, symbol->codepoint, symbol->style, TEX_CORE_FAMILY_MAIN};
                     txc_construct construct = {&glyph, NULL, NULL, NULL, NULL, NULL, NULL};
                     status = txc_deliver(arena, frame, &construct, glyph.atom_class, token.range, error);
                     if (status != TEX_CORE_STATUS_OK) {

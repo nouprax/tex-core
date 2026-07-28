@@ -20,6 +20,9 @@ case "$suite" in
     node-correctness)
         node "$root/packages/es-tex-core/scripts/run-tests.mjs" --target node --skip-build
         ;;
+    node-minimum)
+        node "$root/packages/es-tex-core/scripts/run-tests.mjs" --target node-minimum --skip-build
+        ;;
     browser-correctness)
         node "$root/packages/es-tex-core/scripts/run-tests.mjs" --target browser --skip-build
         ;;
@@ -30,7 +33,7 @@ case "$suite" in
         node "$root/packages/es-tex-core/scripts/benchmark.mjs"
         ;;
     *)
-        echo "usage: $0 <artifact-dir> node-correctness|browser-correctness|node-conformance|node-benchmark" >&2
+        echo "usage: $0 <artifact-dir> node-correctness|node-minimum|browser-correctness|node-conformance|node-benchmark" >&2
         exit 2
         ;;
 esac

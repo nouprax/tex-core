@@ -19,10 +19,12 @@ add_library(
     "${TEX_CORE_CORE_DIR}/tex_core.c"
     "${TEX_CORE_CORE_DIR}/token.c"
     "${TEX_CORE_CORE_DIR}/utf8.c"
+    "${TEX_CORE_ROOT}/packages/tex-core/bridge/tex_core_txc1.c"
     "${TEX_CORE_ROOT}/packages/kotlin-tex-core/src/native/tex_core_kotlin_bridge.c"
     "${TEX_CORE_ROOT}/packages/kotlin-tex-core/src/native/tex_core_kotlin_jni.c")
 
 target_include_directories(tex_core_kotlin PRIVATE "${TEX_CORE_CORE_DIR}" "${TEX_CORE_ROOT}/packages/tex-core/include"
+                                                   "${TEX_CORE_ROOT}/packages/tex-core/bridge"
                                                    "${TEX_CORE_ROOT}/packages/kotlin-tex-core/src/native")
 target_compile_definitions(tex_core_kotlin PRIVATE TEX_CORE_STATIC_DEFINE)
 target_link_options(tex_core_kotlin PRIVATE

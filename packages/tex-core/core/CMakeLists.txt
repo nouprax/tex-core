@@ -35,9 +35,9 @@ add_library(libtex-core_static STATIC ${TEX_CORE_SOURCES})
 target_compile_definitions(libtex-core_static PUBLIC TEX_CORE_STATIC_DEFINE)
 set_target_properties(libtex-core_static PROPERTIES POSITION_INDEPENDENT_CODE ON)
 if(MSVC)
-    set_target_properties(libtex-core_static PROPERTIES OUTPUT_NAME "tex-core_static" VERSION ${PROJECT_VERSION})
+    set_target_properties(libtex-core_static PROPERTIES OUTPUT_NAME "tex-core_static" VERSION ${TEX_CORE_VERSION})
 else()
-    set_target_properties(libtex-core_static PROPERTIES OUTPUT_NAME "tex-core" VERSION ${PROJECT_VERSION})
+    set_target_properties(libtex-core_static PROPERTIES OUTPUT_NAME "tex-core" VERSION ${TEX_CORE_VERSION})
 endif()
 
 set(TEX_CORE_TARGETS libtex-core_static)
@@ -49,11 +49,20 @@ set(TEX_CORE_TARGETS libtex-core_static)
 # archives use the no-op macro through TEX_CORE_STATIC_DEFINE.
 if(TEX_CORE_SHARED)
     add_library(libtex-core SHARED ${TEX_CORE_SOURCES})
+    # Pre-1.0 SONAME policy (docs/releasing.md): every 0.x minor may break
+    # ABI, so the SONAME carries major.minor until 1.0.0 collapses it to
+    # the major alone. Advertising all of 0.x as one ABI would let an
+    # incompatible 0.(x+1) replace 0.x at load time.
+    if(TEX_CORE_VERSION_MAJOR EQUAL 0)
+        set(TEX_CORE_SOVERSION ${TEX_CORE_VERSION_MAJOR_MINOR})
+    else()
+        set(TEX_CORE_SOVERSION ${TEX_CORE_VERSION_MAJOR})
+    endif()
     set_target_properties(
         libtex-core
         PROPERTIES OUTPUT_NAME "tex-core"
-                   VERSION ${PROJECT_VERSION}
-                   SOVERSION ${PROJECT_VERSION_MAJOR}
+                   VERSION ${TEX_CORE_VERSION}
+                   SOVERSION ${TEX_CORE_SOVERSION}
                    DEFINE_SYMBOL TEX_CORE_EXPORTS)
     list(APPEND TEX_CORE_TARGETS libtex-core)
 endif()
@@ -83,6 +92,13 @@ configure_file("${CMAKE_CURRENT_SOURCE_DIR}/tex-core.pc.in" "${CMAKE_CURRENT_BIN
 install(FILES "${TEX_CORE_INCLUDE_DIR}/tex_core.h" "${TEX_CORE_INCLUDE_DIR}/tex-core-export.h"
               "${TEX_CORE_INCLUDE_DIR}/tex-core-version.h" DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}")
 install(FILES "${CMAKE_CURRENT_BINARY_DIR}/tex-core.pc" DESTINATION "${CMAKE_INSTALL_LIBDIR}/pkgconfig")
+if(TEX_CORE_STATIC)
+    # The static consumer contract carries TEX_CORE_STATIC_DEFINE, matching
+    # what the CMake package propagates from the static target.
+    configure_file("${CMAKE_CURRENT_SOURCE_DIR}/tex-core-static.pc.in" "${CMAKE_CURRENT_BINARY_DIR}/tex-core-static.pc"
+                   @ONLY)
+    install(FILES "${CMAKE_CURRENT_BINARY_DIR}/tex-core-static.pc" DESTINATION "${CMAKE_INSTALL_LIBDIR}/pkgconfig")
+endif()
 install(TARGETS tex-core RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}")
 
 # Exactly one target is exported as tex-core::tex-core — the shared library

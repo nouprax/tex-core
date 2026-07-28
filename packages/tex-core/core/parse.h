@@ -16,11 +16,11 @@
 
 typedef enum txc_item_kind { TXC_ITEM_ATOM = 0, TXC_ITEM_SPACE = 1 } txc_item_kind;
 
-/* TeX math atom classes (TeXbook chapter 17). The parser produces Ord,
- * Bin, Rel, Open, Close, Punct, and — for fractions — Inner atoms today;
- * Op arrives with big operators and function names. The spacing table in
- * layout already covers all eight classes. Document-mode atoms always carry
- * TXC_ATOM_ORD; atom classes never affect text layout. */
+/* TeX math atom classes (TeXbook chapter 17). The parser produces all
+ * eight classes: Op comes from big operators and function names, Inner
+ * from fractions and \left/\right fences. The spacing table in layout
+ * covers all eight. Document-mode atoms always carry TXC_ATOM_ORD; atom
+ * classes never affect text layout. */
 typedef enum txc_atom_class {
     TXC_ATOM_ORD = 0,
     TXC_ATOM_OP = 1,
@@ -122,28 +122,39 @@ typedef struct txc_sized_delimiter {
     int size;
 } txc_sized_delimiter;
 
-typedef struct txc_field {
-    txc_field_kind kind;
-    /* TXC_FIELD_CHAR only. `family` is main except under a style
-     * switch, which rewrites letter and digit characters in place;
-     * `text_face` marks a bare \text character, which an outer style
-     * switch leaves alone like all \text content. */
+/* TXC_FIELD_CHAR payload. `family` is main except inside a style-switch
+ * argument, whose face the parser stamps as the character is classified
+ * (the innermost math alphabet wins); `text_face` marks a bare \text
+ * character, which an outer style switch leaves alone like all \text
+ * content. */
+typedef struct txc_char_field {
     uint32_t codepoint;
     tex_core_style style;
     tex_core_family family;
     bool text_face;
-    /* TXC_FIELD_LIST and TXC_FIELD_TEXT. */
-    txc_list list;
-    /* TXC_FIELD_FRACTION only. */
-    struct txc_fraction *fraction;
-    /* TXC_FIELD_DELIMITER only. */
-    txc_sized_delimiter sized;
-    /* TXC_FIELD_FENCED only. */
-    struct txc_fenced *fenced;
-    /* TXC_FIELD_RADICAL only. */
-    struct txc_radical *radical;
-    /* TXC_FIELD_ACCENT only. */
-    struct txc_accent *accent;
+} txc_char_field;
+
+typedef struct txc_field {
+    txc_field_kind kind;
+    /* Exactly one member is active, selected by `kind`; constructors and
+     * txc_field_reset always initialize the tag and the whole payload
+     * together, so no inactive state survives a variant switch. */
+    union {
+        /* TXC_FIELD_CHAR. */
+        txc_char_field character;
+        /* TXC_FIELD_LIST and TXC_FIELD_TEXT. */
+        txc_list list;
+        /* TXC_FIELD_FRACTION. */
+        struct txc_fraction *fraction;
+        /* TXC_FIELD_DELIMITER. */
+        txc_sized_delimiter sized;
+        /* TXC_FIELD_FENCED. */
+        struct txc_fenced *fenced;
+        /* TXC_FIELD_RADICAL. */
+        struct txc_radical *radical;
+        /* TXC_FIELD_ACCENT. */
+        struct txc_accent *accent;
+    };
     /* The field's own source construct: the character or symbol command,
      * the braced group including its braces, the fraction command through
      * its last argument, the size command through its delimiter, \left
@@ -223,9 +234,12 @@ typedef struct txc_item {
     struct txc_item *next;
 } txc_item;
 
-/* Verifies the command dispatch table is strictly sorted (a test seam,
- * like txc_allocation_limit: the binary search is only correct over a
- * sorted table, and the table is maintained by hand). */
+/* Verifies the command dispatch table (a test seam, like
+ * txc_allocation_limit: the table is maintained by hand). Checks that the
+ * table is strictly sorted — the binary search is only correct over a
+ * sorted table — and that every row's class index is in bounds and lands
+ * on the payload row carrying the same command name, so an insertion into
+ * one of the typed tables cannot silently redirect dispatch. */
 bool txc_command_table_sorted(void);
 
 /* Parses the whole source into `list`, allocating items from `arena`. */

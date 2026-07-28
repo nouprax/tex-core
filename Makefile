@@ -53,11 +53,16 @@ install: build
 # a dedicated ASan build tree and runs a bounded smoke campaign. Findings
 # land in the build tree only; longer campaigns rerun the binary with their
 # own options.
+FUZZ_RUNS?=20000
+FUZZ_MAX_LEN?=4096
+
 libFuzzer:
 	cmake -S . -B $(FUZZ_BUILDDIR) -DCMAKE_BUILD_TYPE=Asan -DCMAKE_C_COMPILER=$(FUZZ_CC) \
 	    -DTEX_CORE_SHARED=OFF -DTEX_CORE_TESTS=OFF -DTEX_CORE_LIB_FUZZER=ON
 	cmake --build $(FUZZ_BUILDDIR) --parallel --target tex-core-fuzz
-	$(TEX_CORE_FUZZ) -runs=20000 -max_len=512
+	scripts/build-fuzz-corpus.sh $(FUZZ_BUILDDIR)/corpus
+	$(TEX_CORE_FUZZ) -runs=$(FUZZ_RUNS) -max_len=$(FUZZ_MAX_LEN) \
+	    -dict=packages/tex-core/fuzz/tex.dict $(FUZZ_BUILDDIR)/corpus
 
 clean:
 	rm -rf $(BUILDDIR) $(ASAN_BUILDDIR) $(UBSAN_BUILDDIR) $(TSAN_BUILDDIR) $(FUZZ_BUILDDIR)

@@ -20,7 +20,7 @@ const core = [
     "utf8.c"
 ].map((file) => path.join(root, "packages/tex-core/core", file));
 const bridges = [
-    path.join(root, "packages/kotlin-tex-core/src/native/tex_core_kotlin_bridge.c"),
+    path.join(root, "packages/tex-core/bridge/tex_core_txc1.c"),
     path.join(packageDirectory, "src/bridge.c")
 ];
 
@@ -53,7 +53,7 @@ const result = spawnSync(
         `-sEXPORTED_FUNCTIONS=${JSON.stringify(exported)}`,
         "-DTEX_CORE_STATIC_DEFINE",
         `-I${path.join(root, "packages/tex-core/include")}`,
-        `-I${path.join(root, "packages/kotlin-tex-core/src/native")}`,
+        `-I${path.join(root, "packages/tex-core/bridge")}`,
         "-o",
         output
     ],

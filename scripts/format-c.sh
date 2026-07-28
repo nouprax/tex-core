@@ -15,7 +15,8 @@ case "${1:-}" in
 esac
 
 if [ ! -d packages/tex-core ]; then
-    echo "note: no C sources yet; format:c is a no-op until Phase 2 lands packages/tex-core"
+    echo "format-c.sh must run from the repository root (packages/tex-core not found)" >&2
+    exit 2
     exit 0
 fi
 

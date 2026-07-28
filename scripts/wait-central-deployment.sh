@@ -30,5 +30,10 @@ while [ "$attempt" -lt 80 ]; do
     sleep 15
 done
 
+# Preserve everything an operator needs to resume: the deployment id, the
+# last observed state, and the manual path forward.
 echo "Central deployment $deployment did not reach $expected before timeout" >&2
+echo "last state: ${state:-unknown}" >&2
+echo "resume: run the Release workflow's workflow_dispatch with this tag," >&2
+echo "the original run id, and central-deployment-id=$deployment" >&2
 exit 1
