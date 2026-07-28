@@ -27,8 +27,9 @@
  * symbols), braced groups, superscripts/subscripts set at TeX's script
  * sizes, fractions and binomials (\frac, \dfrac, \tfrac, the \binom
  * family), variable-size delimiters (\left/\right, \bigl through
- * \Biggr), and radicals (\sqrt with the optional index), laid out with
- * TeX's inter-atom spacing. The full self-contained
+ * \Biggr), radicals (\sqrt with the optional index), big operators
+ * with display limits (\sum, \int, \limits/\nolimits), and function
+ * names (\sin through \Pr), laid out with TeX's inter-atom spacing. The full self-contained
  * LaTeX surface arrives with the 1.0.0 milestones; every extension of the
  * surface is a reviewed public-behavior change.
  */

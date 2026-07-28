@@ -522,7 +522,54 @@ const stateValidators = {
         outcome === "tree" && /\\sqrt\[/.test(source ?? "") && / width=-/.test(tree),
     "error.missingRadical": ({ outcome, tree }) =>
         outcome === "error" && / message=missing radical argument\n$/.test(tree),
-    "error.unclosedIndex": ({ outcome, tree }) => outcome === "error" && / message=unclosed radical index\n$/.test(tree)
+    "error.unclosedIndex": ({ outcome, tree }) =>
+        outcome === "error" && / message=unclosed radical index\n$/.test(tree),
+    "op.big": ({ outcome, tree }) =>
+        outcome === "tree" &&
+        / cp=U\+(2211|220F|2210|222B|222E|22C[0-3]|2A0[0-6]) style=upright family=size[12] /.test(tree),
+    // A limits assembly: a box with no rule, at most one glyph (the
+    // operator; function-name operators are boxes), and a shifted limit
+    // box — which excludes fraction boxes (rule) and binomials (two
+    // parenthesis glyphs).
+    "op.limits": treeStates(
+        (all, { source }) =>
+            /\\(sum|prod|coprod|int|oint|big[a-z]+|lim|limsup|liminf|max|min|sup|inf|det|gcd|Pr)/.test(source ?? "") &&
+            all.some((node, index) => {
+                if (node.kind !== "hbox") return false;
+                const children = childrenOf(all, index);
+                if (children.some((child) => child.kind === "rule")) return false;
+                const above = children.some((child) => child.kind === "hbox" && child.y > 0);
+                const below = children.some((child) => child.kind === "hbox" && child.y < 0);
+                const glyphs = children.filter((child) => child.kind === "glyph");
+                return (above || below) && glyphs.length <= 1;
+            })
+    ),
+    "op.scripts": treeStates(
+        (all, { source }) =>
+            /\\(sum|prod|int|oint|sin|log|limsup)/.test(source ?? "") &&
+            all.some((node) => {
+                if (node.kind !== "glyph" || !(node.family ?? "").startsWith("size")) return false;
+                return all.some(
+                    (box) =>
+                        box.kind === "hbox" && box.depth === node.depth && box.y !== 0 && box.x >= node.x + node.width
+                );
+            })
+    ),
+    "op.functionName": treeStates(
+        (all, { source }) =>
+            /\\(sin|cos|log|ln|lim|limsup|max|Pr)/.test(source ?? "") &&
+            all.some((node, index) => {
+                if (node.kind !== "hbox") return false;
+                const glyphs = childrenOf(all, index).filter((child) => child.kind === "glyph");
+                return (
+                    glyphs.length >= 2 &&
+                    glyphs.every((glyph) => glyph.family === "main") &&
+                    new Set(glyphs.map((glyph) => `${glyph.cp}`)).size >= 2
+                );
+            })
+    ),
+    "error.misplacedLimits": ({ outcome, tree }) =>
+        outcome === "error" && / message=misplaced \\(no)?limits\n$/.test(tree)
 };
 const orderValidators = {
     "root.hbox": ({ outcome, tree }) =>

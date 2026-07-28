@@ -43,7 +43,12 @@ const parameterOrder = [
     "axisHeight",
     "delim1",
     "delim2",
-    "num3"
+    "num3",
+    "bigOpSpacing1",
+    "bigOpSpacing2",
+    "bigOpSpacing3",
+    "bigOpSpacing4",
+    "bigOpSpacing5"
 ];
 
 const fixed = (value) => {

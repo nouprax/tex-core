@@ -110,6 +110,9 @@ int main(void) {
     /* Radicals allocate the construct, the sign, the bar, the index box,
      * and its flanking kerns. */
     txc_sweep(&test, "\\sqrt[3]{x+1}+\\sqrt2", TEX_CORE_MODE_MATH_DISPLAY);
+    /* Operators allocate the size-face glyph, the limit boxes, and the
+     * assembly; function names allocate their letter runs. */
+    txc_sweep(&test, "\\sum_{i=1}^{n}\\lim_{x}\\int\\limits_a^b", TEX_CORE_MODE_MATH_DISPLAY);
     txc_allocation_limit(-1);
     return txc_test_finish(&test, "allocfail");
 }

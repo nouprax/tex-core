@@ -1059,7 +1059,20 @@ static tex_core_status txc_radical_box(
 
 /* Nodes one atom contributes to its list: the nucleus rendering plus one
  * box per script. Shared by the counting and building passes. */
-static size_t txc_atom_nodes(const txc_item *item) {
+/* Whether an Op atom's scripts place as limits in `style` (TeXbook
+ * Appendix G rule 13: display style unless overridden). */
+static bool txc_limits_active(const txc_item *item, int style) {
+    if (item->atom_class != TXC_ATOM_OP) {
+        return false;
+    }
+    return item->op_limits == TXC_LIMITS_ALWAYS || (item->op_limits == TXC_LIMITS_DISPLAY && style < TXC_STYLE_TEXT);
+}
+
+static size_t txc_atom_nodes(const txc_item *item, int style) {
+    if (txc_limits_active(item, style) && (item->sup.kind != TXC_FIELD_EMPTY || item->sub.kind != TXC_FIELD_EMPTY)) {
+        /* The whole operator-with-limits assembly is one box. */
+        return 1;
+    }
     size_t count = item->nucleus.kind != TXC_FIELD_EMPTY ? 1 : 0;
     count += item->sup.kind != TXC_FIELD_EMPTY ? 1 : 0;
     count += item->sub.kind != TXC_FIELD_EMPTY ? 1 : 0;
@@ -1091,7 +1104,44 @@ static tex_core_status txc_atom(
     txc_scaled shift_up = 0;
     txc_scaled shift_down = 0;
 
-    if (item->nucleus.kind == TXC_FIELD_CHAR) {
+    if (item->atom_class == TXC_ATOM_OP && item->nucleus.kind == TXC_FIELD_CHAR) {
+        /* make_op (tex.web section 749): the operator glyph comes from
+         * the Size1 face — Size2 in display style — always at the text
+         * em, vertically centered on the axis. Its italic correction is
+         * the script delta, exactly as for a character nucleus. */
+        tex_core_family family = style < TXC_STYLE_TEXT ? TEX_CORE_FAMILY_SIZE2 : TEX_CORE_FAMILY_SIZE1;
+        const txc_metric *metric = txc_metric_find(family, TEX_CORE_STYLE_UPRIGHT, item->nucleus.codepoint);
+        if (metric == NULL) {
+            return txc_fail(
+                error,
+                TEX_CORE_STATUS_UNSUPPORTED,
+                &item->nucleus.range,
+                "unsupported character U+%04X",
+                (unsigned)item->nucleus.codepoint
+            );
+        }
+        txc_node *glyph = txc_arena_alloc(arena, sizeof(txc_node));
+        if (glyph == NULL) {
+            return txc_alloc_fail(error);
+        }
+        txc_glyph_init(
+            glyph,
+            item->nucleus.codepoint,
+            family,
+            metric,
+            TXC_MATHSIZE_EM[TXC_MATHSIZE_TEXT],
+            item->nucleus.range
+        );
+        txc_scaled axis = txc_param(TXC_PARAMETER_AXIS_HEIGHT, size);
+        glyph->x = *cursor;
+        glyph->y = axis - txc_half(glyph->ascent - glyph->descent);
+        children[(*index)++] = glyph;
+        nucleus_width = glyph->width;
+        delta = glyph->italic;
+        /* The shifted glyph behaves as a box for script shifts. */
+        shift_up = (glyph->ascent + glyph->y) - txc_param(TXC_PARAMETER_SUP_DROP, drop);
+        shift_down = (glyph->descent - glyph->y) + txc_param(TXC_PARAMETER_SUB_DROP, drop);
+    } else if (item->nucleus.kind == TXC_FIELD_CHAR) {
         const txc_metric *metric = txc_metric_find(TEX_CORE_FAMILY_MAIN, item->nucleus.style, item->nucleus.codepoint);
         if (metric == NULL) {
             return txc_fail(
@@ -1168,6 +1218,101 @@ static tex_core_status txc_atom(
 
     if (!has_sup && !has_sub) {
         *cursor += nucleus_width + delta;
+        return TEX_CORE_STATUS_OK;
+    }
+
+    if (txc_limits_active(item, style)) {
+        /* make_limits (tex.web section 750, Appendix G rule 13a): the
+         * scripts become boxes centered above and below the operator in
+         * the common width, the superscript nudged half the italic
+         * correction right and the subscript half left, separated by the
+         * bigOpSpacing clearances with the spacing5 pads joining the
+         * assembly's extent. The whole assembly is one box. */
+        txc_node *nucleus_node = (txc_node *)children[--(*index)];
+        txc_scaled op_top = nucleus_node->ascent + nucleus_node->y;
+        txc_scaled op_bottom = nucleus_node->descent - nucleus_node->y;
+        txc_node *sup = NULL;
+        txc_node *sub = NULL;
+        if (has_sup) {
+            tex_core_status status = txc_clean_box(arena, &item->sup, txc_sup_style(style), &sup, error);
+            if (status != TEX_CORE_STATUS_OK) {
+                return status;
+            }
+        }
+        if (has_sub) {
+            tex_core_status status = txc_clean_box(arena, &item->sub, txc_sub_style(style), &sub, error);
+            if (status != TEX_CORE_STATUS_OK) {
+                return status;
+            }
+        }
+        txc_scaled width = nucleus_width;
+        if (sup != NULL) {
+            width = txc_max(width, sup->width);
+        }
+        if (sub != NULL) {
+            width = txc_max(width, sub->width);
+        }
+        nucleus_node->x = txc_half(width - nucleus_width);
+        txc_scaled ascent = op_top;
+        txc_scaled descent = op_bottom;
+        txc_scaled pad = txc_param(TXC_PARAMETER_BIG_OP_SPACING5, size);
+        if (sup != NULL) {
+            txc_scaled clearance = txc_max(
+                txc_param(TXC_PARAMETER_BIG_OP_SPACING1, size),
+                txc_param(TXC_PARAMETER_BIG_OP_SPACING3, size) - sup->descent
+            );
+            sup->x = txc_half(width - sup->width) + txc_half(delta);
+            sup->y = op_top + clearance + sup->descent;
+            ascent = sup->y + sup->ascent + pad;
+        }
+        if (sub != NULL) {
+            txc_scaled clearance = txc_max(
+                txc_param(TXC_PARAMETER_BIG_OP_SPACING2, size),
+                txc_param(TXC_PARAMETER_BIG_OP_SPACING4, size) - sub->ascent
+            );
+            sub->x = txc_half(width - sub->width) - txc_half(delta);
+            sub->y = -(op_bottom + clearance + sub->ascent);
+            descent = -sub->y + sub->descent + pad;
+        }
+
+        txc_node *assembly = txc_arena_alloc(arena, sizeof(txc_node));
+        const txc_node **parts = txc_arena_alloc(arena, 3 * sizeof(*parts));
+        if (assembly == NULL || parts == NULL) {
+            return txc_alloc_fail(error);
+        }
+        size_t part = 0;
+        parts[part++] = nucleus_node;
+        if (item->sub_first) {
+            if (sub != NULL) {
+                parts[part++] = sub;
+            }
+            if (sup != NULL) {
+                parts[part++] = sup;
+            }
+        } else {
+            if (sup != NULL) {
+                parts[part++] = sup;
+            }
+            if (sub != NULL) {
+                parts[part++] = sub;
+            }
+        }
+        assembly->kind = TEX_CORE_NODE_HBOX;
+        assembly->x = *cursor;
+        assembly->y = 0;
+        assembly->codepoint = 0;
+        assembly->style = TEX_CORE_STYLE_UPRIGHT;
+        assembly->family = TEX_CORE_FAMILY_MAIN;
+        assembly->size = 0;
+        assembly->width = width;
+        assembly->ascent = ascent;
+        assembly->descent = descent;
+        assembly->italic = 0;
+        assembly->range = item->range;
+        assembly->children = parts;
+        assembly->child_count = part;
+        children[(*index)++] = assembly;
+        *cursor += width;
         return TEX_CORE_STATUS_OK;
     }
 
@@ -1276,7 +1421,7 @@ static tex_core_status txc_mlist(
     const txc_item *previous_atom = NULL;
     for (const txc_item *item = list->head; item != NULL; item = item->next) {
         if (item->kind == TXC_ITEM_ATOM) {
-            child_capacity += txc_atom_nodes(item);
+            child_capacity += txc_atom_nodes(item, style);
             if (math && previous_atom != NULL &&
                 txc_inter_atom_width(TXC_MATH_SPACING[previous_atom->atom_class][item->atom_class], style) != 0) {
                 child_capacity += 1;

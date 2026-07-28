@@ -685,6 +685,89 @@ static void txc_test_radicals(txc_test *test) {
     tex_core_render_tree_free(tree);
 }
 
+static void txc_test_operators(txc_test *test) {
+    /* Display style takes the Size2 variant with limits above and below
+     * (rule 13a); the assembly is one box padded by bigOpSpacing5. */
+    tex_core_render_tree *tree = txc_compile(test, "\\sum_{i}^{n}", TEX_CORE_MODE_MATH_DISPLAY, "sum limits");
+    const tex_core_node *root = tex_core_render_tree_root(tree);
+    txc_check_size(test, tex_core_node_child_count(root), 1, "sum is one assembly");
+    const tex_core_node *assembly = tex_core_node_child(root, 0);
+    txc_check_size(test, tex_core_node_child_count(assembly), 3, "assembly children");
+    const tex_core_node *op = tex_core_node_child(assembly, 0);
+    txc_check_int(test, tex_core_node_glyph(op).family, TEX_CORE_FAMILY_SIZE2, "display sum from Size2");
+    txc_check(test, tex_core_node_frame(tex_core_node_child(assembly, 1)).y < 0.0, "subscript limit sits below");
+    txc_check(test, tex_core_node_frame(tex_core_node_child(assembly, 2)).y > 0.0, "superscript limit sits above");
+    tex_core_render_tree_free(tree);
+
+    /* Text style keeps Size1 and normal scripts. */
+    tree = txc_compile(test, "\\sum_{i}", TEX_CORE_MODE_MATH_INLINE, "sum inline");
+    root = tex_core_render_tree_root(tree);
+    txc_check_size(test, tex_core_node_child_count(root), 2, "inline sum has sibling scripts");
+    txc_check_int(
+        test,
+        tex_core_node_glyph(tex_core_node_child(root, 0)).family,
+        TEX_CORE_FAMILY_SIZE1,
+        "text sum from Size1"
+    );
+    tex_core_render_tree_free(tree);
+
+    /* Integrals default to nolimits: the subscript tucks under the slant
+     * by the italic correction. */
+    tree = txc_compile(test, "\\int_a^b", TEX_CORE_MODE_MATH_DISPLAY, "integral");
+    root = tex_core_render_tree_root(tree);
+    txc_check_size(test, tex_core_node_child_count(root), 3, "integral children");
+    const tex_core_node *integral = tex_core_node_child(root, 0);
+    tex_core_frame sub = tex_core_node_frame(tex_core_node_child(root, 1));
+    tex_core_frame sup = tex_core_node_frame(tex_core_node_child(root, 2));
+    tex_core_frame base = tex_core_node_frame(integral);
+    txc_check(test, sub.y < 0.0 && sup.y > 0.0, "integral scripts attach normally");
+    txc_check(
+        test,
+        sup.x == base.width + tex_core_node_frame(integral).italic && sub.x == base.width,
+        "the superscript sits the italic correction past the subscript"
+    );
+    tex_core_render_tree_free(tree);
+
+    /* \limits and \nolimits override the defaults. */
+    tree = txc_compile(test, "\\int\\limits_a", TEX_CORE_MODE_MATH_DISPLAY, "int limits");
+    txc_check_size(test, tex_core_node_child_count(tex_core_render_tree_root(tree)), 1, "\\limits forces the assembly");
+    tex_core_render_tree_free(tree);
+    tree = txc_compile(test, "\\sum\\nolimits_i", TEX_CORE_MODE_MATH_DISPLAY, "sum nolimits");
+    txc_check_size(
+        test,
+        tex_core_node_child_count(tex_core_render_tree_root(tree)),
+        2,
+        "\\nolimits keeps sibling scripts"
+    );
+    tex_core_render_tree_free(tree);
+
+    /* Function names are upright letter runs; \limsup carries its thin
+     * space; Op-Ord spacing separates the name from its operand. */
+    tree = txc_compile(test, "\\sin x", TEX_CORE_MODE_MATH_INLINE, "sin");
+    root = tex_core_render_tree_root(tree);
+    txc_check_size(test, tex_core_node_child_count(root), 3, "sin x children");
+    const tex_core_node *name = tex_core_node_child(root, 0);
+    txc_check_size(test, tex_core_node_child_count(name), 3, "sin letters");
+    txc_check_int(
+        test,
+        tex_core_node_glyph(tex_core_node_child(name, 0)).style,
+        TEX_CORE_STYLE_UPRIGHT,
+        "function letters are upright"
+    );
+    txc_check_kern_at(test, root, 1, TXC_POINTS_THIN, "Op-Ord thin space");
+    tex_core_render_tree_free(tree);
+    tree = txc_compile(test, "\\limsup", TEX_CORE_MODE_MATH_INLINE, "limsup");
+    name = tex_core_node_child(tex_core_render_tree_root(tree), 0);
+    txc_check_size(test, tex_core_node_child_count(name), 7, "limsup letters and thin space");
+    txc_check_int(
+        test,
+        tex_core_node_get_kind(tex_core_node_child(name, 3)),
+        TEX_CORE_NODE_KERN,
+        "limsup inner thin space"
+    );
+    tex_core_render_tree_free(tree);
+}
+
 int main(void) {
     txc_test test = {0, 0};
     txc_test_math_glyph(&test);
@@ -699,5 +782,6 @@ int main(void) {
     txc_test_fractions(&test);
     txc_test_delimiters(&test);
     txc_test_radicals(&test);
+    txc_test_operators(&test);
     return txc_test_finish(&test, "engine");
 }
