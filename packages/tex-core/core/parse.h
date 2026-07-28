@@ -134,6 +134,13 @@ typedef struct txc_char_field {
     bool text_face;
 } txc_char_field;
 
+/* The anonymous union is standard C11 (6.7.2.1p13); MSVC still flags it
+ * as its historical pre-C11 extension under /W4 (C4201), so the spurious
+ * warning is silenced for exactly this declaration. */
+#if defined(_MSC_VER)
+#pragma warning(push)
+#pragma warning(disable : 4201)
+#endif
 typedef struct txc_field {
     txc_field_kind kind;
     /* Exactly one member is active, selected by `kind`; constructors and
@@ -163,6 +170,9 @@ typedef struct txc_field {
      * range at the attachment point. */
     tex_core_range range;
 } txc_field;
+#if defined(_MSC_VER)
+#pragma warning(pop)
+#endif
 
 /* A radical (\sqrt): the mandatory radicand and the optional index of
  * the LaTeX bracket form. `command` is the \sqrt token — the source the
