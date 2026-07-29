@@ -979,7 +979,7 @@ static tex_core_status txc_array_box(
         txc_scaled descent = TXC_ARRAY_STRUT_DESCENT;
         size_t column = 0;
         for (const txc_array_cell *cell = row->cells; cell != NULL; cell = cell->next, column++) {
-            txc_node *box;
+            txc_node *box = NULL;
             tex_core_status status = txc_mlist(arena, &cell->list, TXC_STYLE_TEXT, true, cell->range, &box, error);
             if (status != TEX_CORE_STATUS_OK) {
                 return status;

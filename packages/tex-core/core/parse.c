@@ -1633,7 +1633,7 @@ static tex_core_status txc_environment_name(
         }
         if (token.kind == TXC_TOKEN_CHARACTER && token.codepoint == '*' && length > 0) {
             length += 1;
-            tex_core_status status = txc_scan(scanner, &token, error);
+            status = txc_scan(scanner, &token, error);
             if (status != TEX_CORE_STATUS_OK) {
                 return status;
             }
