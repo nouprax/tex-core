@@ -6,6 +6,26 @@ not promised to remain compatible between releases.
 
 ## Unreleased
 
+- Grow milestone M2 with `cases` and `smallmatrix`, each exactly its
+  amsmath definition: `cases` is `\left\lbrace` over two left-aligned
+  text-style columns one `\quad` apart with the 1.2-`\arraystretch`
+  strut (660598/283117 sp by TeX's factor arithmetic), the two-column
+  bound (`extra alignment tab` at a third), and the null right
+  delimiter published as its 1.2 pt kern; `smallmatrix` is a bare
+  `\ialign` in `\vcenter` — centered script-style cells one text-mode
+  `\thickspace` (.2777 em) apart, no strut, real interline glue
+  (`6\ex@`/`1.5\ex@`/`1.5\ex@` with `\ex@` exactly 1 pt at the 10 pt
+  size), unbounded columns, and the flanking `\,` folded into the box
+  edges. The environment table now carries each definition's geometry
+  (cell style, column alignment and gap, strut, interline triple,
+  padding, column bound), and one interline rule serves both models —
+  the array-based environments zero the triple and abut. cases'
+  `@{\quad}` rides the first column's template, so single-column
+  bodies reserve it exactly as LaTeX; scripts attaching to the
+  environment atom (where amsmath's trailing glue would start an
+  empty-nucleus atom instead) is now documented deliberate contract
+  and pinned. Still inside schemaVersion 5; the corpus gains 8 cases
+  (104 -> 112).
 - Open milestone M2 with the math alignment environments of the matrix
   family: `\begin{matrix}` through `\begin{Vmatrix}` parse rows of
   cells split on `&` and `\\` (trailing `\\` contributes no row, empty

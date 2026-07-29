@@ -124,6 +124,11 @@ int main(void) {
         "\\begin{pmatrix}a&b\\\\c\\end{pmatrix}^2+\\begin{matrix}\\end{matrix}",
         TEX_CORE_MODE_MATH_DISPLAY
     );
+    txc_sweep(
+        &test,
+        "\\begin{cases}a&b\\\\c\\end{cases}\\begin{smallmatrix}1\\\\2\\end{smallmatrix}",
+        TEX_CORE_MODE_MATH_INLINE
+    );
     txc_allocation_limit(-1);
     return txc_test_finish(&test, "allocfail");
 }

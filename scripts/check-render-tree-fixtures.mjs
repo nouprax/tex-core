@@ -783,6 +783,83 @@ const stateValidators = {
         / family=(bold|textit|cal|bb|sans|mono) /.test(tree),
     "environment.textCells": ({ mode, outcome, tree }) =>
         outcome === "tree" && mode === "mathDisplay" && / cp=U\+2211 style=upright family=size1 /.test(tree),
+    // cases: \left\lbrace over two left-aligned columns with the
+    // 1.2-\arraystretch strut (660598/283117 sp prints exactly so).
+    "environment.cases": ({ outcome, source, tree }) =>
+        outcome === "tree" &&
+        /\\begin\{cases\}/.test(source ?? "") &&
+        / cp=U\+(007B|23A7) .*family=size[1-4] /.test(tree),
+    "environment.casesStrut": ({ outcome, tree }) =>
+        outcome === "tree" && /ascent=10\.07993pt descent=4\.32002pt/.test(tree),
+    // `l` columns set cells flush at the column start: two sibling rows
+    // whose first cells share x = 0 while their widths differ (centered
+    // layout would inset the narrower one).
+    "environment.leftColumns": treeStates((all) =>
+        all.some((node, index) => {
+            const rows = [];
+            for (let next = index + 1; next < all.length && all[next].depth > all[index].depth; next += 1) {
+                if (all[next].depth === all[index].depth + 1 && all[next].kind === "hbox") rows.push(next);
+            }
+            const firsts = rows
+                .map((row) => childrenOf(all, row))
+                .filter((children) => children.length > 0 && children.every((child) => child.kind === "hbox"))
+                .map((children) => children[0]);
+            return (
+                firsts.length >= 2 &&
+                firsts.every((first) => first.x === 0) &&
+                new Set(firsts.map((first) => first.width)).size >= 2
+            );
+        })
+    ),
+    // smallmatrix: script-size cells with real interline glue and the
+    // flanking thin-space padding.
+    "environment.smallmatrix": ({ outcome, source, tree }) =>
+        outcome === "tree" && /\\begin\{smallmatrix\}/.test(source ?? "") && / size=7\.0pt /.test(tree),
+    "environment.smallPitch": treeStates((all) =>
+        all.some(
+            (node, index) =>
+                node.kind === "hbox" &&
+                all.some(
+                    (other, otherIndex) =>
+                        otherIndex !== index &&
+                        other.kind === "hbox" &&
+                        other.depth === node.depth &&
+                        nearScaledSum(node.y - other.y, 6)
+                )
+        )
+    ),
+    "environment.glueFallback": treeStates((all) =>
+        all.some(
+            (upper, index) =>
+                upper.kind === "hbox" &&
+                all.some(
+                    (lower, lowerIndex) =>
+                        lowerIndex !== index &&
+                        lower.kind === "hbox" &&
+                        lower.depth === upper.depth &&
+                        upper.y > lower.y &&
+                        nearScaledSum(upper.y - lower.y, upper.descent + lower.ascent + 1.5)
+                )
+        )
+    ),
+    // The padding witness needs at least two rows sharing the same
+    // positive inset — one centered cell can mimic the shape — and the
+    // width sum compares independently printed decimals, so it takes
+    // the scaled-print tolerance.
+    "environment.padding": treeStates((all) =>
+        all.some((node, index) => {
+            const children = childrenOf(all, index);
+            const rows = children.filter((child) => child.kind === "hbox");
+            return (
+                node.kind === "hbox" &&
+                rows.length >= 2 &&
+                rows.length === children.length &&
+                rows[0].x > 0 &&
+                rows.every((row) => row.x === rows[0].x) &&
+                nearScaledSum(node.width, rows[0].width + 2 * rows[0].x)
+            );
+        })
+    ),
     "error.unsupportedEnvironment": ({ outcome, tree }) =>
         outcome === "error" && / message=unsupported environment /.test(tree),
     "error.missingEnvironmentName": ({ outcome, tree }) =>

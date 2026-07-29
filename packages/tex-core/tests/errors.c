@@ -645,6 +645,14 @@ static const txc_error_case TXC_ERROR_CASES[] = {
      "unsupported environment align*",
      0,
      14},
+    {"third cases column",
+     "\\begin{cases}a&b&c\\end{cases}",
+     29,
+     TEX_CORE_MODE_MATH_INLINE,
+     TEX_CORE_STATUS_UNSUPPORTED,
+     "extra alignment tab",
+     16,
+     17},
 };
 
 int main(void) {
