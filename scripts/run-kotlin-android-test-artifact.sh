@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+root=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
+. "$root/scripts/lib/artifact.sh"
 artifact_dir=${1:-}
 suite=${2:-}
 page_size=${3:-}
@@ -27,15 +29,7 @@ case "$page_size" in
         ;;
 esac
 
-test -d "$artifact_dir"
-(
-    cd "$artifact_dir"
-    sha256sum --check SHA256SUMS
-)
-grep -Fxq 'kind=android-instrumentation-apk' "$artifact_dir/manifest.txt"
-if [ -n "${GITHUB_SHA:-}" ]; then
-    grep -Fxq "source_sha=$GITHUB_SHA" "$artifact_dir/manifest.txt"
-fi
+artifact_verify "$artifact_dir" android-instrumentation-apk
 
 apk="$artifact_dir/kotlin-tex-core-androidTest.apk"
 test -f "$apk"

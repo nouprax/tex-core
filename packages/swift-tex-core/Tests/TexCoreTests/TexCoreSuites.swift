@@ -1,3 +1,4 @@
+import Foundation
 import Testing
 import TexCore
 
@@ -40,6 +41,39 @@ import TexCore
         #expect(tree.dump() == "render-tree 5\nhbox x=0.0pt y=0.0pt width=0.0pt ascent=0.0pt descent=0.0pt src=0..0\n")
     }
 
+    @Test("the canonical dump is stack-safe for deeply nested trees")
+    func deepDump() {
+        let depth = 2_048
+        var root = HBox(
+            x: 0,
+            y: 0,
+            width: 0,
+            ascent: 0,
+            descent: 0,
+            src: SourceRange(begin: 0, end: 0),
+            children: []
+        )
+        for _ in 1..<depth {
+            root = HBox(
+                x: 0,
+                y: 0,
+                width: 0,
+                ascent: 0,
+                descent: 0,
+                src: SourceRange(begin: 0, end: 0),
+                children: [.hbox(root)]
+            )
+        }
+        let retained = RetainedTree(RenderTree(root: root))
+        let dump = retained.tree.dump()
+        #expect(dump.hasPrefix("render-tree 5\n"))
+        #expect(dump.count > depth)
+        // Keep the pathological value alive until process exit: recursively
+        // releasing a synthetic value-tree chain would test ARC teardown,
+        // not the canonical dumper's explicit traversal stack.
+        _ = Unmanaged.passRetained(retained)
+    }
+
     @Test("trees compile and share safely across concurrent tasks")
     func concurrency() async throws {
         let trees = try await withThrowingTaskGroup(of: RenderTree.self) { group in
@@ -56,6 +90,14 @@ import TexCore
     }
 }
 
+private final class RetainedTree {
+    let tree: RenderTree
+
+    init(_ tree: RenderTree) {
+        self.tree = tree
+    }
+}
+
 @Suite("errors") struct ErrorSuite {
     @Test("unsupported input throws the structured fail-fast error")
     func unsupported() {
@@ -67,6 +109,7 @@ import TexCore
             #expect(error.range == SourceRange(begin: 0, end: 4))
             #expect(error.message == "unsupported command \\foo")
             #expect(error.description == "unsupported command \\foo (bytes 0..4)")
+            #expect(error.localizedDescription == error.description)
         } catch {
             Issue.record("unexpected error type: \(error)")
         }

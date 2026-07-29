@@ -32,13 +32,31 @@ else
     }
 fi
 
-# Supply-chain pinning: every workflow action must reference an immutable
-# commit SHA (a movable major tag lets a tag replacement change the code CI
-# and release jobs execute without a reviewed diff), and the repo-managed
-# installers must stay content-pinned.
-if grep -rhoE 'uses: [^ ]+' .github/workflows/ | grep -vE 'uses: [^ ]+@[0-9a-f]{40}$' | grep -v 'uses: \./' | grep -q .; then
+# Extract one top-level YAML key (a job under `jobs:` or a trigger under
+# `on:`) through the next 4-space key, regardless of neighbouring job order.
+# Policy assertions must slice structurally instead of treating workflow
+# layout as part of the contract.
+job_body() {
+    awk -v key="$1" '
+        BEGIN { target = "    " key ":" }
+        $0 == target { collecting = 1; print; next }
+        collecting && /^    [A-Za-z0-9_-]+:$/ { exit }
+        collecting { print }
+    ' "$2"
+}
+
+# Supply-chain pinning: every workflow and repo-owned composite action must
+# reference an immutable commit SHA (a movable major tag lets a tag
+# replacement change the code CI executes without a reviewed diff). Local
+# composite actions (uses: ./…) are exempt from the SHA rule, but their
+# external dependencies are scanned alongside workflows.
+action_sources=(.github/workflows/)
+if [ -d .github/actions ]; then
+    action_sources+=(.github/actions/)
+fi
+if grep -rhoE 'uses: [^ ]+' "${action_sources[@]}" | grep -vE 'uses: [^ ]+@[0-9a-f]{40}$' | grep -v 'uses: \./' | grep -q .; then
     echo "workflow action references must be pinned to a full commit SHA:" >&2
-    grep -rnE 'uses: [^ ]+' .github/workflows/ | grep -vE '@[0-9a-f]{40}( #.*)?$' | grep -v 'uses: \./' >&2
+    grep -rnE 'uses: [^ ]+' "${action_sources[@]}" | grep -vE '@[0-9a-f]{40}( #.*)?$' | grep -v 'uses: \./' >&2
     exit 1
 fi
 grep -q 'EMSCRIPTEN_COMMIT=[0-9a-f]\{40\}' scripts/init-environment.sh || {
@@ -49,7 +67,10 @@ grep -q -- '--require-hashes' scripts/init-environment.sh || {
     echo "init-environment.sh must install Python tools with --require-hashes" >&2
     exit 1
 }
-
+grep -q 'brace-expansion@5\.0\.8:' pnpm-lock.yaml || {
+    echo "pnpm lockfile must carry the patched brace-expansion release" >&2
+    exit 1
+}
 for required in \
     "$ci" \
     "$codeql" \
@@ -59,9 +80,18 @@ for required in \
     "$release_ruleset" \
     "$release_environment" \
     "$release_environment_policy" \
+    docs/repository-setup-template.md \
+    scripts/lib/artifact.sh \
+    scripts/lib/discover-toolchain.sh \
     scripts/bootstrap-repository.sh; do
     if [ ! -f "$required" ]; then
         echo "missing CI policy file: $required" >&2
+        exit 1
+    fi
+done
+for setup_recipe in scripts/bootstrap-repository.sh docs/repository-setup-template.md; do
+    if [ "$(grep -Fc 'required_review_thread_resolution: true' "$setup_recipe")" -ne 1 ]; then
+        echo "main ruleset recipe must require resolved review conversations: $setup_recipe" >&2
         exit 1
     fi
 done
@@ -78,10 +108,18 @@ grep -Fq 'benchmark' scripts/run-c-test-artifact.sh
 test -x scripts/build-swift-product-artifact.sh
 test -x scripts/build-swift-test-artifact.sh
 test -x scripts/run-swift-test-artifact.sh
+test -x scripts/run-swift-ios-tests.sh
 test -x scripts/build-swift-deployment.sh
 test -x scripts/check-swift-source-archive.sh
 grep -Fq -- 'swift build --target TexCore' scripts/build-swift-product-artifact.sh
 grep -Fq 'Package.release.swift' scripts/check-swift-source-archive.sh
+grep -Fq 'prepare-swift-ios-simulator.sh' scripts/run-swift-test-artifact.sh
+grep -Fq 'prepare-swift-ios-simulator.sh' scripts/run-swift-ios-tests.sh
+if grep -Eq 'name=iPhone|OS=latest' scripts/build-swift-test-artifact.sh scripts/run-swift-test-artifact.sh \
+    scripts/run-swift-ios-tests.sh package.json; then
+    echo "Swift CI or pnpm entry points hard-code a simulator model or moving runtime alias" >&2
+    exit 1
+fi
 if grep -Eq 'swift package archive-source|cp .*Tests|cp .*Benchmarks|swift test|specs/render-tree' \
     scripts/check-swift-source-archive.sh; then
     echo "Swift release staging still includes test, benchmark, or conformance source" >&2
@@ -99,16 +137,29 @@ test -x scripts/run-kotlin-host-test-artifact.sh
 test -x scripts/build-kotlin-android-test-artifact.sh
 test -x scripts/run-kotlin-android-test-artifact.sh
 test -x scripts/stage-maven-publications.sh
+for toolchain_consumer in scripts/gradle.sh scripts/check-kotlin-consumers.sh scripts/gradle-model-smoke.sh; do
+    grep -Fq 'scripts/lib/discover-toolchain.sh' "$toolchain_consumer" \
+        || grep -Fq 'lib/discover-toolchain.sh' "$toolchain_consumer"
+done
+grep -Fq 'gradle/wrapper/gradle-wrapper.properties' scripts/gradle-model-smoke.sh
+if grep -Eq 'gradle-[0-9]+\.[0-9]+(\.[0-9]+)?/lib/gradle-tooling-api' scripts/gradle-model-smoke.sh; then
+    echo "Gradle model smoke hard-codes the wrapper/tooling API version" >&2
+    exit 1
+fi
+grep -Fq 'org.gradle.configuration-cache=true' gradle.properties
+grep -Fq 'org.gradle.configuration-cache.parallel=true' gradle.properties
+grep -Fq 'org.gradle.toolchains.foojay-resolver-convention' settings.gradle.kts
+grep -Fq 'val runtimeAarFile = androidRuntimeAar' packages/kotlin-tex-core/build.gradle.kts
+grep -Fq 'inputs.file(desktopLibraryFile)' packages/kotlin-tex-core/build.gradle.kts
 grep -Fq 'stageJvmBenchmarkArtifact' scripts/build-kotlin-host-test-artifact.sh
 grep -Fq -- '-PtexCore.android.abis=x86_64' scripts/build-kotlin-android-test-artifact.sh
-search 'sha256sum --check SHA256SUMS' scripts/run-kotlin-android-test-artifact.sh
-search 'source_sha' scripts/run-kotlin-android-test-artifact.sh
+search 'artifact_verify ' scripts/run-kotlin-android-test-artifact.sh
 
 # The emulator consumers execute one immutable APK; any build-system entry
 # point there voids the build-once/test-many contract, and the four
 # page-size x suite legs must stay independent so a wedged leg cannot mask
 # its siblings.
-android_test_job=$(sed -n '/^    kotlin-android-test:$/,/^    swift-test:$/p' "$ci")
+android_test_job=$(job_body kotlin-android-test "$ci")
 for forbidden in \
     'gradle' \
     'sdkmanager "platforms' \
@@ -121,7 +172,7 @@ for forbidden in \
         exit 1
     fi
 done
-if [ "$(grep -c '^                      suite:' <<<"$android_test_job")" -ne 4 ]; then
+if [ "$(grep -c -E '^[[:space:]]*suite:' <<<"$android_test_job")" -ne 4 ]; then
     echo "Android correctness/conformance and 4K/16K must be four independent consumers" >&2
     exit 1
 fi
@@ -130,8 +181,7 @@ test -x scripts/build-es-product-artifact.sh
 test -x scripts/build-es-test-artifact.sh
 test -x scripts/run-es-test-artifact.sh
 grep -Fq 'kind=es-product-dist' scripts/build-es-product-artifact.sh
-search 'sha256sum --check SHA256SUMS' scripts/run-es-test-artifact.sh
-search 'source_sha' scripts/run-es-test-artifact.sh
+search 'artifact_verify ' scripts/run-es-test-artifact.sh
 
 for job in \
     health-check-repository \
@@ -175,8 +225,7 @@ if search 'cmake --build|cmake --preset| cc | clang | gcc ' scripts/run-c-test-a
     echo "test artifact consumer contains a compiler/build invocation" >&2
     exit 1
 fi
-search 'sha256sum --check SHA256SUMS' scripts/run-c-test-artifact.sh
-search 'source_sha' scripts/run-c-test-artifact.sh
+search 'artifact_verify ' scripts/run-c-test-artifact.sh
 
 for consumer in \
     c-test \
@@ -188,7 +237,7 @@ for consumer in \
     benchmark-c \
     benchmark-kotlin \
     benchmark-es; do
-    consumer_job=$(sed -n "/^    ${consumer}:$/,/^    [a-z].*:$/p" "$ci")
+    consumer_job=$(job_body "$consumer" "$ci")
     if ! grep -Fq '        needs: build-tests-ready' <<<"$consumer_job"; then
         echo "test consumer bypasses the global build-test barrier: $consumer" >&2
         exit 1
@@ -200,7 +249,7 @@ for producer in \
     c-product-build-windows \
     kotlin-product-build \
     es-product-build; do
-    producer_job=$(sed -n "/^    ${producer}:$/,/^    [a-z].*:$/p" "$ci")
+    producer_job=$(job_body "$producer" "$ci")
     if ! grep -Fq '        needs: health-checks-ready' <<<"$producer_job"; then
         echo "build producer bypasses the global health-check barrier: $producer" >&2
         exit 1
@@ -216,7 +265,7 @@ for contract in \
     kotlin-consumers \
     kotlin-android-test-build \
     es-test-build; do
-    contract_job=$(sed -n "/^    ${contract}:$/,/^    [a-z].*:$/p" "$ci")
+    contract_job=$(job_body "$contract" "$ci")
     if ! grep -Fq '        needs: builds-ready' <<<"$contract_job"; then
         echo "build test bypasses the global build barrier: $contract" >&2
         exit 1
@@ -234,18 +283,18 @@ if search '^        name:.*matrix\.(os|suite|compiler|shared|sanitizer|variant|p
     exit 1
 fi
 
-tests_ready_job=$(sed -n '/^    tests-ready:$/,/^    required-gates:$/p' "$ci")
+tests_ready_job=$(job_body tests-ready "$ci")
 grep -Fq '        if: ${{ always() }}' <<<"$tests_ready_job"
 if grep -Fq 'benchmarks-ready' <<<"$tests_ready_job"; then
     echo "Tests - Ready must not depend on the parallel benchmark barrier" >&2
     exit 1
 fi
-required_gate_job=$(sed -n '/^    required-gates:/,$p' "$ci")
+required_gate_job=$(job_body required-gates "$ci")
 grep -Fq '            - tests-ready' <<<"$required_gate_job"
 grep -Fq '            - benchmarks-ready' <<<"$required_gate_job"
 grep -Fq 'BENCHMARKS_READY: ${{ needs.benchmarks-ready.result }}' <<<"$required_gate_job"
 
-benchmarks_ready_job=$(sed -n '/^    benchmarks-ready:$/,/^    tests-ready:$/p' "$ci")
+benchmarks_ready_job=$(job_body benchmarks-ready "$ci")
 grep -Fq '        if: ${{ always() }}' <<<"$benchmarks_ready_job"
 
 # Formal release workflow: tag-triggered only, tag-local quality gates,
@@ -289,15 +338,17 @@ for release_name in \
     'Publish Release - GitHub'; do
     grep -Fq "        name: $release_name" "$release"
 done
-release_ready_job=$(sed -n '/^    release-artifacts-ready:$/,/^    maven-stage:$/p' "$release")
+release_ready_job=$(job_body release-artifacts-ready "$release")
 grep -Fq "if: \${{ github.event_name == 'push' && always() }}" <<<"$release_ready_job"
 for dependency in c-artifacts swift-source npm-package maven-assemble; do
     grep -Fq "$dependency" <<<"$release_ready_job"
 done
-maven_stage_job=$(sed -n '/^    maven-stage:$/,/^    npm-publish:$/p' "$release")
+maven_stage_job=$(job_body maven-stage "$release")
 grep -Fq '        needs: release-artifacts-ready' <<<"$maven_stage_job"
 grep -Fq 'central-portal.sh upload build/tex-core-maven-central.zip' <<<"$maven_stage_job"
-if search 'central-portal\.sh upload' <(sed -n '/^    maven-assemble:$/,/^    release-artifacts-ready:$/p' "$release"); then
+grep -Fq 'name: release-central-deployment' <<<"$maven_stage_job"
+grep -Fq 'if: ${{ always() }}' <<<"$maven_stage_job"
+if search 'central-portal\.sh upload' <(job_body maven-assemble "$release"); then
     echo "Maven assembly phase may not publish externally" >&2
     exit 1
 fi
@@ -307,6 +358,15 @@ search 'actions/attest-build-provenance@' "$release"
 search 'npm publish \./release-npm/\*\.tgz --access public' "$release"
 search '^    resume-publish:$' "$release"
 search "if: github.event_name == 'workflow_dispatch'" "$release"
+if search 'central-deployment-id:' "$release"; then
+    echo "release resume may not accept a Central deployment id from the operator" >&2
+    exit 1
+fi
+search 'github\.event_name.*format.*refs/tags' "$release"
+search "jq -r '\\.status'.*= \"completed\"" "$release"
+search 'gh run download "\$SOURCE_RUN_ID" --name release-central-deployment' "$release"
+search 'bound_tag.*RELEASE_TAG' "$release"
+search 'bound_version.*cat VERSION' "$release"
 search 'gh run download "\$SOURCE_RUN_ID" --name release-npm-package' "$release"
 grep -Fq 'test -s "docs/releases/$(cat VERSION).md"' "$release"
 grep -Fq -- '--notes-file "docs/releases/$(cat VERSION).md"' "$release"
@@ -350,7 +410,7 @@ done
 search '^    workflow_call:$' "$ci"
 search '^    workflow_dispatch:$' "$ci"
 
-ci_push_trigger=$(sed -n '/^    push:$/,/^    merge_group:$/p' "$ci")
+ci_push_trigger=$(job_body push "$ci")
 if ! grep -Fqx '        branches:' <<<"$ci_push_trigger" ||
     ! grep -Fqx '            - main' <<<"$ci_push_trigger"; then
     echo "blocking CI push trigger must cover only the default branch" >&2
@@ -397,6 +457,9 @@ if (ruleset.conditions?.ref_name?.include?.join(",") !== "~DEFAULT_BRANCH") {
 const mainPullRequest = ruleset.rules.find((rule) => rule.type === "pull_request");
 if (mainPullRequest?.parameters?.required_reviewers?.length) {
     throw new Error("owner reviewers must not share the main CI ruleset");
+}
+if (mainPullRequest?.parameters?.required_review_thread_resolution !== true) {
+    throw new Error("all pull-request review conversations must be resolved before merge");
 }
 if (ruleset.bypass_actors?.length) {
     throw new Error("the main quality gate must not carry bypass actors");

@@ -3,7 +3,9 @@ set -eu
 
 case "${1:-}" in
     --check)
-        swift_format_args="lint"
+        # --strict promotes findings (including missing public API
+        # documentation) to errors instead of advisory warnings.
+        swift_format_args="lint --strict"
         ;;
     "")
         swift_format_args="--in-place"
@@ -17,7 +19,6 @@ esac
 if [ ! -f Package.swift ]; then
     echo "format-swift.sh must run from the repository root (Package.swift not found)" >&2
     exit 2
-    exit 0
 fi
 
 EXPECTED_VERSION="6.3.0"

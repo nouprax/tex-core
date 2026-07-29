@@ -82,7 +82,8 @@ static int txc_bench(const char *workload, const char *source, tex_core_mode mod
      * dump boundary rides along under its own key so the collector never
      * confuses the two. */
     printf(
-        "benchmark runtime=c boundary=native_compile workload=%s bytes=%zu warmup=%d repeats=%d "
+        "benchmark runtime=c boundary=native_compile workload=%s workload_version=1 "
+        "bytes=%zu warmup=%d repeats=%d "
         "median_ns=%llu dump_median_ns=%llu\n",
         workload,
         length,

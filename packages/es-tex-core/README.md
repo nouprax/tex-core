@@ -17,7 +17,7 @@ for (const node of tree.root.children) {
 }
 ```
 
-- ESM-only, `sideEffects: false`, Node ≥ 20 or an ES2022+/WASM browser
+- ESM-only, `sideEffects: false`, Node ≥ 24 or an ES2022+/WASM browser
   runtime (CI exercises Node and Chromium); the
   WASM asset resolves through the `./tex-core.wasm` export and deep imports
   are blocked by the `exports` map.

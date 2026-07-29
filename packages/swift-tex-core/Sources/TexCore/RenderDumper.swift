@@ -7,16 +7,25 @@ struct RenderDumper: RenderVisitor {
     private(set) var output = "render-tree 5\n"
     private var depth = 0
 
+    mutating func dump(_ root: HBox) -> String {
+        var stack: [(RenderNode, Int)] = [(.hbox(root), 0)]
+        while let (node, nodeDepth) = stack.popLast() {
+            depth = nodeDepth
+            node.accept(&self)
+            if case .hbox(let box) = node {
+                for child in box.children.reversed() {
+                    stack.append((child, nodeDepth + 1))
+                }
+            }
+        }
+        return output
+    }
+
     mutating func visit(_ node: HBox) {
         indent()
         output += "hbox x=\(measure(node.x)) y=\(measure(node.y))"
         output += " width=\(measure(node.width)) ascent=\(measure(node.ascent))"
         output += " descent=\(measure(node.descent)) src=\(range(node.src))\n"
-        depth += 1
-        for child in node.children {
-            child.accept(&self)
-        }
-        depth -= 1
     }
 
     mutating func visit(_ node: Glyph) {

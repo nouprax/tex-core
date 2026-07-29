@@ -158,16 +158,41 @@ function frozenNode(node: RenderNode): RenderNode {
 }
 
 function frozenBox(box: HBox): HBox {
-    return Object.freeze({
-        kind: "hbox",
-        x: box.x,
-        y: box.y,
-        width: box.width,
-        ascent: box.ascent,
-        descent: box.descent,
-        src: frozenRange(box.src),
-        children: Object.freeze(box.children.map(frozenNode))
-    });
+    interface FreezeFrame {
+        readonly source: HBox;
+        readonly children: RenderNode[];
+        index: number;
+    }
+
+    const stack: FreezeFrame[] = [{ source: box, children: [], index: 0 }];
+    while (true) {
+        const top = stack[stack.length - 1]!;
+        if (top.index < top.source.children.length) {
+            const child = top.source.children[top.index]!;
+            top.index += 1;
+            if (child.kind === "hbox") {
+                stack.push({ source: child, children: [], index: 0 });
+            } else {
+                top.children.push(frozenNode(child));
+            }
+            continue;
+        }
+
+        const source = top.source;
+        const value: HBox = Object.freeze({
+            kind: "hbox",
+            x: source.x,
+            y: source.y,
+            width: source.width,
+            ascent: source.ascent,
+            descent: source.descent,
+            src: frozenRange(source.src),
+            children: Object.freeze(top.children)
+        });
+        stack.pop();
+        if (stack.length === 0) return value;
+        stack[stack.length - 1]!.children.push(value);
+    }
 }
 
 /**

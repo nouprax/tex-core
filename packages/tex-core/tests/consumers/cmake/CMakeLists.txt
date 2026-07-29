@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.20)
+cmake_minimum_required(VERSION 3.21)
 project(tex-core-installed-consumer LANGUAGES C)
 
 find_package(tex-core CONFIG REQUIRED)

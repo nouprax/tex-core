@@ -1,7 +1,8 @@
 # CTest is the single source of truth for the C test graph. Suites are
 # grouped by label:
 #
-#   api engine errors determinism allocfail threads cli conformance benchmark
+#   api engine errors determinism allocfail threads cli conformance complexity
+#   benchmark
 #
 # The default correctness preset excludes conformance and benchmark; the
 # sanitizer correctness presets also exclude wall-clock complexity gates.
@@ -27,6 +28,16 @@ tex_core_add_suite(engine)
 tex_core_add_suite(errors)
 tex_core_add_suite(determinism)
 tex_core_add_suite(allocfail)
+
+# Complexity: one process per input family so each endpoint gets a fresh,
+# explicit warmup before adaptive sampling. These are Release-only
+# wall-clock gates; sanitizer presets exclude the `complexity` label.
+add_executable(tex-core-test-complexity complexity.c)
+target_link_libraries(tex-core-test-complexity PRIVATE libtex-core_static)
+foreach(case_name document math)
+    add_test(NAME complexity-${case_name} COMMAND tex-core-test-complexity "${case_name}")
+    set_tests_properties(complexity-${case_name} PROPERTIES LABELS complexity RUN_SERIAL TRUE TIMEOUT 120)
+endforeach()
 
 # conformance: one CTest per case of the shared render-tree corpus. The
 # manifest is the sole case list; CMake validates its shape and fails the

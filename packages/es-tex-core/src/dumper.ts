@@ -1,4 +1,4 @@
-import type { Glyph, HBox, Kern, RenderTree, Rule } from "./model.js";
+import type { Glyph, HBox, Kern, RenderNode, RenderTree, Rule } from "./model.js";
 import type { RenderVisitor } from "./visitor.js";
 import { accept } from "./visitor.js";
 
@@ -11,14 +11,24 @@ import { accept } from "./visitor.js";
 export const RenderDumper = {
     dump(tree: RenderTree): string {
         const visitor = new DumpVisitor();
-        visitor.visitHBox(tree.root);
+        const stack: Array<{ node: RenderNode; depth: number }> = [{ node: tree.root, depth: 0 }];
+        while (stack.length > 0) {
+            const frame = stack.pop()!;
+            visitor.depth = frame.depth;
+            accept(frame.node, visitor);
+            if (frame.node.kind === "hbox") {
+                for (let index = frame.node.children.length - 1; index >= 0; index -= 1) {
+                    stack.push({ node: frame.node.children[index]!, depth: frame.depth + 1 });
+                }
+            }
+        }
         return visitor.output;
     }
 };
 
 class DumpVisitor implements RenderVisitor<void> {
     output = "render-tree 5\n";
-    private depth = 0;
+    depth = 0;
 
     visitHBox(node: HBox): void {
         this.indent();
@@ -26,9 +36,6 @@ class DumpVisitor implements RenderVisitor<void> {
             `hbox x=${measure(node.x)} y=${measure(node.y)}` +
             ` width=${measure(node.width)} ascent=${measure(node.ascent)}` +
             ` descent=${measure(node.descent)} src=${range(node.src)}\n`;
-        this.depth += 1;
-        for (const child of node.children) accept(child, this);
-        this.depth -= 1;
     }
 
     visitGlyph(node: Glyph): void {

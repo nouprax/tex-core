@@ -7,7 +7,7 @@ public final class Main {
     private Main() {}
 
     public static void main(String[] args) {
-        RenderTree tree = Document.INSTANCE.compile("The 42 rows, 3.14 total.\n");
+        RenderTree tree = Document.compile("The 42 rows, 3.14 total.\n");
         if (tree.getRoot().getChildren().isEmpty()) {
             throw new IllegalStateException("Document.compile returned an empty galley");
         }
