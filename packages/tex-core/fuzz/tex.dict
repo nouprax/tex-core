@@ -1,6 +1,16 @@
-# libFuzzer dictionary: the M1 LaTeX surface's structural tokens and a
-# representative command from every dispatch class, so mutation reaches
-# structured constructs instead of rediscovering command spellings blind.
+# libFuzzer dictionary: the supported LaTeX surface's structural tokens
+# and a representative command from every dispatch class, so mutation
+# reaches structured constructs instead of rediscovering command
+# spellings blind.
+"\\begin"
+"\\end"
+"\\begin{matrix}"
+"\\end{matrix}"
+"\\begin{pmatrix}"
+"\\end{pmatrix}"
+"\\begin{Vmatrix}"
+"&"
+"\\\\"
 "\\frac"
 "\\dfrac"
 "\\tfrac"

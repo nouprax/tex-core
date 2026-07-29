@@ -282,6 +282,15 @@ static tex_core_status txc_accent_box(
     tex_core_error *error
 );
 
+static tex_core_status txc_array_box(
+    txc_arena *arena,
+    const txc_array *array,
+    int style,
+    tex_core_range range,
+    txc_node **out,
+    tex_core_error *error
+);
+
 /* The rule-19 target of one \big size step. */
 static txc_scaled txc_big_target(int size) {
     return txc_delimiter_target(TXC_BIG_HEIGHTS[size - 1] - txc_param(TXC_PARAMETER_AXIS_HEIGHT, TXC_MATHSIZE_TEXT));
@@ -308,6 +317,9 @@ txc_clean_box(txc_arena *arena, const txc_field *field, int style, txc_node **ou
     }
     if (field->kind == TXC_FIELD_ACCENT) {
         return txc_accent_box(arena, field->accent, style, field->range, out, error);
+    }
+    if (field->kind == TXC_FIELD_ARRAY) {
+        return txc_array_box(arena, field->array, style, field->range, out, error);
     }
     if (field->kind == TXC_FIELD_DELIMITER) {
         return txc_delimiter_boxed(
@@ -894,6 +906,211 @@ static tex_core_status txc_fenced_box(
     return TEX_CORE_STATUS_OK;
 }
 
+/* LaTeX's array geometry at the 10 pt text size. \arraycolsep (5 pt)
+ * pads every column on both sides; the matrix family's outer
+ * -\arraycolsep skips cancel the edge padding exactly, so columns sit
+ * 2\arraycolsep apart with none outside and no kerns are published.
+ * \@array zeroes \baselineskip and \lineskip before the alignment
+ * (lttab.dtx), so consecutive rows abut exactly on their extents and
+ * the \@arstrut alone pitches ordinary rows: it floors every row at
+ * .7 and .3 of the 12 pt \baselineskip — by TeX's decimal scan those
+ * coefficients are 45875/65536 and 19661/65536, so the strut is
+ * exactly 550500 sp over 235932 sp, and strut-floored baselines sit
+ * 12 pt apart while taller rows meet with no added clearance. */
+#define TXC_ARRAY_COLSEP 327680
+#define TXC_ARRAY_STRUT_ASCENT 550500
+#define TXC_ARRAY_STRUT_DESCENT 235932
+
+/* Builds a math alignment environment's box (the matrix family): every
+ * cell is its own inline math list set in text style whatever the
+ * surrounding style — array cells open fresh inline math, so a matrix
+ * inside a script keeps full-size entries, exactly as LaTeX. Each
+ * column takes its widest cell's width with cells centered by half the
+ * excess; each row is an hbox of the full alignment width whose
+ * extents are floored by the array strut (a deliberate excess over
+ * its children, like the operator-limits assembly); consecutive rows
+ * abut on those extents; the stacked rows are centered on the math
+ * axis exactly as \vcenter (tex.web section 736), and the delimited
+ * variants grow their fences to the rule-19 target of the centered
+ * box's reach, exactly as \left/\right. */
+static tex_core_status txc_array_box(
+    txc_arena *arena,
+    const txc_array *array,
+    int style,
+    tex_core_range range,
+    txc_node **out,
+    tex_core_error *error
+) {
+    size_t column_count = 0;
+    for (const txc_array_row *row = array->rows; row != NULL; row = row->next) {
+        if (row->cell_count > column_count) {
+            column_count = row->cell_count;
+        }
+    }
+
+    txc_scaled *column_widths = NULL;
+    txc_node **row_boxes = NULL;
+    txc_scaled *row_ascents = NULL;
+    txc_scaled *row_descents = NULL;
+    if (column_count > 0) {
+        column_widths = txc_arena_alloc(arena, column_count * sizeof(*column_widths));
+        row_boxes = txc_arena_alloc(arena, array->row_count * sizeof(*row_boxes));
+        row_ascents = txc_arena_alloc(arena, array->row_count * sizeof(*row_ascents));
+        row_descents = txc_arena_alloc(arena, array->row_count * sizeof(*row_descents));
+        if (column_widths == NULL || row_boxes == NULL || row_ascents == NULL || row_descents == NULL) {
+            return txc_alloc_fail(error);
+        }
+        for (size_t column = 0; column < column_count; column++) {
+            column_widths[column] = 0;
+        }
+    }
+
+    /* First pass: lay out every cell, collecting the column width and
+     * strutted row extent maxima. */
+    size_t row_index = 0;
+    for (const txc_array_row *row = array->rows; row != NULL; row = row->next, row_index++) {
+        txc_node *row_box = txc_arena_alloc(arena, sizeof(txc_node));
+        const txc_node **cells = txc_arena_alloc(arena, row->cell_count * sizeof(*cells));
+        if (row_box == NULL || cells == NULL) {
+            return txc_alloc_fail(error);
+        }
+        txc_scaled ascent = TXC_ARRAY_STRUT_ASCENT;
+        txc_scaled descent = TXC_ARRAY_STRUT_DESCENT;
+        size_t column = 0;
+        for (const txc_array_cell *cell = row->cells; cell != NULL; cell = cell->next, column++) {
+            txc_node *box = NULL;
+            tex_core_status status = txc_mlist(arena, &cell->list, TXC_STYLE_TEXT, true, cell->range, &box, error);
+            if (status != TEX_CORE_STATUS_OK) {
+                return status;
+            }
+            cells[column] = box;
+            if (box->width > column_widths[column]) {
+                column_widths[column] = box->width;
+            }
+            ascent = txc_max(ascent, box->ascent);
+            descent = txc_max(descent, box->descent);
+        }
+        tex_core_range row_range = {row->cells->range.begin, row->cells->range.begin};
+        for (const txc_array_cell *cell = row->cells; cell != NULL; cell = cell->next) {
+            row_range.end = cell->range.end;
+        }
+        txc_box_init(row_box, row_range, cells, row->cell_count);
+        row_box->ascent = ascent;
+        row_box->descent = descent;
+        row_boxes[row_index] = row_box;
+        row_ascents[row_index] = ascent;
+        row_descents[row_index] = descent;
+    }
+
+    /* Column positions and the alignment width. */
+    txc_scaled width = 0;
+    for (size_t column = 0; column < column_count; column++) {
+        if (column > 0) {
+            width += 2 * TXC_ARRAY_COLSEP;
+        }
+        width += column_widths[column];
+    }
+
+    /* Rows abut on their strutted extents (\@array zeroes the interline
+     * glue), then the \vcenter split centers the stack around the axis
+     * of the surrounding style's size. */
+    txc_scaled axis = txc_param(TXC_PARAMETER_AXIS_HEIGHT, txc_style_size(style));
+    txc_scaled depth_below_first = 0;
+    for (size_t index = 0; index < array->row_count; index++) {
+        if (index > 0) {
+            depth_below_first += row_descents[index - 1] + row_ascents[index];
+        }
+    }
+    txc_scaled stack_height = array->row_count > 0 ? row_ascents[0] : 0;
+    txc_scaled stack_depth = array->row_count > 0 ? depth_below_first + row_descents[array->row_count - 1] : 0;
+    txc_scaled delta = stack_height + stack_depth;
+    txc_scaled ascent = axis + txc_half(delta);
+    txc_scaled descent = delta - ascent;
+
+    /* Second pass: place the cells in their columns and the rows on
+     * their baselines. */
+    txc_scaled baseline = ascent - stack_height;
+    for (size_t index = 0; index < array->row_count; index++) {
+        txc_node *row_box = row_boxes[index];
+        if (index > 0) {
+            baseline -= row_descents[index - 1] + row_ascents[index];
+        }
+        row_box->y = baseline;
+        row_box->width = width;
+        txc_scaled cursor = 0;
+        size_t column = 0;
+        for (size_t cell = 0; cell < row_box->child_count; cell++, column++) {
+            txc_node *box = (txc_node *)row_box->children[cell];
+            box->x = cursor + txc_half(column_widths[column] - box->width);
+            cursor += column_widths[column] + 2 * TXC_ARRAY_COLSEP;
+        }
+    }
+
+    if (!array->delimited) {
+        txc_node *box = txc_arena_alloc(arena, sizeof(txc_node));
+        const txc_node **children = NULL;
+        if (array->row_count > 0 && box != NULL) {
+            children = txc_arena_alloc(arena, array->row_count * sizeof(*children));
+        }
+        if (box == NULL || (array->row_count > 0 && children == NULL)) {
+            return txc_alloc_fail(error);
+        }
+        for (size_t index = 0; index < array->row_count; index++) {
+            children[index] = row_boxes[index];
+        }
+        txc_box_init(box, range, children, array->row_count);
+        box->width = width;
+        box->ascent = ascent;
+        box->descent = descent;
+        *out = box;
+        return TEX_CORE_STATUS_OK;
+    }
+
+    /* The delimited variants are their amsmath definitions —
+     * \left<delim> matrix \right<delim> — so the fences grow against
+     * the centered stack's reach around the axis. */
+    txc_scaled delta1 = txc_max(ascent - axis, descent + axis);
+    txc_scaled target = txc_delimiter_target(delta1);
+    txc_node *left;
+    tex_core_status status = txc_delimiter_node(arena, &array->left, style, target, array->begin, &left, error);
+    if (status != TEX_CORE_STATUS_OK) {
+        return status;
+    }
+    txc_node *right;
+    status = txc_delimiter_node(arena, &array->right, style, target, array->end, &right, error);
+    if (status != TEX_CORE_STATUS_OK) {
+        return status;
+    }
+
+    size_t child_count = 2 + array->row_count;
+    txc_node *box = txc_arena_alloc(arena, sizeof(txc_node));
+    const txc_node **children = txc_arena_alloc(arena, child_count * sizeof(*children));
+    if (box == NULL || children == NULL) {
+        return txc_alloc_fail(error);
+    }
+    size_t index = 0;
+    children[index++] = left;
+    for (size_t row = 0; row < array->row_count; row++) {
+        txc_node *row_box = row_boxes[row];
+        row_box->x = left->width;
+        children[index++] = row_box;
+    }
+    right->x = left->width + width;
+    children[index++] = right;
+
+    txc_scaled box_ascent = ascent;
+    txc_scaled box_descent = descent;
+    box_ascent = txc_max(box_ascent, txc_max(left->y + left->ascent, right->y + right->ascent));
+    box_descent = txc_max(box_descent, txc_max(left->descent - left->y, right->descent - right->y));
+
+    txc_box_init(box, range, children, child_count);
+    box->width = left->width + width + right->width;
+    box->ascent = box_ascent;
+    box->descent = box_descent;
+    *out = box;
+    return TEX_CORE_STATUS_OK;
+}
+
 /* LaTeX's index raise (\r@@t): 0.6 of the radical box's ascent minus
  * descent, as the 16.16 fraction 39322; and the \mkern amounts flanking
  * the index, 5 mu and -10 mu of the current size's quad. */
@@ -1254,6 +1471,9 @@ static tex_core_status txc_atom(
             break;
         case TXC_FIELD_ACCENT:
             status = txc_accent_box(arena, item->nucleus.accent, style, item->nucleus.range, &box, error);
+            break;
+        case TXC_FIELD_ARRAY:
+            status = txc_array_box(arena, item->nucleus.array, style, item->nucleus.range, &box, error);
             break;
         case TXC_FIELD_TEXT:
             status = txc_mlist(arena, &item->nucleus.list, style, false, item->nucleus.range, &box, error);

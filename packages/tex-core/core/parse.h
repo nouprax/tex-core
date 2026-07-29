@@ -1,8 +1,10 @@
 /* Parser: token stream to semantic list. The semantic lists are internal;
  * the public contract is the render tree only (plan section 5.2). The
  * grammar covers classed math atoms (characters and symbol commands) with
- * braced groups, superscripts, subscripts, and fractions, plus explicit
- * spacing; document mode still typesets ordinary text atoms only. */
+ * braced groups, superscripts, subscripts, fractions, fences, radicals,
+ * accents, style switches, and the matrix-family alignment environments,
+ * plus explicit spacing; document mode still typesets ordinary text atoms
+ * only. */
 
 #ifndef TXC_PARSE_H
 #define TXC_PARSE_H
@@ -94,7 +96,8 @@ typedef enum txc_field_kind {
     TXC_FIELD_FENCED = 5,
     TXC_FIELD_RADICAL = 6,
     TXC_FIELD_ACCENT = 7,
-    TXC_FIELD_TEXT = 8
+    TXC_FIELD_TEXT = 8,
+    TXC_FIELD_ARRAY = 9
 } txc_field_kind;
 
 /* The face a style switch applies to its argument's letters and digits.
@@ -114,6 +117,7 @@ struct txc_fraction;
 struct txc_fenced;
 struct txc_radical;
 struct txc_accent;
+struct txc_array;
 
 /* An explicit-size delimiter (\bigl … \Biggr): the delimiter and the
  * plain TeX size step 1-4 (\big through \Bigg). */
@@ -161,6 +165,8 @@ typedef struct txc_field {
         struct txc_radical *radical;
         /* TXC_FIELD_ACCENT. */
         struct txc_accent *accent;
+        /* TXC_FIELD_ARRAY. */
+        struct txc_array *array;
     };
     /* The field's own source construct: the character or symbol command,
      * the braced group including its braces, the fraction command through
@@ -192,6 +198,38 @@ typedef struct txc_accent {
     txc_field argument;
     tex_core_range command;
 } txc_accent;
+
+/* One cell of a math alignment environment: its own math sub-list. The
+ * range spans the cell's constructs, or is empty at the point where
+ * content would start (after the opening \begin{...} or a separator). */
+typedef struct txc_array_cell {
+    txc_list list;
+    tex_core_range range;
+    struct txc_array_cell *next;
+} txc_array_cell;
+
+/* One environment row: the cells split on `&`. Every row has at least
+ * one cell; a trailing `\\` directly before \end contributes no row. */
+typedef struct txc_array_row {
+    txc_array_cell *cells;
+    size_t cell_count;
+    struct txc_array_row *next;
+} txc_array_row;
+
+/* A math alignment environment (the milestone M2 matrix family): rows of
+ * centered cells. Delimited variants (pmatrix through Vmatrix) carry the
+ * fence pair their amsmath definitions wrap around the array; `begin` and
+ * `end` are the whole \begin{...} and \end{...} token runs, the sources
+ * the delimiters are attributed to. */
+typedef struct txc_array {
+    bool delimited;
+    txc_delimiter left;
+    txc_delimiter right;
+    tex_core_range begin;
+    tex_core_range end;
+    txc_array_row *rows;
+    size_t row_count;
+} txc_array;
 
 /* A \left/\right fence: both delimiters with their own token ranges and
  * the enclosed sub-list. */

@@ -965,6 +965,145 @@ static void txc_test_text_face_protection(txc_test *test) {
     tex_core_render_tree_free(tree);
 }
 
+/* Exact points for an internal scaled-point value; published measures
+ * are exact integer-sp multiples, so equality is exact. */
+static double txc_scaled_as_points(long value) { return (double)value / 65536.0; }
+
+static void txc_test_environments(txc_test *test) {
+    /* A 2x2 matrix: both rows take the \@arstrut floor (550500 over
+     * 235932 sp — .7/.3 of the 12 pt \baselineskip by TeX's decimal
+     * scan), the baselines sit \baselineskip apart, and the stack
+     * centers on the 2.5 pt axis: 14.5 pt over 9.5 pt. */
+    tex_core_render_tree *tree =
+        txc_compile(test, "\\begin{matrix}a&b\\\\c&d\\end{matrix}", TEX_CORE_MODE_MATH_INLINE, "matrix");
+    const tex_core_node *root = tex_core_render_tree_root(tree);
+    txc_check_size(test, tex_core_node_child_count(root), 1, "matrix is one atom");
+    const tex_core_node *matrix = tex_core_node_child(root, 0);
+    txc_check_size(test, tex_core_node_child_count(matrix), 2, "matrix has two rows");
+    tex_core_frame box = tex_core_node_frame(matrix);
+    txc_check(test, box.ascent == txc_scaled_as_points(950272), "matrix ascent is axis-centered");
+    txc_check(test, box.descent == txc_scaled_as_points(622592), "matrix descent is axis-centered");
+
+    const tex_core_node *first = tex_core_node_child(matrix, 0);
+    const tex_core_node *second = tex_core_node_child(matrix, 1);
+    tex_core_frame first_frame = tex_core_node_frame(first);
+    tex_core_frame second_frame = tex_core_node_frame(second);
+    txc_check(test, first_frame.ascent == txc_scaled_as_points(550500), "row ascent floors at the strut");
+    txc_check(test, first_frame.descent == txc_scaled_as_points(235932), "row descent floors at the strut");
+    txc_check(
+        test,
+        first_frame.y - second_frame.y == txc_scaled_as_points(786432),
+        "row baselines sit \\baselineskip apart"
+    );
+    txc_check(test, first_frame.width == second_frame.width, "rows share the alignment width");
+
+    /* Columns take their widest cell (a over c, d over b) separated by
+     * 2\arraycolsep; the narrower cell centers by half the excess,
+     * rounding up. */
+    tex_core_frame cell_a = tex_core_node_frame(tex_core_node_child(first, 0));
+    tex_core_frame cell_c = tex_core_node_frame(tex_core_node_child(second, 0));
+    tex_core_frame cell_d = tex_core_node_frame(tex_core_node_child(second, 1));
+    txc_check(test, cell_a.x == 0.0, "widest first-column cell sits flush");
+    txc_check(
+        test,
+        cell_d.x == cell_a.width + txc_scaled_as_points(655360),
+        "second column starts 2\\arraycolsep after the first"
+    );
+    double centering = 2.0 * cell_c.x - (cell_a.width - cell_c.width);
+    txc_check(
+        test,
+        centering == 0.0 || centering == txc_scaled_as_points(1),
+        "narrower cell centers by half the excess rounding up"
+    );
+    tex_core_render_tree_free(tree);
+
+    /* The delimited variants wrap the same stack in the rule-19 fences:
+     * the one-row pmatrix needs the Size1 parenthesis. Child order is
+     * source order — left fence, rows, right fence. */
+    tree = txc_compile(test, "\\begin{pmatrix}x\\end{pmatrix}", TEX_CORE_MODE_MATH_INLINE, "pmatrix");
+    root = tex_core_render_tree_root(tree);
+    const tex_core_node *fenced = tex_core_node_child(root, 0);
+    txc_check_size(test, tex_core_node_child_count(fenced), 3, "pmatrix has fences around one row");
+    const tex_core_node *left = tex_core_node_child(fenced, 0);
+    const tex_core_node *right = tex_core_node_child(fenced, 2);
+    tex_core_glyph left_view = tex_core_node_glyph(left);
+    txc_check_int(test, (long long)left_view.codepoint, '(', "pmatrix left parenthesis");
+    txc_check_int(test, left_view.family, TEX_CORE_FAMILY_SIZE1, "one-row pmatrix takes the Size1 face");
+    tex_core_frame row = tex_core_node_frame(tex_core_node_child(fenced, 1));
+    tex_core_frame left_frame = tex_core_node_frame(left);
+    tex_core_frame right_frame = tex_core_node_frame(right);
+    txc_check(test, row.x == left_frame.width, "row sits after the left fence");
+    txc_check(test, right_frame.x == left_frame.width + row.width, "right fence sits after the row");
+    tex_core_render_tree_free(tree);
+
+    /* matrix is an Ord atom, the delimited variants are Inner: only the
+     * latter takes the Ord-Inner thin space after a letter. */
+    tree = txc_compile(test, "x\\begin{matrix}a\\end{matrix}", TEX_CORE_MODE_MATH_INLINE, "ord matrix");
+    txc_check_size(
+        test,
+        tex_core_node_child_count(tex_core_render_tree_root(tree)),
+        2,
+        "no space before an undelimited matrix"
+    );
+    tex_core_render_tree_free(tree);
+    tree = txc_compile(test, "x\\begin{pmatrix}a\\end{pmatrix}", TEX_CORE_MODE_MATH_INLINE, "inner matrix");
+    txc_check_size(
+        test,
+        tex_core_node_child_count(tex_core_render_tree_root(tree)),
+        3,
+        "thin space before a delimited matrix"
+    );
+    tex_core_render_tree_free(tree);
+
+    /* A trailing \\ contributes no row, and an all-blank body has zero
+     * rows: the empty \vcenter splits the zero stack around the axis. */
+    tree = txc_compile(test, "\\begin{matrix}a\\\\\\end{matrix}", TEX_CORE_MODE_MATH_INLINE, "trailing row");
+    txc_check_size(
+        test,
+        tex_core_node_child_count(tex_core_node_child(tex_core_render_tree_root(tree), 0)),
+        1,
+        "trailing \\\\ drops the empty last row"
+    );
+    tex_core_render_tree_free(tree);
+    tree = txc_compile(test, "\\begin{matrix} \\end{matrix}", TEX_CORE_MODE_MATH_INLINE, "empty matrix");
+    matrix = tex_core_node_child(tex_core_render_tree_root(tree), 0);
+    txc_check_size(test, tex_core_node_child_count(matrix), 0, "blank body has zero rows");
+    box = tex_core_node_frame(matrix);
+    txc_check(test, box.width == 0.0, "empty matrix has zero width");
+    txc_check(test, box.ascent == txc_scaled_as_points(163840), "empty matrix ascent is the axis");
+    txc_check(test, box.descent == -txc_scaled_as_points(163840), "empty matrix descent is minus the axis");
+    tex_core_render_tree_free(tree);
+
+    /* LaTeX's \\* no-page-break terminator is consumed — meaningless
+     * before pagination — so the starred form keeps the plain form's
+     * two rows and publishes no asterisk glyph. */
+    tree = txc_compile(test, "\\begin{matrix}a\\\\*b\\end{matrix}", TEX_CORE_MODE_MATH_INLINE, "starred");
+    matrix = tex_core_node_child(tex_core_render_tree_root(tree), 0);
+    txc_check_size(test, tex_core_node_child_count(matrix), 2, "starred terminator keeps two rows");
+    const tex_core_node *starred_cell = tex_core_node_child(tex_core_node_child(matrix, 1), 0);
+    txc_check_int(
+        test,
+        (long long)tex_core_node_glyph(tex_core_node_child(starred_cell, 0)).codepoint,
+        'b',
+        "the star is consumed, not typeset"
+    );
+    tex_core_render_tree_free(tree);
+
+    /* Ragged rows keep their own cell counts; the alignment width still
+     * covers every column. */
+    tree = txc_compile(test, "\\begin{matrix}a&b\\\\c\\end{matrix}", TEX_CORE_MODE_MATH_INLINE, "ragged");
+    matrix = tex_core_node_child(tex_core_render_tree_root(tree), 0);
+    txc_check_size(test, tex_core_node_child_count(tex_core_node_child(matrix, 0)), 2, "full row keeps two cells");
+    txc_check_size(test, tex_core_node_child_count(tex_core_node_child(matrix, 1)), 1, "short row keeps one cell");
+    txc_check(
+        test,
+        tex_core_node_frame(tex_core_node_child(matrix, 0)).width ==
+            tex_core_node_frame(tex_core_node_child(matrix, 1)).width,
+        "short row spans the alignment width"
+    );
+    tex_core_render_tree_free(tree);
+}
+
 int main(void) {
     txc_test test = {0, 0};
     txc_test_math_glyph(&test);
@@ -984,6 +1123,7 @@ int main(void) {
     txc_test_styles(&test);
     txc_test_text_face_protection(&test);
     txc_test_nested_styles(&test);
+    txc_test_environments(&test);
     txc_test_command_table(&test);
     txc_test_scaled_rounding(&test);
     txc_test_long_input(&test);

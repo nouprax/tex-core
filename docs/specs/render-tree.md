@@ -59,7 +59,7 @@ in the source-range section.
 
 | Kind | Fields in canonical order | Semantics and invariants |
 | --- | --- | --- |
-| `hbox` | `x: measure`, `y: measure`, `width: measure`, `ascent: measure`, `descent: measure`, `src: range`, `children: [node]` | horizontal box: the compile root, a braced group's nucleus, a script box, a fraction atom's box, a numerator/denominator box, a `\left`/`\right` box, or a delimiter piece assembly; `x`/`y` place its reference point in its parent (the root sits at the origin), a script, numerator, or denominator box's `y` is its baseline shift; `width` is the advance of its content — plus TeX's `\scriptspace` (0.5 pt) on a script box — `ascent`/`descent` the maxima over children floored at zero; the root box spans the whole input |
+| `hbox` | `x: measure`, `y: measure`, `width: measure`, `ascent: measure`, `descent: measure`, `src: range`, `children: [node]` | horizontal box: the compile root, a braced group's nucleus, a script box, a fraction atom's box, a numerator/denominator box, a `\left`/`\right` box, a delimiter piece assembly, or an environment's stack or row; `x`/`y` place its reference point in its parent (the root sits at the origin), a script, numerator, or denominator box's `y` is its baseline shift; `width` is the advance of its content — plus TeX's `\scriptspace` (0.5 pt) on a script box — `ascent`/`descent` the maxima over children floored at zero, except the deliberate excesses their sections pin: the operator-limits assembly's pads, the environment rows' strut floors, and the environment stack's axis split, whose descent may be negative; the root box spans the whole input |
 | `glyph` | `x: measure`, `y: measure`, `cp: codepoint`, `style: style`, `family: family`, `size: measure`, `width: measure`, `ascent: measure`, `descent: measure`, `italic: measure`, `src: range` | leaf; one glyph named by Unicode codepoint + style + family + size, never a private glyph ID; `italic` is the italic correction, included in the advance of a math Ord glyph unless its atom carries a subscript — the correction then offsets the superscript box instead, exactly as TeX |
 | `kern` | `x: measure`, `width: measure`, `src: range` | leaf; fixed horizontal advance; `width` may be negative; the engine resolves interword spacing, explicit spacing commands, math inter-atom spacing, and the null-delimiter spaces flanking a fraction to kerns (glue arrives with stretch/shrink later, as a schema change) |
 | `rule` | `x: measure`, `y: measure`, `width: measure`, `ascent: measure`, `descent: measure`, `src: range` | leaf; a solid rectangle: its reference point sits at its left edge on the parent's baseline shifted by `y`, and the ink extends `ascent` up, `descent` down, and `width` right from there; today produced as fraction bars and radical bars (`ascent` is the rule thickness, `descent` is zero, and `src` is the producing command's own token) |
@@ -283,8 +283,9 @@ centered in the common width, the superscript box centered above
 (nudged half the italic correction right) behind the `bigOpSpacing3`/
 `bigOpSpacing1` clearance, the subscript box centered below (nudged
 half left) behind `bigOpSpacing4`/`bigOpSpacing2`, and the assembly's
-ascent and descent gain the `bigOpSpacing5` pads — the one hbox whose
-extent deliberately exceeds its children's maxima. Its children keep
+ascent and descent gain the `bigOpSpacing5` pads — an hbox whose
+extent deliberately exceeds its children's maxima, like an
+environment's strutted rows. Its children keep
 source order: operator, then the script boxes in written order. Without
 limits the scripts attach exactly as on any box nucleus.
 
@@ -325,6 +326,88 @@ interword spaces, everything else a structured error until the M3 text
 surface — published as the group's box with no atom classes inside. A
 bare character argument is upright main, exactly `\mathrm` — and it
 keeps that face under an outer style switch, like all `\text` content.
+
+## Math environments
+
+`\begin{name}` … `\end{name}` bracket a math alignment environment in
+the math modes (milestone M2); the covered names are the amsmath matrix
+family `matrix pmatrix bmatrix Bmatrix vmatrix Vmatrix`. The name
+argument is blanks, `{`, one or more ASCII letters with an optional
+trailing `*` (the starred-environment spelling), and `}`; anything
+else is `missing environment name` at the offending token — or at the
+command itself at end of input. An unknown name is the structured
+error `unsupported environment` naming it (such as `unsupported
+environment foo`) over the whole `\begin{name}`. Every `\begin` needs
+its matching `\end` directly inside the same environment body
+(`missing \end{name}`, at the closing brace or the `\begin{name}` run
+at end of input, exactly as `missing \right`); a different name there
+is `mismatched \end{name}`, and `\end` anywhere else is `unmatched
+\end{name}` — both over the whole `\end{name}`. Environments nest
+inside braces, fences, and other environments, and count toward the
+255-group nesting bound. `\begin` is not a legal script or command
+argument, exactly as `\left`. Document mode and `\text` content keep
+rejecting `\begin`/`\end` as unsupported commands until the M3 text
+surface.
+
+Inside an environment body `&` ends a cell and `\\` ends a row; used
+anywhere else in math — including inside a group, fence, or radical
+index nested in a cell — they are the structured errors `misplaced
+alignment tab` and `misplaced \\` (document mode keeps rejecting `&`
+as an unsupported character). The matrix family carries amsmath's ten
+column limit (`\c@MaxMatrixCols`): the tenth tab of a row, which would
+open an eleventh column, is the structured error `extra alignment tab`
+at that `&`. After `\\`, LaTeX's trailing forms are scanned past
+blanks exactly as its `\@ifnextchar`: a `*` — the no-page-break
+terminator, meaningless before pagination — is consumed so the output
+matches LaTeX's, and a `[` — the optional row-space dimension — is
+the structured error `unsupported row spacing` at the bracket until
+dimensions land (a literal bracket opens the next row as a braced
+group, `\\{[}`, exactly as in LaTeX). Rows may have different cell
+counts, an empty cell is legal, and a `\\` directly before `\end` —
+blanks between them included — contributes no row, exactly as TeX's
+`\crcr`; an environment whose whole body is blank has zero rows. Each
+cell is
+its own inline math list: Bin demotion and inter-atom spacing resolve
+per cell, and every cell is set in text style whatever the surrounding
+style — a matrix inside a script keeps full-size entries, exactly as
+LaTeX's array.
+
+Layout is LaTeX's array over TeX's `\vcenter` (tex.web section 736) at
+the environment's own geometry: every column takes its widest cell's
+width, the narrower cells centered by `half(excess)` rounding up;
+columns sit `2\arraycolsep` (10 pt) apart with no padding outside the
+first and last — the matrix family's outer `-\arraycolsep` skips
+cancel the edge padding exactly, so no kerns are published. Every row
+is one `hbox` of the full alignment width holding its cell boxes on a
+common baseline; its ascent and descent are floored by LaTeX's
+`\@arstrut` — `.7\baselineskip` over `.3\baselineskip` of the 10 pt
+text size's 12 pt `\baselineskip`, by TeX's decimal scan exactly
+550500 sp over 235932 sp — a deliberate extent excess over the box's
+children, like the operator-limits assembly's pads. LaTeX's `\@array`
+zeroes `\baselineskip` and `\lineskip` before the alignment, so
+consecutive rows abut exactly on their strutted extents: each baseline
+sits the previous row's descent plus its own ascent below the last —
+the strut floors alone pitch ordinary rows 12 pt apart, and taller
+rows meet with no added clearance. The stacked rows then center on
+the math axis of the surrounding style's size — the stack's ascent
+is `axisHeight + half(total)`, its descent the rest, so a zero-row
+`matrix` publishes ascent `axisHeight` and descent `-axisHeight` (a
+delimited variant still maxes its fence extents into the published
+box).
+
+`matrix` publishes that box as one Ord atom whose children are the row
+boxes in source order. The delimited variants are their amsmath
+definitions — `\left( matrix \right)` and so on over `( ) [ ] \{ \}
+\vert \Vert` — published exactly as a `\left`/`\right` construct: one
+Inner atom whose children are the left delimiter node, the row boxes,
+and the right delimiter node, the fences grown through the rule-19
+ladder against the centered stack's reach around the axis. The
+delimiter nodes carry the whole `\begin{name}` and `\end{name}` runs
+as their sources; the environment's box spans `\begin` through
+`\end{name}`. A row's range spans its first cell's range through its
+last; a cell's range spans its constructs, or is empty at the point
+where content would start — after `\begin{name}`, `&`, or `\\`.
+Scripts attach to the environment's atom like to any box nucleus.
 
 ## Source ranges
 

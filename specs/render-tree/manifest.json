@@ -145,7 +145,36 @@
             "style.face",
             "style.scoped",
             "text.words",
-            "error.missingStyle"
+            "error.missingStyle",
+            "environment.matrix",
+            "environment.paren",
+            "environment.bracket",
+            "environment.brace",
+            "environment.vert",
+            "environment.doubleVert",
+            "environment.grid",
+            "environment.strut",
+            "environment.baselineskip",
+            "environment.tallRows",
+            "environment.raggedRows",
+            "environment.emptyCell",
+            "environment.trailingTerminator",
+            "environment.emptyBody",
+            "environment.nested",
+            "environment.scripted",
+            "environment.cellScripts",
+            "environment.starredTerminator",
+            "environment.styled",
+            "environment.textCells",
+            "error.unsupportedEnvironment",
+            "error.missingEnvironmentName",
+            "error.mismatchedEnvironment",
+            "error.unmatchedEnvironment",
+            "error.missingEnvironmentEnd",
+            "error.misplacedAlignmentTab",
+            "error.misplacedRowTerminator",
+            "error.unsupportedRowSpacing",
+            "error.extraAlignmentTab"
         ],
         "orders": [
             "root.hbox",
@@ -2560,6 +2589,597 @@
                     "mode.mathInline",
                     "outcome.error",
                     "error.unsupportedCharacter"
+                ],
+                "orders": []
+            }
+        },
+        {
+            "name": "math-matrix",
+            "input": "math-matrix.tex",
+            "expected": "math-matrix.tree",
+            "compileOptions": {
+                "mode": "mathInline"
+            },
+            "outcome": "tree",
+            "coverage": {
+                "kinds": [
+                    "hbox",
+                    "glyph"
+                ],
+                "states": [
+                    "mode.mathInline",
+                    "outcome.tree",
+                    "children.populated",
+                    "atom.lower",
+                    "glyph.style.italic",
+                    "environment.matrix",
+                    "environment.grid",
+                    "environment.strut",
+                    "environment.baselineskip"
+                ],
+                "orders": [
+                    "root.hbox"
+                ]
+            }
+        },
+        {
+            "name": "math-matrix-paren",
+            "input": "math-matrix-paren.tex",
+            "expected": "math-matrix-paren.tree",
+            "compileOptions": {
+                "mode": "mathInline"
+            },
+            "outcome": "tree",
+            "coverage": {
+                "kinds": [
+                    "hbox",
+                    "glyph"
+                ],
+                "states": [
+                    "mode.mathInline",
+                    "outcome.tree",
+                    "children.populated",
+                    "atom.lower",
+                    "environment.paren",
+                    "environment.grid",
+                    "environment.strut",
+                    "environment.baselineskip",
+                    "delim.sizeFace"
+                ],
+                "orders": [
+                    "root.hbox"
+                ]
+            }
+        },
+        {
+            "name": "math-matrix-bracket",
+            "input": "math-matrix-bracket.tex",
+            "expected": "math-matrix-bracket.tree",
+            "compileOptions": {
+                "mode": "mathInline"
+            },
+            "outcome": "tree",
+            "coverage": {
+                "kinds": [
+                    "hbox",
+                    "glyph"
+                ],
+                "states": [
+                    "mode.mathInline",
+                    "outcome.tree",
+                    "children.populated",
+                    "atom.lower",
+                    "atom.digit",
+                    "environment.bracket",
+                    "environment.grid",
+                    "delim.sizeFace"
+                ],
+                "orders": [
+                    "root.hbox"
+                ]
+            }
+        },
+        {
+            "name": "math-matrix-braces",
+            "input": "math-matrix-braces.tex",
+            "expected": "math-matrix-braces.tree",
+            "compileOptions": {
+                "mode": "mathInline"
+            },
+            "outcome": "tree",
+            "coverage": {
+                "kinds": [
+                    "hbox",
+                    "glyph"
+                ],
+                "states": [
+                    "mode.mathInline",
+                    "outcome.tree",
+                    "children.populated",
+                    "atom.lower",
+                    "environment.brace",
+                    "environment.strut",
+                    "environment.baselineskip",
+                    "delim.sizeFace"
+                ],
+                "orders": [
+                    "root.hbox"
+                ]
+            }
+        },
+        {
+            "name": "math-matrix-vert",
+            "input": "math-matrix-vert.tex",
+            "expected": "math-matrix-vert.tree",
+            "compileOptions": {
+                "mode": "mathInline"
+            },
+            "outcome": "tree",
+            "coverage": {
+                "kinds": [
+                    "hbox",
+                    "glyph"
+                ],
+                "states": [
+                    "mode.mathInline",
+                    "outcome.tree",
+                    "children.populated",
+                    "atom.lower",
+                    "environment.vert",
+                    "environment.grid",
+                    "delim.assembly",
+                    "delim.sizeFace"
+                ],
+                "orders": [
+                    "root.hbox"
+                ]
+            }
+        },
+        {
+            "name": "math-matrix-double-vert",
+            "input": "math-matrix-double-vert.tex",
+            "expected": "math-matrix-double-vert.tree",
+            "compileOptions": {
+                "mode": "mathInline"
+            },
+            "outcome": "tree",
+            "coverage": {
+                "kinds": [
+                    "hbox",
+                    "glyph"
+                ],
+                "states": [
+                    "mode.mathInline",
+                    "outcome.tree",
+                    "children.populated",
+                    "atom.lower",
+                    "environment.doubleVert",
+                    "environment.strut",
+                    "delim.sizeFace"
+                ],
+                "orders": [
+                    "root.hbox"
+                ]
+            }
+        },
+        {
+            "name": "math-matrix-ragged",
+            "input": "math-matrix-ragged.tex",
+            "expected": "math-matrix-ragged.tree",
+            "compileOptions": {
+                "mode": "mathInline"
+            },
+            "outcome": "tree",
+            "coverage": {
+                "kinds": [
+                    "hbox",
+                    "glyph"
+                ],
+                "states": [
+                    "mode.mathInline",
+                    "outcome.tree",
+                    "children.populated",
+                    "atom.lower",
+                    "glyph.italic.positive",
+                    "environment.matrix",
+                    "environment.grid",
+                    "environment.raggedRows",
+                    "environment.emptyCell",
+                    "environment.strut",
+                    "environment.baselineskip"
+                ],
+                "orders": [
+                    "root.hbox"
+                ]
+            }
+        },
+        {
+            "name": "math-matrix-trailing",
+            "input": "math-matrix-trailing.tex",
+            "expected": "math-matrix-trailing.tree",
+            "compileOptions": {
+                "mode": "mathInline"
+            },
+            "outcome": "tree",
+            "coverage": {
+                "kinds": [
+                    "hbox",
+                    "glyph",
+                    "kern"
+                ],
+                "states": [
+                    "mode.mathInline",
+                    "outcome.tree",
+                    "children.populated",
+                    "atom.lower",
+                    "environment.matrix",
+                    "environment.trailingTerminator",
+                    "environment.emptyBody",
+                    "environment.strut",
+                    "environment.baselineskip",
+                    "bin.kept",
+                    "space.interAtom.medium",
+                    "measure.negative"
+                ],
+                "orders": [
+                    "root.hbox",
+                    "children.sourceOrder"
+                ]
+            }
+        },
+        {
+            "name": "math-matrix-tall",
+            "input": "math-matrix-tall.tex",
+            "expected": "math-matrix-tall.tree",
+            "compileOptions": {
+                "mode": "mathInline"
+            },
+            "outcome": "tree",
+            "coverage": {
+                "kinds": [
+                    "hbox",
+                    "glyph",
+                    "kern",
+                    "rule"
+                ],
+                "states": [
+                    "mode.mathInline",
+                    "outcome.tree",
+                    "children.populated",
+                    "atom.lower",
+                    "atom.digit",
+                    "environment.paren",
+                    "environment.tallRows",
+                    "environment.strut",
+                    "fraction.dfrac",
+                    "fraction.display",
+                    "kern.nullDelimiter",
+                    "delim.sizeFace"
+                ],
+                "orders": [
+                    "root.hbox"
+                ]
+            }
+        },
+        {
+            "name": "math-matrix-nested",
+            "input": "math-matrix-nested.tex",
+            "expected": "math-matrix-nested.tree",
+            "compileOptions": {
+                "mode": "mathInline"
+            },
+            "outcome": "tree",
+            "coverage": {
+                "kinds": [
+                    "hbox",
+                    "glyph"
+                ],
+                "states": [
+                    "mode.mathInline",
+                    "outcome.tree",
+                    "children.populated",
+                    "atom.lower",
+                    "atom.digit",
+                    "environment.nested",
+                    "environment.matrix",
+                    "environment.grid",
+                    "environment.tallRows",
+                    "environment.strut",
+                    "environment.baselineskip"
+                ],
+                "orders": [
+                    "root.hbox"
+                ]
+            }
+        },
+        {
+            "name": "math-matrix-scripts",
+            "input": "math-matrix-scripts.tex",
+            "expected": "math-matrix-scripts.tree",
+            "compileOptions": {
+                "mode": "mathInline"
+            },
+            "outcome": "tree",
+            "coverage": {
+                "kinds": [
+                    "hbox",
+                    "glyph"
+                ],
+                "states": [
+                    "mode.mathInline",
+                    "outcome.tree",
+                    "children.populated",
+                    "atom.lower",
+                    "atom.digit",
+                    "environment.paren",
+                    "environment.scripted",
+                    "environment.cellScripts",
+                    "script.sup",
+                    "script.sub",
+                    "size.script",
+                    "environment.strut",
+                    "environment.baselineskip",
+                    "delim.sizeFace"
+                ],
+                "orders": [
+                    "root.hbox",
+                    "children.sourceOrder"
+                ]
+            }
+        },
+        {
+            "name": "math-matrix-styled",
+            "input": "math-matrix-styled.tex",
+            "expected": "math-matrix-styled.tree",
+            "compileOptions": {
+                "mode": "mathInline"
+            },
+            "outcome": "tree",
+            "coverage": {
+                "kinds": [
+                    "hbox",
+                    "glyph"
+                ],
+                "states": [
+                    "mode.mathInline",
+                    "outcome.tree",
+                    "children.populated",
+                    "atom.lower",
+                    "atom.digit",
+                    "environment.matrix",
+                    "environment.styled",
+                    "style.face",
+                    "environment.strut",
+                    "environment.baselineskip"
+                ],
+                "orders": [
+                    "root.hbox",
+                    "children.sourceOrder"
+                ]
+            }
+        },
+        {
+            "name": "math-matrix-display",
+            "input": "math-matrix-display.tex",
+            "expected": "math-matrix-display.tree",
+            "compileOptions": {
+                "mode": "mathDisplay"
+            },
+            "outcome": "tree",
+            "coverage": {
+                "kinds": [
+                    "hbox",
+                    "glyph",
+                    "kern"
+                ],
+                "states": [
+                    "mode.mathDisplay",
+                    "outcome.tree",
+                    "children.populated",
+                    "atom.lower",
+                    "atom.digit",
+                    "environment.paren",
+                    "environment.textCells",
+                    "environment.grid",
+                    "environment.strut",
+                    "environment.baselineskip",
+                    "op.big",
+                    "op.scripts",
+                    "space.interAtom.thin",
+                    "delim.sizeFace"
+                ],
+                "orders": [
+                    "root.hbox",
+                    "children.sourceOrder"
+                ]
+            }
+        },
+        {
+            "name": "error-environment-unknown",
+            "input": "error-environment-unknown.tex",
+            "expected": "error-environment-unknown.tree",
+            "compileOptions": {
+                "mode": "mathInline"
+            },
+            "outcome": "error",
+            "coverage": {
+                "kinds": [],
+                "states": [
+                    "mode.mathInline",
+                    "outcome.error",
+                    "error.unsupportedEnvironment"
+                ],
+                "orders": []
+            }
+        },
+        {
+            "name": "error-environment-name",
+            "input": "error-environment-name.tex",
+            "expected": "error-environment-name.tree",
+            "compileOptions": {
+                "mode": "mathInline"
+            },
+            "outcome": "error",
+            "coverage": {
+                "kinds": [],
+                "states": [
+                    "mode.mathInline",
+                    "outcome.error",
+                    "error.missingEnvironmentName"
+                ],
+                "orders": []
+            }
+        },
+        {
+            "name": "error-environment-mismatch",
+            "input": "error-environment-mismatch.tex",
+            "expected": "error-environment-mismatch.tree",
+            "compileOptions": {
+                "mode": "mathInline"
+            },
+            "outcome": "error",
+            "coverage": {
+                "kinds": [],
+                "states": [
+                    "mode.mathInline",
+                    "outcome.error",
+                    "error.mismatchedEnvironment"
+                ],
+                "orders": []
+            }
+        },
+        {
+            "name": "error-environment-unmatched",
+            "input": "error-environment-unmatched.tex",
+            "expected": "error-environment-unmatched.tree",
+            "compileOptions": {
+                "mode": "mathInline"
+            },
+            "outcome": "error",
+            "coverage": {
+                "kinds": [],
+                "states": [
+                    "mode.mathInline",
+                    "outcome.error",
+                    "error.unmatchedEnvironment"
+                ],
+                "orders": []
+            }
+        },
+        {
+            "name": "error-environment-unclosed",
+            "input": "error-environment-unclosed.tex",
+            "expected": "error-environment-unclosed.tree",
+            "compileOptions": {
+                "mode": "mathInline"
+            },
+            "outcome": "error",
+            "coverage": {
+                "kinds": [],
+                "states": [
+                    "mode.mathInline",
+                    "outcome.error",
+                    "error.missingEnvironmentEnd"
+                ],
+                "orders": []
+            }
+        },
+        {
+            "name": "error-misplaced-tab",
+            "input": "error-misplaced-tab.tex",
+            "expected": "error-misplaced-tab.tree",
+            "compileOptions": {
+                "mode": "mathInline"
+            },
+            "outcome": "error",
+            "coverage": {
+                "kinds": [],
+                "states": [
+                    "mode.mathInline",
+                    "outcome.error",
+                    "error.misplacedAlignmentTab"
+                ],
+                "orders": []
+            }
+        },
+        {
+            "name": "error-misplaced-newline",
+            "input": "error-misplaced-newline.tex",
+            "expected": "error-misplaced-newline.tree",
+            "compileOptions": {
+                "mode": "mathInline"
+            },
+            "outcome": "error",
+            "coverage": {
+                "kinds": [],
+                "states": [
+                    "mode.mathInline",
+                    "outcome.error",
+                    "error.misplacedRowTerminator"
+                ],
+                "orders": []
+            }
+        },
+        {
+            "name": "math-matrix-starred",
+            "input": "math-matrix-starred.tex",
+            "expected": "math-matrix-starred.tree",
+            "compileOptions": {
+                "mode": "mathInline"
+            },
+            "outcome": "tree",
+            "coverage": {
+                "kinds": [
+                    "hbox",
+                    "glyph"
+                ],
+                "states": [
+                    "mode.mathInline",
+                    "outcome.tree",
+                    "children.populated",
+                    "atom.lower",
+                    "environment.matrix",
+                    "environment.starredTerminator",
+                    "environment.strut",
+                    "environment.baselineskip"
+                ],
+                "orders": [
+                    "root.hbox"
+                ]
+            }
+        },
+        {
+            "name": "error-row-spacing",
+            "input": "error-row-spacing.tex",
+            "expected": "error-row-spacing.tree",
+            "compileOptions": {
+                "mode": "mathInline"
+            },
+            "outcome": "error",
+            "coverage": {
+                "kinds": [],
+                "states": [
+                    "mode.mathInline",
+                    "outcome.error",
+                    "error.unsupportedRowSpacing"
+                ],
+                "orders": []
+            }
+        },
+        {
+            "name": "error-extra-tab",
+            "input": "error-extra-tab.tex",
+            "expected": "error-extra-tab.tree",
+            "compileOptions": {
+                "mode": "mathInline"
+            },
+            "outcome": "error",
+            "coverage": {
+                "kinds": [],
+                "states": [
+                    "mode.mathInline",
+                    "outcome.error",
+                    "error.extraAlignmentTab"
                 ],
                 "orders": []
             }
