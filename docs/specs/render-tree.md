@@ -331,7 +331,8 @@ keeps that face under an outer style switch, like all `\text` content.
 
 `\begin{name}` … `\end{name}` bracket a math alignment environment in
 the math modes (milestone M2); the covered names are the amsmath matrix
-family `matrix pmatrix bmatrix Bmatrix vmatrix Vmatrix`. The name
+family `matrix pmatrix bmatrix Bmatrix vmatrix Vmatrix`, `cases`, and
+`smallmatrix`. The name
 argument is blanks, `{`, one or more ASCII letters with an optional
 trailing `*` (the starred-environment spelling), and `}`; anything
 else is `missing environment name` at the offending token — or at the
@@ -353,10 +354,12 @@ Inside an environment body `&` ends a cell and `\\` ends a row; used
 anywhere else in math — including inside a group, fence, or radical
 index nested in a cell — they are the structured errors `misplaced
 alignment tab` and `misplaced \\` (document mode keeps rejecting `&`
-as an unsupported character). The matrix family carries amsmath's ten
-column limit (`\c@MaxMatrixCols`): the tenth tab of a row, which would
-open an eleventh column, is the structured error `extra alignment tab`
-at that `&`. After `\\`, LaTeX's trailing forms are scanned past
+as an unsupported character). Column counts are bounded where the
+definitions bound them: the matrix family carries amsmath's ten-column
+`\c@MaxMatrixCols` and `cases` its two columns, so the tab that would
+open one column too many is the structured error `extra alignment tab`
+at that `&`; smallmatrix's repeating template is unbounded. After
+`\\`, LaTeX's trailing forms are scanned past
 blanks exactly as its `\@ifnextchar`: a `*` — the no-page-break
 terminator, meaningless before pagination — is consumed so the output
 matches LaTeX's, and a `[` — the optional row-space dimension — is
@@ -366,48 +369,80 @@ group, `\\{[}`, exactly as in LaTeX). Rows may have different cell
 counts, an empty cell is legal, and a `\\` directly before `\end` —
 blanks between them included — contributes no row, exactly as TeX's
 `\crcr`; an environment whose whole body is blank has zero rows. Each
-cell is
-its own inline math list: Bin demotion and inter-atom spacing resolve
-per cell, and every cell is set in text style whatever the surrounding
-style — a matrix inside a script keeps full-size entries, exactly as
-LaTeX's array.
+cell is its own math list: Bin demotion and inter-atom spacing resolve
+per cell, and every cell is set at the environment's own cell style
+whatever the surrounding style — the array-based environments open
+inline math (text style) and smallmatrix forces script style, so a
+matrix inside a script keeps full-size entries, exactly as LaTeX.
 
-Layout is LaTeX's array over TeX's `\vcenter` (tex.web section 736) at
-the environment's own geometry: every column takes its widest cell's
-width, the narrower cells centered by `half(excess)` rounding up;
-columns sit `2\arraycolsep` (10 pt) apart with no padding outside the
-first and last — the matrix family's outer `-\arraycolsep` skips
-cancel the edge padding exactly, so no kerns are published. Every row
-is one `hbox` of the full alignment width holding its cell boxes on a
-common baseline; its ascent and descent are floored by LaTeX's
-`\@arstrut` — `.7\baselineskip` over `.3\baselineskip` of the 10 pt
-text size's 12 pt `\baselineskip`, by TeX's decimal scan exactly
-550500 sp over 235932 sp — a deliberate extent excess over the box's
-children, like the operator-limits assembly's pads. LaTeX's `\@array`
-zeroes `\baselineskip` and `\lineskip` before the alignment, so
-consecutive rows abut exactly on their strutted extents: each baseline
-sits the previous row's descent plus its own ascent below the last —
-the strut floors alone pitch ordinary rows 12 pt apart, and taller
-rows meet with no added clearance. The stacked rows then center on
-the math axis of the surrounding style's size — the stack's ascent
-is `axisHeight + half(total)`, its descent the rest, so a zero-row
-`matrix` publishes ascent `axisHeight` and descent `-axisHeight` (a
-delimited variant still maxes its fence extents into the published
-box).
+Layout stacks the rows over TeX's `\vcenter` (tex.web section 736) at
+each environment's own geometry. Every column takes its widest cell's
+width — the narrower cells centered by `half(excess)` rounding up, or
+set flush at the column start in the `l` columns of `cases`. Every
+row is one `hbox` of the full alignment width holding its cell boxes
+on a common baseline; its ascent and descent are floored by the
+environment's strut — a deliberate extent excess over the box's
+children, like the operator-limits assembly's pads. Consecutive
+baselines follow TeX's interline glue over the environment's
+`\baselineskip`, `\lineskip`, and `\lineskiplimit`: LaTeX's `\@array`
+zeroes them all before an alignment, so the array-based environments'
+rows abut exactly on their strutted extents — the strut floors alone
+pitch ordinary rows, and taller rows meet with no added clearance —
+while smallmatrix keeps real glue over natural row extents. The
+stacked rows then center on the math axis of the surrounding style's
+size — the stack's ascent is `axisHeight + half(total)`, its descent
+the rest, so a zero-row environment's stack spans `axisHeight` to
+`-axisHeight` (a delimited environment still maxes its fence extents
+into the published box).
 
-`matrix` publishes that box as one Ord atom whose children are the row
-boxes in source order. The delimited variants are their amsmath
-definitions — `\left( matrix \right)` and so on over `( ) [ ] \{ \}
-\vert \Vert` — published exactly as a `\left`/`\right` construct: one
-Inner atom whose children are the left delimiter node, the row boxes,
-and the right delimiter node, the fences grown through the rule-19
-ladder against the centered stack's reach around the axis. The
-delimiter nodes carry the whole `\begin{name}` and `\end{name}` runs
-as their sources; the environment's box spans `\begin` through
-`\end{name}`. A row's range spans its first cell's range through its
-last; a cell's range spans its constructs, or is empty at the point
-where content would start — after `\begin{name}`, `&`, or `\\`.
-Scripts attach to the environment's atom like to any box nucleus.
+Each environment's geometry is its amsmath definition exactly:
+
+- The matrix family is `\array{*{10}c}` — centered text-style cells,
+  columns `2\arraycolsep` (10 pt) apart with no padding outside the
+  first and last (the outer `-\arraycolsep` skips cancel the edge
+  padding exactly, so no kerns are published), rows floored by
+  LaTeX's `\@arstrut` — `.7\baselineskip` over `.3\baselineskip` of
+  the 10 pt text size's 12 pt `\baselineskip`, by TeX's decimal scan
+  exactly 550500 sp over 235932 sp — so ordinary rows pitch 12 pt
+  apart.
+- `cases` is `\left\lbrace \def\arraystretch{1.2}
+  \array{@{}l@{\quad}l@{}} … \right.` — two left-aligned text-style
+  columns exactly one `\quad` (1 em = 10 pt) apart with no edge
+  padding, the strut scaled by 1.2 (TeX's factor arithmetic exactly:
+  660598 sp over 283117 sp), the left brace grown through the rule-19
+  ladder, and the null right delimiter published as its
+  `\nulldelimiterspace` kern carrying the `\end{cases}` source. The
+  `@{\quad}` rides the first column's template, so the alignment
+  reserves it even when no row ever opens the second column.
+- `smallmatrix` is a bare `\ialign` inside `\vcenter` — centered
+  script-style cells one text-mode `\thickspace` (`.2777 em` =
+  181990 sp) apart, no strut, real interline glue (`\baselineskip`
+  `6\ex@` with `\lineskip` and `\lineskiplimit` `1.5\ex@`; amsgen's
+  `\ex@` is exactly 1 pt at the 10 pt size, so 6 pt, 1.5 pt, and
+  1.5 pt), and the flanking `\,` of its definition folded into the
+  published box as a thin space of the surrounding size padding each
+  edge.
+
+`matrix` and `smallmatrix` publish their box as one Ord atom whose
+children are the row boxes in source order. The delimited environments
+are their amsmath definitions — `\left( matrix \right)` and so on over
+`( ) [ ] \{ \} \vert \Vert`, and the `cases` brace — published exactly
+as a `\left`/`\right` construct: one Inner atom whose children are the
+left delimiter node, the row boxes, and the right delimiter node (or
+null-delimiter kern), the fences grown through the rule-19 ladder
+against the centered stack's reach around the axis. The delimiter
+nodes carry the whole `\begin{name}` and `\end{name}` runs as their
+sources; the environment's box spans `\begin` through `\end{name}`. A
+row's range spans its first cell's range through its last; a cell's
+range spans its constructs, or is empty at the point where content
+would start — after `\begin{name}`, `&`, or `\\`. Scripts attach to
+the environment's atom like to any box nucleus — a deliberate
+divergence for the environments whose amsmath definitions end in
+glue: after real LaTeX's bare `matrix` (the trailing `-\arraycolsep`)
+or `smallmatrix` (the trailing `\,`), a script mark starts a fresh
+empty-nucleus atom instead, an accident of the macro plumbing this
+engine's structured surface does not reproduce (`cases` ends with
+`\right.`, so LaTeX and this engine agree there).
 
 ## Source ranges
 

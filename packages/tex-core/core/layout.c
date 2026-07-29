@@ -906,33 +906,26 @@ static tex_core_status txc_fenced_box(
     return TEX_CORE_STATUS_OK;
 }
 
-/* LaTeX's array geometry at the 10 pt text size. \arraycolsep (5 pt)
- * pads every column on both sides; the matrix family's outer
- * -\arraycolsep skips cancel the edge padding exactly, so columns sit
- * 2\arraycolsep apart with none outside and no kerns are published.
- * \@array zeroes \baselineskip and \lineskip before the alignment
- * (lttab.dtx), so consecutive rows abut exactly on their extents and
- * the \@arstrut alone pitches ordinary rows: it floors every row at
- * .7 and .3 of the 12 pt \baselineskip — by TeX's decimal scan those
- * coefficients are 45875/65536 and 19661/65536, so the strut is
- * exactly 550500 sp over 235932 sp, and strut-floored baselines sit
- * 12 pt apart while taller rows meet with no added clearance. */
-#define TXC_ARRAY_COLSEP 327680
-#define TXC_ARRAY_STRUT_ASCENT 550500
-#define TXC_ARRAY_STRUT_DESCENT 235932
-
-/* Builds a math alignment environment's box (the matrix family): every
- * cell is its own inline math list set in text style whatever the
- * surrounding style — array cells open fresh inline math, so a matrix
- * inside a script keeps full-size entries, exactly as LaTeX. Each
- * column takes its widest cell's width with cells centered by half the
- * excess; each row is an hbox of the full alignment width whose
- * extents are floored by the array strut (a deliberate excess over
- * its children, like the operator-limits assembly); consecutive rows
- * abut on those extents; the stacked rows are centered on the math
- * axis exactly as \vcenter (tex.web section 736), and the delimited
- * variants grow their fences to the rule-19 target of the centered
- * box's reach, exactly as \left/\right. */
+/* Builds a math alignment environment's box over the geometry its
+ * amsmath definition pins (the txc_environment_row columns the parser
+ * resolves into the construct): every cell is its own math list opened
+ * at the environment's cell style whatever the surrounding style —
+ * array cells open fresh inline math and smallmatrix forces script
+ * style, so a matrix inside a script keeps full-size entries, exactly
+ * as LaTeX. Each column takes its widest cell's width, cells centered
+ * by half the excess or set flush for `l` columns; each row is an hbox
+ * of the full alignment width whose extents are floored by the
+ * environment's strut (a deliberate excess over its children, like the
+ * operator-limits assembly). Consecutive baselines follow TeX's
+ * interline glue over the environment's baselineskip, lineskip, and
+ * lineskiplimit — the array-based environments zero all three
+ * (lttab.dtx's \@array), so their rows abut on the strut floors, while
+ * smallmatrix keeps real glue over natural row extents. The stacked
+ * rows are centered on the math axis exactly as \vcenter (tex.web
+ * section 736); the delimited environments grow their fences to the
+ * rule-19 target of the centered box's reach, exactly as \left/\right;
+ * and smallmatrix's flanking \, fold into the box edges as thin spaces
+ * of the surrounding size. */
 static tex_core_status txc_array_box(
     txc_arena *arena,
     const txc_array *array,
@@ -965,8 +958,9 @@ static tex_core_status txc_array_box(
         }
     }
 
-    /* First pass: lay out every cell, collecting the column width and
-     * strutted row extent maxima. */
+    /* First pass: lay out every cell at the environment's cell style,
+     * collecting the column width and strut-floored row extent maxima. */
+    int cell_style = array->cell_style == TXC_CELL_SCRIPT ? TXC_STYLE_SCRIPT : TXC_STYLE_TEXT;
     size_t row_index = 0;
     for (const txc_array_row *row = array->rows; row != NULL; row = row->next, row_index++) {
         txc_node *row_box = txc_arena_alloc(arena, sizeof(txc_node));
@@ -974,12 +968,12 @@ static tex_core_status txc_array_box(
         if (row_box == NULL || cells == NULL) {
             return txc_alloc_fail(error);
         }
-        txc_scaled ascent = TXC_ARRAY_STRUT_ASCENT;
-        txc_scaled descent = TXC_ARRAY_STRUT_DESCENT;
+        txc_scaled ascent = array->strut_ascent;
+        txc_scaled descent = array->strut_descent;
         size_t column = 0;
         for (const txc_array_cell *cell = row->cells; cell != NULL; cell = cell->next, column++) {
             txc_node *box = NULL;
-            tex_core_status status = txc_mlist(arena, &cell->list, TXC_STYLE_TEXT, true, cell->range, &box, error);
+            tex_core_status status = txc_mlist(arena, &cell->list, cell_style, true, cell->range, &box, error);
             if (status != TEX_CORE_STATUS_OK) {
                 return status;
             }
@@ -1002,23 +996,32 @@ static tex_core_status txc_array_box(
         row_descents[row_index] = descent;
     }
 
-    /* Column positions and the alignment width. */
+    /* Column positions and the alignment width. cases' @{\quad} rides
+     * the first column's template, so its gap is reserved after that
+     * column even when no row ever opens a second one. */
     txc_scaled width = 0;
     for (size_t column = 0; column < column_count; column++) {
         if (column > 0) {
-            width += 2 * TXC_ARRAY_COLSEP;
+            width += array->column_gap;
         }
         width += column_widths[column];
     }
+    if (array->gap_after_first_column && column_count == 1) {
+        width += array->column_gap;
+    }
 
-    /* Rows abut on their strutted extents (\@array zeroes the interline
-     * glue), then the \vcenter split centers the stack around the axis
-     * of the surrounding style's size. */
+    /* Row baselines by TeX's interline glue over the environment's
+     * parameters — zeroed for the array-based environments, so their
+     * rows abut on the strut floors — then the \vcenter split centers
+     * the stack around the axis of the surrounding style's size. */
     txc_scaled axis = txc_param(TXC_PARAMETER_AXIS_HEIGHT, txc_style_size(style));
     txc_scaled depth_below_first = 0;
     for (size_t index = 0; index < array->row_count; index++) {
         if (index > 0) {
-            depth_below_first += row_descents[index - 1] + row_ascents[index];
+            txc_scaled shared = row_descents[index - 1] + row_ascents[index];
+            txc_scaled glue = array->interline_baselineskip - shared;
+            depth_below_first +=
+                glue < array->interline_limit ? shared + array->interline_lineskip : array->interline_baselineskip;
         }
     }
     txc_scaled stack_height = array->row_count > 0 ? row_ascents[0] : 0;
@@ -1029,20 +1032,25 @@ static tex_core_status txc_array_box(
 
     /* Second pass: place the cells in their columns and the rows on
      * their baselines. */
+    txc_scaled padding = array->thin_padding ? txc_em(TXC_SPACE_EM_THIN, txc_quad(txc_style_size(style))) : 0;
     txc_scaled baseline = ascent - stack_height;
     for (size_t index = 0; index < array->row_count; index++) {
         txc_node *row_box = row_boxes[index];
         if (index > 0) {
-            baseline -= row_descents[index - 1] + row_ascents[index];
+            txc_scaled shared = row_descents[index - 1] + row_ascents[index];
+            txc_scaled glue = array->interline_baselineskip - shared;
+            baseline -=
+                glue < array->interline_limit ? shared + array->interline_lineskip : array->interline_baselineskip;
         }
         row_box->y = baseline;
         row_box->width = width;
+        row_box->x = padding;
         txc_scaled cursor = 0;
         size_t column = 0;
         for (size_t cell = 0; cell < row_box->child_count; cell++, column++) {
             txc_node *box = (txc_node *)row_box->children[cell];
-            box->x = cursor + txc_half(column_widths[column] - box->width);
-            cursor += column_widths[column] + 2 * TXC_ARRAY_COLSEP;
+            box->x = cursor + (array->left_aligned ? 0 : txc_half(column_widths[column] - box->width));
+            cursor += column_widths[column] + array->column_gap;
         }
     }
 
@@ -1059,7 +1067,7 @@ static tex_core_status txc_array_box(
             children[index] = row_boxes[index];
         }
         txc_box_init(box, range, children, array->row_count);
-        box->width = width;
+        box->width = padding + width + padding;
         box->ascent = ascent;
         box->descent = descent;
         *out = box;
@@ -1089,13 +1097,14 @@ static tex_core_status txc_array_box(
         return txc_alloc_fail(error);
     }
     size_t index = 0;
+    left->x = padding;
     children[index++] = left;
     for (size_t row = 0; row < array->row_count; row++) {
         txc_node *row_box = row_boxes[row];
-        row_box->x = left->width;
+        row_box->x = padding + left->width;
         children[index++] = row_box;
     }
-    right->x = left->width + width;
+    right->x = padding + left->width + width;
     children[index++] = right;
 
     txc_scaled box_ascent = ascent;
@@ -1104,7 +1113,7 @@ static tex_core_status txc_array_box(
     box_descent = txc_max(box_descent, txc_max(left->descent - left->y, right->descent - right->y));
 
     txc_box_init(box, range, children, child_count);
-    box->width = left->width + width + right->width;
+    box->width = padding + left->width + width + right->width + padding;
     box->ascent = box_ascent;
     box->descent = box_descent;
     *out = box;
