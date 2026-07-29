@@ -6,6 +6,7 @@ import { fileURLToPath } from "node:url";
 import path from "node:path";
 
 const packageDirectory = path.resolve(fileURLToPath(new URL("..", import.meta.url)));
+const readmeSnippetTimeoutMs = 10_000;
 const mode = process.argv[2] ?? "all";
 if (!["all", "consumer", "packaging", "types"].includes(mode)) throw new Error(`unknown mode: ${mode}`);
 const temporary = await mkdtemp(path.join(tmpdir(), "es-tex-core-consumer-"));
@@ -90,12 +91,19 @@ try {
                 const ran = spawnSync("node", ["--input-type=module", "--eval", snippet], {
                     cwd: temporary,
                     encoding: "utf8",
-                    timeout: 10_000
+                    timeout: readmeSnippetTimeoutMs
                 });
-                const timedOut = ran.signal === "SIGTERM";
-                const externalReference = ran.status !== 0 && /ReferenceError/.test(ran.stderr ?? "");
-                if (ran.status !== 0 && !timedOut && !externalReference) {
-                    throw new Error(`README snippet failed in ${readme}:\n${ran.stderr}`);
+                if (ran.status !== 0) {
+                    const details = [
+                        ran.error?.code === "ETIMEDOUT"
+                            ? `timed out after ${readmeSnippetTimeoutMs} ms`
+                            : `exit status: ${ran.status}`,
+                        ran.signal === null ? null : `signal: ${ran.signal}`,
+                        ran.error === undefined ? null : `spawn error: ${ran.error.message}`,
+                        ran.stderr ? `stderr:\n${ran.stderr.trimEnd()}` : null,
+                        ran.stdout ? `stdout:\n${ran.stdout.trimEnd()}` : null
+                    ].filter((detail) => detail !== null);
+                    throw new Error(`README snippet failed in ${readme}:\n${details.join("\n")}`);
                 }
             }
         }
