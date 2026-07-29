@@ -18,6 +18,7 @@ function benchmark(workload, source, mode) {
     const heapUsedKib = Math.trunc(process.memoryUsage().heapUsed / 1024);
     console.log(
         `benchmark runtime=es-node boundary=wasm_compile_and_value_copy workload=${workload} ` +
+            `workload_version=1 ` +
             `bytes=${Buffer.byteLength(source, "utf8")} warmup=${warmupCount} repeats=${repeatCount} ` +
             `median_ns=${medianNanoseconds} heap_used_kib=${heapUsedKib}`
     );

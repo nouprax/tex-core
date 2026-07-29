@@ -6,6 +6,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "dump.h"
 #include "harness.h"
 #include "memory.h"
 #include "parse.h"
@@ -44,8 +45,13 @@ static char *txc_dump_text(txc_test *test, const char *source, tex_core_mode mod
     return dump;
 }
 
-static void
-txc_check_dumps_equal(txc_test *test, const char *left, const char *right, tex_core_mode mode, const char *label) {
+static void txc_check_dumps_equal(
+    txc_test *test,
+    const char *left,
+    const char *right,
+    tex_core_mode mode,
+    const char *label
+) {
     char *left_dump = txc_dump_text(test, left, mode, label);
     char *right_dump = txc_dump_text(test, right, mode, label);
     txc_check(
@@ -234,8 +240,13 @@ static void txc_test_whitespace(txc_test *test) {
 #define TXC_POINTS_MEDIUM (145640.0 / 65536.0)
 #define TXC_POINTS_THICK (182040.0 / 65536.0)
 
-static void
-txc_check_kern_at(txc_test *test, const tex_core_node *root, size_t index, double width, const char *label) {
+static void txc_check_kern_at(
+    txc_test *test,
+    const tex_core_node *root,
+    size_t index,
+    double width,
+    const char *label
+) {
     const tex_core_node *kern = tex_core_node_child(root, index);
     txc_check(test, tex_core_node_get_kind(kern) == TEX_CORE_NODE_KERN, "%s: child %zu is a kern", label, index);
     txc_check(test, tex_core_node_frame(kern).width == width, "%s: kern width at child %zu", label, index);
@@ -951,6 +962,36 @@ static void txc_test_long_input(txc_test *test) {
     free(source);
 }
 
+static void txc_test_deep_dump(txc_test *test) {
+    /* The public parser deliberately caps syntactic nesting, but render
+     * trees are also consumed through internal/native seams. Prove the
+     * canonical dumper does not spend one C stack frame per tree level. */
+    enum { DEPTH = 4096 };
+    txc_node *nodes = calloc(DEPTH, sizeof(*nodes));
+    const txc_node **children = calloc(DEPTH - 1, sizeof(*children));
+    txc_check(test, nodes != NULL && children != NULL, "deep dump fixture allocation");
+    if (nodes == NULL || children == NULL) {
+        free(children);
+        free(nodes);
+        return;
+    }
+    for (size_t index = 0; index < DEPTH; index++) {
+        nodes[index].kind = TEX_CORE_NODE_HBOX;
+        if (index + 1 < DEPTH) {
+            children[index] = &nodes[index + 1];
+            nodes[index].children = &children[index];
+            nodes[index].child_count = 1;
+        }
+    }
+    char *dump = NULL;
+    size_t length = 0;
+    txc_check(test, txc_dump(nodes, &dump, &length) == TEX_CORE_STATUS_OK, "deep dump is stack safe");
+    txc_check(test, dump != NULL && length > DEPTH, "deep dump produced every level");
+    tex_core_dump_free(dump);
+    free(children);
+    free(nodes);
+}
+
 static void txc_test_text_face_protection(txc_test *test) {
     /* A bare \text character keeps upright main under an outer style
      * switch, like braced \text content. */
@@ -1232,5 +1273,6 @@ int main(void) {
     txc_test_command_table(&test);
     txc_test_scaled_rounding(&test);
     txc_test_long_input(&test);
+    txc_test_deep_dump(&test);
     return txc_test_finish(&test, "engine");
 }

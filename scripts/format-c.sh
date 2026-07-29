@@ -17,21 +17,12 @@ esac
 if [ ! -d packages/tex-core ]; then
     echo "format-c.sh must run from the repository root (packages/tex-core not found)" >&2
     exit 2
-    exit 0
 fi
 
 # Generated headers (tex-core-export.h, tex-core-version.h) are configured
 # into the build tree, never the source tree, so no exclusions are needed;
 # the committed generated metrics table is metrics.inc, which the patterns
 # below do not match.
-file_list=$(find packages/tex-core -type f \
-    \( -name '*.c' -o -name '*.h' -o -name '*.cpp' \) \
-    -print)
-if [ -z "$file_list" ]; then
-    echo "note: no C sources yet; format:c is a no-op until Phase 2 lands them"
-    exit 0
-fi
-
 EXPECTED_VERSION="22.1.8"
 REPO_CLANG_FORMAT="$PWD/.tools/clang-format/$EXPECTED_VERSION/venv/bin/clang-format"
 if [ -n "${CLANG_FORMAT:-}" ]; then
@@ -48,4 +39,6 @@ if [ "$actual_version" != "$EXPECTED_VERSION" ]; then
     exit 1
 fi
 
-printf '%s\n' "$file_list" | xargs "$CLANG_FORMAT" $clang_format_args
+find packages/tex-core -type f \
+    \( -name '*.c' -o -name '*.h' -o -name '*.cpp' \) \
+    -print0 | xargs -0 "$CLANG_FORMAT" $clang_format_args

@@ -18,14 +18,31 @@ import com.nouprax.tex.core.model.SourceRange
 internal object RenderDumper {
     fun dump(tree: RenderTree): String {
         val visitor = DumpVisitor()
-        tree.root.accept(visitor)
+        val stack = ArrayDeque<DumpFrame>()
+        stack.addLast(DumpFrame(tree.root, 0))
+        while (stack.isNotEmpty()) {
+            val frame = stack.removeLast()
+            visitor.depth = frame.depth
+            frame.node.accept(visitor)
+            if (frame.node is HBox) {
+                for (index in frame.node.children.indices
+                    .reversed()) {
+                    stack.addLast(DumpFrame(frame.node.children[index], frame.depth + 1))
+                }
+            }
+        }
         return visitor.output.toString()
     }
 }
 
+private data class DumpFrame(
+    val node: com.nouprax.tex.core.model.RenderNode,
+    val depth: Int,
+)
+
 private class DumpVisitor : RenderVisitor<Unit> {
     val output = StringBuilder("render-tree 5\n")
-    private var depth = 0
+    var depth = 0
 
     override fun visit(node: HBox) {
         indent()
@@ -43,11 +60,6 @@ private class DumpVisitor : RenderVisitor<Unit> {
             .append(" src=")
             .append(range(node.src))
             .append('\n')
-        depth += 1
-        for (child in node.children) {
-            child.accept(this)
-        }
-        depth -= 1
     }
 
     override fun visit(node: Glyph) {

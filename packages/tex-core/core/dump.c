@@ -154,7 +154,10 @@ static void txc_line_family(txc_line *line, tex_core_family family) {
 }
 
 /* Appends 2*depth spaces of indentation directly to the buffer. */
-static bool txc_buffer_indent(txc_buffer *buffer, unsigned depth) {
+static bool txc_buffer_indent(txc_buffer *buffer, size_t depth) {
+    if (depth > SIZE_MAX / 2u) {
+        return false;
+    }
     size_t spaces = 2u * depth;
     if (!txc_buffer_reserve(buffer, spaces)) {
         return false;
@@ -165,7 +168,7 @@ static bool txc_buffer_indent(txc_buffer *buffer, unsigned depth) {
     return true;
 }
 
-static bool txc_dump_node(txc_buffer *buffer, const txc_node *node, unsigned depth) {
+static bool txc_dump_node_line(txc_buffer *buffer, const txc_node *node, size_t depth) {
     if (!txc_buffer_indent(buffer, depth)) {
         return false;
     }
@@ -183,11 +186,6 @@ static bool txc_dump_node(txc_buffer *buffer, const txc_node *node, unsigned dep
         TXC_LINE_LITERAL(&line, "\n");
         if (!txc_buffer_append(buffer, line.data, line.length)) {
             return false;
-        }
-        for (size_t index = 0; index < node->child_count; index++) {
-            if (!txc_dump_node(buffer, node->children[index], depth + 1)) {
-                return false;
-            }
         }
         return true;
 
@@ -237,9 +235,67 @@ static bool txc_dump_node(txc_buffer *buffer, const txc_node *node, unsigned dep
     return false;
 }
 
+typedef struct txc_dump_frame {
+    const txc_node *node;
+    size_t depth;
+} txc_dump_frame;
+
+static bool txc_dump_stack_reserve(txc_dump_frame **stack, size_t *capacity, size_t needed) {
+    if (needed <= *capacity) {
+        return true;
+    }
+    size_t next_capacity = *capacity > 0 ? *capacity : 64;
+    while (next_capacity < needed) {
+        if (next_capacity > SIZE_MAX / 2u) {
+            return false;
+        }
+        next_capacity *= 2u;
+    }
+    if (next_capacity > SIZE_MAX / sizeof(**stack)) {
+        return false;
+    }
+    txc_dump_frame *grown = txc_realloc(*stack, next_capacity * sizeof(*grown));
+    if (grown == NULL) {
+        return false;
+    }
+    *stack = grown;
+    *capacity = next_capacity;
+    return true;
+}
+
+/* Nesting depth is input-controlled, so the canonical dump walks preorder
+ * over explicit frames. Children are pushed in reverse to preserve source
+ * order when popped. */
+static bool txc_dump_tree(txc_buffer *buffer, const txc_node *root) {
+    txc_dump_frame *stack = NULL;
+    size_t count = 0;
+    size_t capacity = 0;
+    bool success = txc_dump_stack_reserve(&stack, &capacity, 1);
+    if (success) {
+        stack[count++] = (txc_dump_frame){root, 0};
+    }
+    while (success && count > 0) {
+        txc_dump_frame frame = stack[--count];
+        success = txc_dump_node_line(buffer, frame.node, frame.depth);
+        if (!success || frame.node->kind != TEX_CORE_NODE_HBOX) {
+            continue;
+        }
+        if (frame.node->child_count > SIZE_MAX - count || frame.depth == SIZE_MAX) {
+            success = false;
+            break;
+        }
+        success = txc_dump_stack_reserve(&stack, &capacity, count + frame.node->child_count);
+        for (size_t index = frame.node->child_count; success && index > 0; index--) {
+            stack[count++] = (txc_dump_frame){frame.node->children[index - 1], frame.depth + 1};
+        }
+    }
+    txc_free(stack);
+    return success;
+}
+
 tex_core_status txc_dump(const txc_node *root, char **dump, size_t *length) {
     txc_buffer buffer = {NULL, 0, 0};
-    if (!txc_buffer_append(&buffer, "render-tree 5\n", 14) || !txc_dump_node(&buffer, root, 0)) {
+    if (!txc_buffer_append(&buffer, "render-tree 5\n", 14) || !txc_dump_tree(&buffer, root)) {
         txc_free(buffer.data);
         return TEX_CORE_STATUS_ALLOCATION_FAILED;
     }

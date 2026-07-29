@@ -55,11 +55,9 @@ fi
 # critical path's cheap side (the dedicated build jobs compile the same
 # source exactly once, later and in parallel).
 BUILD_DIR=build/cmake
-if [ ! -f "$BUILD_DIR/CTestTestfile.cmake" ]; then
-    cmake --preset default >/dev/null
-fi
+cmake --preset default >/dev/null
 
-for label in api engine errors determinism allocfail threads cli conformance benchmark; do
+for label in api engine errors determinism allocfail threads cli conformance complexity benchmark; do
     count=$(ctest --test-dir "$BUILD_DIR" -N -L "^${label}$" | sed -n 's/^Total Tests: //p')
     if [ "${count:-0}" -lt 1 ]; then
         fail "no CTest tests carry label '$label'"
@@ -107,11 +105,36 @@ else
     note "benchmark selection contains only benchmark workloads"
 fi
 
-# 4. Platform suite discovery stays non-empty where it can be answered
-# statically. Swift discovery needs a test build, so its non-empty
-# guarantee lives in the runtime consumer instead
-# (run-swift-test-artifact.sh fails when zero tests execute), keeping this
-# health check compilation-free.
+complexity_list=$(ctest --test-dir "$BUILD_DIR" -N -L '^complexity$' | sed -n 's/^  Test *#[0-9]*: //p')
+if echo "$complexity_list" | grep -v '^complexity-' | grep -q .; then
+    fail "complexity selection includes non-complexity tests"
+elif ! echo "$correctness_list" | grep -q '^complexity-'; then
+    fail "Release correctness selection omits the complexity gates"
+else
+    note "complexity gates are isolated and included in Release correctness"
+fi
+
+node --input-type=module <<'NODE' || fail "sanitizer presets do not exclude wall-clock complexity gates"
+import fs from "node:fs";
+const presets = JSON.parse(fs.readFileSync("CMakePresets.json", "utf8")).testPresets;
+for (const name of ["correctness-asan", "correctness-ubsan", "correctness-tsan"]) {
+    const preset = presets.find((candidate) => candidate.name === name);
+    if (!preset?.filter?.exclude?.label?.includes("complexity")) {
+        throw new Error(`${name} does not exclude complexity`);
+    }
+}
+NODE
+note "sanitizer presets exclude wall-clock complexity gates"
+
+# 4. Platform suite discovery stays non-empty. The Swift source assertion
+# runs on every host, including the required Linux health-check runner; the
+# Swift artifact producer additionally lists the built test graph.
+if grep -R -q '@Test' packages/swift-tex-core/Tests/TexCoreTests \
+    && grep -R -q '@Test' packages/swift-tex-core/Tests/TexCoreConformanceTests; then
+    note "Swift test targets declare Swift Testing tests"
+else
+    fail "Swift test targets declare no Swift Testing tests"
+fi
 if [ "$(node packages/es-tex-core/scripts/run-tests.mjs --list | wc -l)" -lt 1 ]; then
     fail "the ES runner discovers no correctness suites"
 else

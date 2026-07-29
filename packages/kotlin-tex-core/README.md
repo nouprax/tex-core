@@ -21,6 +21,10 @@ dump byte for byte.
   time from the manifest (inputs as hex bytes — one case is deliberately
   invalid UTF-8), never a checked-in copy. Conformance is filtered by
   `*ConformanceTest*` into its own test runs on every target.
+- Published Javadocs are generated from `commonMain` with Dokka; the
+  checked-in `jvm-abi.txt` freezes Java-visible classes, hierarchy, and
+  members. Native packaging verifies each ELF/Mach-O payload's actual
+  architecture against the closed macOS-arm64/Linux-x64 host model.
 - `android-runtime` — publishes
   `com.nouprax:kotlin-tex-core-android-runtime`, the JNI payload AAR for
   all four Android ABIs; the KMP Android publication depends on it.

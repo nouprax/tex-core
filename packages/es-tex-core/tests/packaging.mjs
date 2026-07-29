@@ -76,6 +76,30 @@ try {
         );
         if (consumer.status !== 0) throw new Error(consumer.stderr || `consumer exited ${consumer.status}`);
         console.log("consumer: packed npm artifact imported, compiled, and blocked deep imports");
+
+        // Execute every package-importing README snippet against the packed
+        // artifact so documented export names and API shapes cannot drift.
+        const readmes = [path.resolve(packageDirectory, "../../README.md"), path.join(packageDirectory, "README.md")];
+        for (const readme of readmes) {
+            const text = await readFile(readme, "utf8");
+            const snippets = [...text.matchAll(/```js\n([\s\S]*?)```/g)]
+                .map((match) => match[1])
+                .filter((snippet) => snippet.includes("@nouprax/es-tex-core"));
+            if (snippets.length === 0) throw new Error(`no runnable package snippet found in ${readme}`);
+            for (const snippet of snippets) {
+                const ran = spawnSync("node", ["--input-type=module", "--eval", snippet], {
+                    cwd: temporary,
+                    encoding: "utf8",
+                    timeout: 10_000
+                });
+                const timedOut = ran.signal === "SIGTERM";
+                const externalReference = ran.status !== 0 && /ReferenceError/.test(ran.stderr ?? "");
+                if (ran.status !== 0 && !timedOut && !externalReference) {
+                    throw new Error(`README snippet failed in ${readme}:\n${ran.stderr}`);
+                }
+            }
+        }
+        console.log("consumer: README snippets ran against the packed artifact");
     }
 } finally {
     await rm(temporary, { recursive: true, force: true });
