@@ -3,8 +3,13 @@
 #include <stdarg.h>
 #include <stdio.h>
 
-tex_core_status
-txc_fail(tex_core_error *error, tex_core_status status, const tex_core_range *range, const char *format, ...) {
+tex_core_status txc_fail(
+    tex_core_error *error,
+    tex_core_status status,
+    const tex_core_range *range,
+    const char *format,
+    ...
+) {
     if (error != NULL) {
         error->status = status;
         error->has_range = range != NULL;

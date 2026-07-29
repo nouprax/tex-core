@@ -13,10 +13,12 @@ public enum class CompileMode {
 }
 
 /** Options of one compile call. Every field has a frozen default. */
-public data class CompileOptions(
-    /** The input form; the default is [CompileMode.DOCUMENT]. */
-    val mode: CompileMode = CompileMode.DOCUMENT,
-)
+public data class CompileOptions
+    @kotlin.jvm.JvmOverloads
+    constructor(
+        /** The input form; the default is [CompileMode.DOCUMENT]. */
+        val mode: CompileMode = CompileMode.DOCUMENT,
+    )
 
 internal fun CompileOptions.toNativeMode(): Int =
     when (mode) {

@@ -76,6 +76,17 @@ make build && make test    # or: cmake --preset default && ctest --preset correc
 
 All packages release the same version from the same protected `vX.Y.Z` tag.
 
+The ES package is ESM-only:
+
+```js
+import { Document } from "@nouprax/es-tex-core";
+
+const tree = Document.compile("E = mc^2", { mode: "mathInline" });
+if (!tree.dump().startsWith("render-tree 5\n")) {
+    throw new Error("unexpected render-tree schema");
+}
+```
+
 ## Roadmap
 
 Capability grows along a fixed major-version ladder:

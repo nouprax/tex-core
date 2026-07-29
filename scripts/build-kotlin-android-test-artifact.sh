@@ -2,6 +2,7 @@
 set -euo pipefail
 
 root=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
+. "$root/scripts/lib/artifact.sh"
 output=${1:-"$root/build/ci-artifacts/kotlin-android-x86_64"}
 apk_source="$root/packages/kotlin-tex-core/build/outputs/apk/androidTest/kotlin-tex-core-androidTest.apk"
 apk_name=kotlin-tex-core-androidTest.apk
@@ -25,20 +26,16 @@ if [ "$native_entries" != x86_64 ]; then
     exit 1
 fi
 
-source_sha=${GITHUB_SHA:-$(git -C "$root" rev-parse HEAD)}
 cat >"$output/manifest.txt" <<EOF
 schema=1
 kind=android-instrumentation-apk
-source_sha=$source_sha
+source_sha=$(artifact_source_sha "$root")
 abi=x86_64
 apk=$apk_name
 package=com.nouprax.tex.core.test
 runner=androidx.test.runner.AndroidJUnitRunner
 EOF
 
-(
-    cd "$output"
-    sha256sum "$apk_name" manifest.txt >SHA256SUMS
-)
+artifact_sha256_write "$output" "$apk_name" manifest.txt
 
 printf 'Staged Android test artifact at %s\n' "$output"

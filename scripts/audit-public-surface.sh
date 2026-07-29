@@ -71,6 +71,9 @@ if grep -R -n -E \
 fi
 grep -q 'public func dump() -> String' packages/swift-tex-core/Sources/TexCore/RenderTree.swift \
     || fail "Swift does not expose the reviewed RenderTree.dump API"
+grep -q 'extension CompileError: LocalizedError' packages/swift-tex-core/Sources/TexCore/CompileError.swift \
+    && grep -q 'lint --strict' scripts/format-swift.sh \
+    || fail "Swift errors or public documentation linting are not Foundation/CI complete"
 if grep -R -n 'defaultVisit' packages/swift-tex-core/Sources/TexCore; then
     fail "Swift RenderVisitor exposes a catch-all fallback"
 fi
@@ -80,6 +83,23 @@ test "$(grep -c 'mutating func visit' packages/swift-tex-core/Sources/TexCore/Re
 # Kotlin: explicit API, no mutation/native vocabulary, exhaustive visitor.
 grep -q 'explicitApi()' packages/kotlin-tex-core/build.gradle.kts \
     || fail "Kotlin explicit API mode is disabled"
+grep -q 'alias(libs.plugins.dokka)' packages/kotlin-tex-core/build.gradle.kts \
+    && grep -q 'dokkaGeneratePublicationHtml' packages/kotlin-tex-core/build.gradle.kts \
+    || fail "Kotlin javadoc artifact does not contain generated API reference"
+grep -q 'verifyJvmAbi' packages/kotlin-tex-core/build.gradle.kts \
+    && test -s packages/kotlin-tex-core/jvm-abi.txt \
+    || fail "Kotlin JVM Java-visible ABI snapshot is missing"
+grep -q 'class HostTriple' packages/kotlin-tex-core/build.gradle.kts \
+    && grep -q 'binaryArchitecture' packages/kotlin-tex-core/build.gradle.kts \
+    || fail "Kotlin native packaging lacks the closed host/architecture checks"
+grep -q '@kotlin.jvm.JvmStatic' packages/kotlin-tex-core/src/commonMain/kotlin/com/nouprax/tex/core/Document.kt \
+    && grep -q '@kotlin.jvm.JvmOverloads' \
+        packages/kotlin-tex-core/src/commonMain/kotlin/com/nouprax/tex/core/model/CompileOptions.kt \
+    && grep -q 'Document.compile' packages/kotlin-tex-core/consumers/jvm-maven/src/main/java/consumer/Main.java \
+    || fail "Kotlin Java facade is not directly callable with default arguments"
+grep -q 'getResourceAsStream' \
+    packages/kotlin-tex-core/src/androidMain/kotlin/com/nouprax/tex/core/CBridge.android.kt \
+    || fail "Kotlin Android host loader lacks the classpath fallback"
 if grep -R -n -E \
     'public (fun|val|var).*\b(render[A-Z(]|set[A-Z]|insert|append|prepend|replace|unlink|nativeHandle|pointer|memory|wasm)' \
     packages/kotlin-tex-core/src/commonMain; then
@@ -130,6 +150,9 @@ if grep -q '"paths"' packages/es-tex-core/tests/types/tsconfig.json \
     || grep -R -n -E '(\.\./)+dist/index\.d\.ts' packages/es-tex-core/tests/types; then
     fail "ES type consumer bypasses installed-package exports.types resolution"
 fi
+grep -q '"node": ">=24"' packages/es-tex-core/package.json \
+    && grep -q 'README snippets ran against the packed artifact' packages/es-tex-core/tests/packaging.mjs \
+    || fail "ES runtime floor or executable README contract drifted"
 
 # Coordinates the audits already pinned per package.
 grep -q '^group = "com.nouprax"$' packages/kotlin-tex-core/build.gradle.kts \

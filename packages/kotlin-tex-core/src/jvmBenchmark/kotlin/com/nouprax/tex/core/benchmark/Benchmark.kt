@@ -27,6 +27,7 @@ private fun benchmark(
             .heapMemoryUsage.used / 1024
     println(
         "benchmark runtime=kotlin-jvm boundary=native_compile_and_value_copy workload=$workload " +
+            "workload_version=1 " +
             "bytes=${source.encodeToByteArray().size} warmup=$WARMUP_COUNT repeats=$REPEAT_COUNT " +
             "median_ns=$medianNanoseconds heap_used_kib=$peakRssKib",
     )

@@ -157,6 +157,12 @@ jobs:
                       const allowedPlatforms = new Set(["linux", "macos"]);
                       const allowedRuntimes = new Set(["c", "swift", "kotlin-jvm", "es-node"]);
                       const allowedWorkloads = new Set(["large_document", "math_spacing"]);
+                      const allowedBoundaries = new Map([
+                          ["c", new Set(["native_compile"])],
+                          ["swift", new Set(["native_compile_and_value_copy"])],
+                          ["kotlin-jvm", new Set(["native_compile_and_value_copy"])],
+                          ["es-node", new Set(["wasm_compile_and_value_copy"])],
+                      ]);
                       const allowedSizes = new Set([
                           "c-shared-library",
                           "kotlin-jvm-jar",
@@ -197,7 +203,7 @@ jobs:
                           const sizes = new Map();
                           for (const document of documents) {
                               if (
-                                  document?.schema !== 1 ||
+                                  document?.schema !== 2 ||
                                   !allowedPlatforms.has(document.platform) ||
                                   !Array.isArray(document.benchmarks) ||
                                   !Array.isArray(document.sizes)
@@ -208,6 +214,19 @@ jobs:
                                   if (
                                       !allowedRuntimes.has(metric?.runtime) ||
                                       !allowedWorkloads.has(metric?.workload) ||
+                                      !allowedBoundaries.get(metric?.runtime)?.has(metric?.boundary) ||
+                                      !Number.isSafeInteger(metric?.workloadVersion) ||
+                                      metric.workloadVersion <= 0 ||
+                                      !Number.isSafeInteger(metric?.bytes) ||
+                                      metric.bytes <= 0 ||
+                                      !Number.isSafeInteger(metric?.warmup) ||
+                                      metric.warmup < 0 ||
+                                      !Number.isSafeInteger(metric?.repeats) ||
+                                      metric.repeats <= 0 ||
+                                      !(metric.depth === null ||
+                                          (Number.isSafeInteger(metric.depth) && metric.depth > 0)) ||
+                                      !(metric.commits === null ||
+                                          (Number.isSafeInteger(metric.commits) && metric.commits > 0)) ||
                                       !Number.isSafeInteger(metric?.medianNs) ||
                                       metric.medianNs < 0 ||
                                       !(metric.memoryKiB === null ||
@@ -215,7 +234,10 @@ jobs:
                                   ) {
                                       continue;
                                   }
-                                  benchmarks.set(`${metric.runtime}:${metric.workload}`, metric);
+                                  benchmarks.set(
+                                      `${document.platform}:${metric.runtime}:${metric.boundary}:${metric.workload}`,
+                                      { ...metric, platform: document.platform },
+                                  );
                               }
                               for (const metric of document.sizes) {
                                   if (
@@ -229,6 +251,32 @@ jobs:
                               }
                           }
                           return { benchmarks, sizes };
+                      }
+
+                      function benchmarkSignature(metric) {
+                          return JSON.stringify([
+                              metric.platform,
+                              metric.runtime,
+                              metric.workload,
+                              metric.workloadVersion,
+                              metric.boundary,
+                              metric.bytes,
+                              metric.depth,
+                              metric.commits,
+                              metric.warmup,
+                              metric.repeats,
+                          ]);
+                      }
+
+                      function inputLabel(metric) {
+                          const fields = [`${metric.bytes.toLocaleString("en-US")} B`];
+                          if (metric.depth !== null) {
+                              fields.push(`depth ${metric.depth.toLocaleString("en-US")}`);
+                          }
+                          if (metric.commits !== null) {
+                              fields.push(`${metric.commits.toLocaleString("en-US")} commits`);
+                          }
+                          return fields.join(", ");
                       }
 
                       function percentDelta(current, baseline) {
@@ -291,11 +339,16 @@ jobs:
                           lines.push(
                               "### Performance",
                               "",
-                              "| Runtime | Workload | Median | Perf diff | Memory | Memory diff |",
-                              "| --- | --- | ---: | ---: | ---: | ---: |",
+                              "| Platform | Runtime | Boundary | Workload | Input | Median | Perf diff | Memory | Memory diff |",
+                              "| --- | --- | --- | --- | ---: | ---: | ---: | ---: | ---: |",
                           );
                           for (const [key, metric] of benchmarkRows) {
-                              const baseline = base.benchmarks.get(key);
+                              const candidate = base.benchmarks.get(key);
+                              const baseline =
+                                  candidate &&
+                                  benchmarkSignature(candidate) === benchmarkSignature(metric)
+                                      ? candidate
+                                      : undefined;
                               const milliseconds = (metric.medianNs / 1e6).toFixed(3);
                               const memory =
                                   metric.memoryKiB === null
@@ -306,7 +359,7 @@ jobs:
                                       ? "n/a"
                                       : memoryDelta(metric.memoryKiB, baseline?.memoryKiB);
                               lines.push(
-                                  `| ${metric.runtime} | ${metric.workload} | ${milliseconds} ms | ${latencyDelta(metric.medianNs, baseline?.medianNs)} | ${memory} | ${memoryDiff} |`,
+                                  `| ${metric.platform} | ${metric.runtime} | ${metric.boundary} | ${metric.workload} (v${metric.workloadVersion}) | ${inputLabel(metric)} | ${milliseconds} ms | ${latencyDelta(metric.medianNs, baseline?.medianNs)} | ${memory} | ${memoryDiff} |`,
                               );
                           }
                           lines.push("");

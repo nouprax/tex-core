@@ -303,8 +303,13 @@ static txc_scaled txc_big_target(int size) {
  * lays out the sub-list at `style` and then applies the same
  * simplification when it produced exactly one glyph; a fraction field
  * builds the fraction's own box. */
-static tex_core_status
-txc_clean_box(txc_arena *arena, const txc_field *field, int style, txc_node **out, tex_core_error *error) {
+static tex_core_status txc_clean_box(
+    txc_arena *arena,
+    const txc_field *field,
+    int style,
+    txc_node **out,
+    tex_core_error *error
+) {
     txc_node *box;
     if (field->kind == TXC_FIELD_FRACTION) {
         return txc_fraction_box(arena, field->fraction, style, field->range, out, error);
@@ -386,8 +391,13 @@ txc_clean_box(txc_arena *arena, const txc_field *field, int style, txc_node **ou
 
 /* Builds the box for a script field: TeX's clean_box plus \scriptspace of
  * width. */
-static tex_core_status
-txc_script_box(txc_arena *arena, const txc_field *field, int style, txc_node **out, tex_core_error *error) {
+static tex_core_status txc_script_box(
+    txc_arena *arena,
+    const txc_field *field,
+    int style,
+    txc_node **out,
+    tex_core_error *error
+) {
     txc_node *box;
     tex_core_status status = txc_clean_box(arena, field, style, &box, error);
     if (status != TEX_CORE_STATUS_OK) {

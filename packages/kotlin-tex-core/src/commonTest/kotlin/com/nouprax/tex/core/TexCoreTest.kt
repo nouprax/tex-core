@@ -13,6 +13,7 @@ import com.nouprax.tex.core.model.RenderNode
 import com.nouprax.tex.core.model.Rule
 import com.nouprax.tex.core.model.SourceRange
 import com.nouprax.tex.core.walker.RenderVisitor
+import com.nouprax.tex.core.wire.WireDecoder
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -115,6 +116,49 @@ class TexCoreTest {
         assertEquals(begins.sorted(), begins)
         assertTrue(tree.root.children.any { it is Kern })
     }
+
+    @Test
+    fun wireDecoderIsStackSafeForDeepTrees() {
+        val depth = 8_000
+        val nodeSize = 92
+        val payload = ByteArray(8 + depth * nodeSize)
+        payload.writeU32(4, depth)
+        repeat(depth) { index ->
+            val at = 8 + index * nodeSize
+            payload.writeU32(at, 1)
+            payload.writeU32(at + 88, if (index + 1 < depth) 1 else 0)
+        }
+
+        var node: RenderNode = WireDecoder.decode(payload).root
+        var decoded = 1
+        while (node is HBox && node.children.size == 1) {
+            node = node.children[0]
+            decoded += 1
+        }
+        assertEquals(depth, decoded)
+    }
+
+    @Test
+    fun canonicalDumperIsStackSafeForDeepTrees() {
+        val depth = 2_048
+        var root = HBox(0.0, 0.0, 0.0, 0.0, 0.0, SourceRange(0, 0), emptyList())
+        repeat(depth - 1) {
+            root = HBox(0.0, 0.0, 0.0, 0.0, 0.0, SourceRange(0, 0), listOf(root))
+        }
+        val dump =
+            com.nouprax.tex.core.model
+                .RenderTree(root)
+                .dump()
+        assertTrue(dump.startsWith("render-tree 5\n"))
+        assertTrue(dump.length > depth)
+    }
+}
+
+private fun ByteArray.writeU32(
+    offset: Int,
+    value: Int,
+) {
+    repeat(4) { byte -> this[offset + byte] = (value ushr (8 * byte)).toByte() }
 }
 
 private class KindCounter : RenderVisitor<Unit> {

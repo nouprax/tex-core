@@ -67,6 +67,13 @@ make tsan-test      # ThreadSanitizer preset build + correctness
 make libFuzzer      # explicit non-default fuzz smoke campaign
 ```
 
+The Release correctness preset also runs two compile-complexity gates. Each
+small and large endpoint is warmed once before timing; short endpoints use
+median-of-three adaptive samples, while a first post-warmup bucket containing
+one long compile is used directly. The gate compares time per input byte and
+does not enforce an absolute wall-clock threshold. Sanitizer presets exclude
+these timing-sensitive tests.
+
 The equivalent pnpm lanes are `build:c`, `test:c-host`, and
 `benchmark:c-host`. Build trees live under `build/` (`cmake`, `asan`,
 `ubsan`, `tsan`, `fuzz`, and the `lint-c` tree used by `pnpm lint:c`).

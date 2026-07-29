@@ -156,6 +156,22 @@ test("immutability: a publicly constructed tree snapshots its root", async () =>
     assert.ok(Object.isFrozen(tree.root.src), "the adopted range is frozen");
 });
 
+test("immutability: deeply nested caller trees snapshot without growing the JavaScript stack", async () => {
+    const { RenderTree } = await import("../dist/index.js");
+    const depth = 12_000;
+    let root = hbox([]);
+    for (let index = 1; index < depth; index += 1) root = hbox([root]);
+    const tree = new RenderTree(root);
+    let node = tree.root;
+    let frozen = 1;
+    while (node.children.length === 1) {
+        node = node.children[0];
+        assert.equal(node.kind, "hbox");
+        frozen += 1;
+    }
+    assert.equal(frozen, depth);
+});
+
 test("immutability: decoded trees are deeply frozen", () => {
     const tree = Document.compile("\\frac{a}{2}", { mode: "mathInline" });
     const stack = [tree.root];
@@ -234,3 +250,43 @@ test("wire: malformed payloads fail closed instead of defaulting", async () => {
         /unknown status/
     );
 });
+
+test("wire: deeply nested payloads decode without growing the JavaScript stack", async () => {
+    const { decodePayload } = await import("../dist/wire.js");
+    const depth = 12_000;
+    const tree = decodePayload(nestedHBoxPayload(depth));
+    let node = tree.root;
+    let decoded = 1;
+    while (node.children.length === 1) {
+        node = node.children[0];
+        assert.equal(node.kind, "hbox");
+        decoded += 1;
+    }
+    assert.equal(decoded, depth);
+});
+
+test("dump: deeply nested trees do not grow the JavaScript stack", async () => {
+    const { decodePayload } = await import("../dist/wire.js");
+    const depth = 4_096;
+    const dump = decodePayload(nestedHBoxPayload(depth)).dump();
+    assert.ok(dump.startsWith("render-tree 5\n"));
+    assert.ok(dump.length > depth);
+});
+
+function nestedHBoxPayload(depth) {
+    const nodeSize = 92;
+    const payload = new Uint8Array(8 + depth * nodeSize);
+    const view = new DataView(payload.buffer);
+    view.setUint32(0, 0, true);
+    view.setUint32(4, depth, true);
+    for (let index = 0; index < depth; index += 1) {
+        const at = 8 + index * nodeSize;
+        view.setUint32(at, 1, true);
+        view.setUint32(at + 88, index + 1 < depth ? 1 : 0, true);
+    }
+    return payload;
+}
+
+function hbox(children) {
+    return { kind: "hbox", x: 0, y: 0, width: 0, ascent: 0, descent: 0, src: { begin: 0, end: 0 }, children };
+}
