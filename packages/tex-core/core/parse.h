@@ -14,6 +14,7 @@
 #include <stdint.h>
 
 #include "memory.h"
+#include "scaled.h"
 #include "tex_core.h"
 
 typedef enum txc_item_kind { TXC_ITEM_ATOM = 0, TXC_ITEM_SPACE = 1 } txc_item_kind;
@@ -216,15 +217,40 @@ typedef struct txc_array_row {
     struct txc_array_row *next;
 } txc_array_row;
 
-/* A math alignment environment (the milestone M2 matrix family): rows of
- * centered cells. Delimited variants (pmatrix through Vmatrix) carry the
- * fence pair their amsmath definitions wrap around the array; `begin` and
- * `end` are the whole \begin{...} and \end{...} token runs, the sources
- * the delimiters are attributed to. */
+/* The TeX math style an environment's cells open in: the matrix family
+ * and cases set inline math (text style), smallmatrix forces script
+ * style. */
+typedef enum txc_cell_style { TXC_CELL_TEXT = 0, TXC_CELL_SCRIPT = 1 } txc_cell_style;
+
+/* A math alignment environment (milestone M2): rows of cells with the
+ * geometry of its amsmath definition. Delimited environments (pmatrix
+ * through Vmatrix, and cases with its null right) carry the fence pair
+ * their definitions wrap around the alignment; `begin` and `end` are the
+ * whole \begin{...} and \end{...} token runs, the sources the delimiters
+ * are attributed to. Consecutive row baselines follow TeX's interline
+ * glue over the `interline_*` triple — the array-based environments zero
+ * all three (\@array), so their rows abut on the strut floors, while
+ * smallmatrix keeps real glue and no strut. */
 typedef struct txc_array {
     bool delimited;
     txc_delimiter left;
     txc_delimiter right;
+    txc_cell_style cell_style;
+    /* `l` columns set cells flush at the column start; centered
+     * otherwise. */
+    bool left_aligned;
+    txc_scaled column_gap;
+    /* cases' @{\quad} rides the first column's template, so the gap is
+     * reserved after that column even when no row has a second one. */
+    bool gap_after_first_column;
+    txc_scaled strut_ascent;
+    txc_scaled strut_descent;
+    txc_scaled interline_baselineskip;
+    txc_scaled interline_lineskip;
+    txc_scaled interline_limit;
+    /* smallmatrix's flanking \, — a thin space of the surrounding size
+     * folded into each edge of the published box. */
+    bool thin_padding;
     tex_core_range begin;
     tex_core_range end;
     txc_array_row *rows;

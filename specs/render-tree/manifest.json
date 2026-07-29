@@ -166,6 +166,13 @@
             "environment.starredTerminator",
             "environment.styled",
             "environment.textCells",
+            "environment.cases",
+            "environment.casesStrut",
+            "environment.leftColumns",
+            "environment.smallmatrix",
+            "environment.smallPitch",
+            "environment.glueFallback",
+            "environment.padding",
             "error.unsupportedEnvironment",
             "error.missingEnvironmentName",
             "error.mismatchedEnvironment",
@@ -3182,6 +3189,264 @@
                     "error.extraAlignmentTab"
                 ],
                 "orders": []
+            }
+        },
+        {
+            "name": "math-cases",
+            "input": "math-cases.tex",
+            "expected": "math-cases.tree",
+            "compileOptions": {
+                "mode": "mathInline"
+            },
+            "outcome": "tree",
+            "coverage": {
+                "kinds": [
+                    "hbox",
+                    "glyph",
+                    "kern"
+                ],
+                "states": [
+                    "mode.mathInline",
+                    "outcome.tree",
+                    "children.populated",
+                    "atom.lower",
+                    "atom.digit",
+                    "atom.rel",
+                    "environment.cases",
+                    "environment.casesStrut",
+                    "environment.leftColumns",
+                    "environment.grid",
+                    "delim.sizeFace",
+                    "delim.null"
+                ],
+                "orders": [
+                    "root.hbox"
+                ]
+            }
+        },
+        {
+            "name": "math-cases-tall",
+            "input": "math-cases-tall.tex",
+            "expected": "math-cases-tall.tree",
+            "compileOptions": {
+                "mode": "mathInline"
+            },
+            "outcome": "tree",
+            "coverage": {
+                "kinds": [
+                    "hbox",
+                    "glyph",
+                    "kern",
+                    "rule"
+                ],
+                "states": [
+                    "mode.mathInline",
+                    "outcome.tree",
+                    "children.populated",
+                    "atom.lower",
+                    "atom.digit",
+                    "environment.cases",
+                    "environment.casesStrut",
+                    "delim.assembly",
+                    "delim.null",
+                    "fraction.dfrac",
+                    "fraction.display",
+                    "kern.nullDelimiter"
+                ],
+                "orders": [
+                    "root.hbox"
+                ]
+            }
+        },
+        {
+            "name": "math-cases-single",
+            "input": "math-cases-single.tex",
+            "expected": "math-cases-single.tree",
+            "compileOptions": {
+                "mode": "mathInline"
+            },
+            "outcome": "tree",
+            "coverage": {
+                "kinds": [
+                    "hbox",
+                    "glyph",
+                    "kern"
+                ],
+                "states": [
+                    "mode.mathInline",
+                    "outcome.tree",
+                    "children.populated",
+                    "atom.lower",
+                    "environment.cases",
+                    "environment.casesStrut",
+                    "delim.sizeFace",
+                    "delim.null"
+                ],
+                "orders": [
+                    "root.hbox"
+                ]
+            }
+        },
+        {
+            "name": "math-smallmatrix",
+            "input": "math-smallmatrix.tex",
+            "expected": "math-smallmatrix.tree",
+            "compileOptions": {
+                "mode": "mathInline"
+            },
+            "outcome": "tree",
+            "coverage": {
+                "kinds": [
+                    "hbox",
+                    "glyph"
+                ],
+                "states": [
+                    "mode.mathInline",
+                    "outcome.tree",
+                    "children.populated",
+                    "atom.lower",
+                    "environment.smallmatrix",
+                    "environment.glueFallback",
+                    "environment.padding",
+                    "size.script"
+                ],
+                "orders": [
+                    "root.hbox"
+                ]
+            }
+        },
+        {
+            "name": "math-smallmatrix-short",
+            "input": "math-smallmatrix-short.tex",
+            "expected": "math-smallmatrix-short.tree",
+            "compileOptions": {
+                "mode": "mathInline"
+            },
+            "outcome": "tree",
+            "coverage": {
+                "kinds": [
+                    "hbox",
+                    "glyph"
+                ],
+                "states": [
+                    "mode.mathInline",
+                    "outcome.tree",
+                    "children.populated",
+                    "atom.lower",
+                    "environment.smallmatrix",
+                    "environment.smallPitch",
+                    "environment.padding",
+                    "size.script"
+                ],
+                "orders": [
+                    "root.hbox"
+                ]
+            }
+        },
+        {
+            "name": "math-smallmatrix-script",
+            "input": "math-smallmatrix-script.tex",
+            "expected": "math-smallmatrix-script.tree",
+            "compileOptions": {
+                "mode": "mathInline"
+            },
+            "outcome": "tree",
+            "coverage": {
+                "kinds": [
+                    "hbox",
+                    "glyph"
+                ],
+                "states": [
+                    "mode.mathInline",
+                    "outcome.tree",
+                    "children.populated",
+                    "atom.lower",
+                    "script.sub",
+                    "environment.smallmatrix",
+                    "environment.glueFallback",
+                    "environment.padding",
+                    "size.script"
+                ],
+                "orders": [
+                    "root.hbox",
+                    "children.sourceOrder"
+                ]
+            }
+        },
+        {
+            "name": "error-cases-extra-tab",
+            "input": "error-cases-extra-tab.tex",
+            "expected": "error-cases-extra-tab.tree",
+            "compileOptions": {
+                "mode": "mathInline"
+            },
+            "outcome": "error",
+            "coverage": {
+                "kinds": [],
+                "states": [
+                    "mode.mathInline",
+                    "outcome.error",
+                    "error.extraAlignmentTab"
+                ],
+                "orders": []
+            }
+        },
+        {
+            "name": "math-smallmatrix-scripted",
+            "input": "math-smallmatrix-scripted.tex",
+            "expected": "math-smallmatrix-scripted.tree",
+            "compileOptions": {
+                "mode": "mathInline"
+            },
+            "outcome": "tree",
+            "coverage": {
+                "kinds": [
+                    "hbox",
+                    "glyph"
+                ],
+                "states": [
+                    "mode.mathInline",
+                    "outcome.tree",
+                    "children.populated",
+                    "atom.digit",
+                    "script.sup",
+                    "environment.smallmatrix",
+                    "environment.padding",
+                    "size.script"
+                ],
+                "orders": [
+                    "root.hbox",
+                    "children.sourceOrder"
+                ]
+            }
+        },
+        {
+            "name": "math-cases-nested-matrix",
+            "input": "math-cases-nested-matrix.tex",
+            "expected": "math-cases-nested-matrix.tree",
+            "compileOptions": {
+                "mode": "mathInline"
+            },
+            "outcome": "tree",
+            "coverage": {
+                "kinds": [
+                    "hbox",
+                    "glyph",
+                    "kern"
+                ],
+                "states": [
+                    "mode.mathInline",
+                    "outcome.tree",
+                    "children.populated",
+                    "atom.lower",
+                    "environment.cases",
+                    "environment.casesStrut",
+                    "delim.sizeFace",
+                    "delim.null"
+                ],
+                "orders": [
+                    "root.hbox"
+                ]
             }
         }
     ]
