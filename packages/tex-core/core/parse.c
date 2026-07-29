@@ -848,6 +848,9 @@ typedef struct txc_environment_row {
     bool left_aligned;
     txc_scaled column_gap;
     bool gap_after_first_column;
+    /* \def\arraystretch{1.2}: the environment stretches the strut for
+     * its whole body, nested array-based environments included. */
+    bool sets_stretch;
     txc_scaled strut_ascent;
     txc_scaled strut_descent;
     txc_scaled interline_baselineskip;
@@ -863,19 +866,22 @@ typedef struct txc_environment_row {
 #define TXC_ENV_STRUT_ASCENT 550500
 #define TXC_ENV_STRUT_DESCENT 235932
 #define TXC_ENV_MATRIX_COLUMNS 10
-/* cases: \arraystretch 1.2 over the strut, one \quad riding the first
- * column's template — reserved even when no row has a second column. */
+/* cases: one \quad riding the first column's template — reserved even
+ * when no row has a second column — and \def\arraystretch{1.2}, whose
+ * local scope covers the whole cases body: every array-based
+ * environment nested anywhere inside builds its strut at 1.2 too
+ * (TeX's factor arithmetic over the base strut exactly). */
 #define TXC_ENV_CASES_GAP 655360
-#define TXC_ENV_CASES_STRUT_ASCENT 660598
-#define TXC_ENV_CASES_STRUT_DESCENT 283117
+#define TXC_ENV_STRUT_ASCENT_STRETCHED 660598
+#define TXC_ENV_STRUT_DESCENT_STRETCHED 283117
 /* smallmatrix: text-mode \thickspace columns, 6\ex@/1.5\ex@ glue. */
 #define TXC_ENV_SMALL_GAP 181990
 #define TXC_ENV_SMALL_BASELINESKIP 393216
 #define TXC_ENV_SMALL_LINESKIP 98304
 
 #define TXC_ENV_MATRIX_GEOMETRY                                                                                        \
-    TXC_CELL_TEXT, false, TXC_ENV_MATRIX_GAP, false, TXC_ENV_STRUT_ASCENT, TXC_ENV_STRUT_DESCENT, 0, 0, 0, false,      \
-        TXC_ENV_MATRIX_COLUMNS
+    TXC_CELL_TEXT, false, TXC_ENV_MATRIX_GAP, false, false, TXC_ENV_STRUT_ASCENT, TXC_ENV_STRUT_DESCENT, 0, 0, 0,      \
+        false, TXC_ENV_MATRIX_COLUMNS
 
 static const txc_environment_row TXC_ENVIRONMENTS[] = {
     {"Bmatrix",
@@ -901,8 +907,9 @@ static const txc_environment_row TXC_ENVIRONMENTS[] = {
      true,
      TXC_ENV_CASES_GAP,
      true,
-     TXC_ENV_CASES_STRUT_ASCENT,
-     TXC_ENV_CASES_STRUT_DESCENT,
+     true,
+     TXC_ENV_STRUT_ASCENT,
+     TXC_ENV_STRUT_DESCENT,
      0,
      0,
      0,
@@ -925,6 +932,7 @@ static const txc_environment_row TXC_ENVIRONMENTS[] = {
      TXC_CELL_SCRIPT,
      false,
      TXC_ENV_SMALL_GAP,
+     false,
      false,
      0,
      0,
@@ -1283,6 +1291,10 @@ typedef struct txc_frame {
      * styled — their content follows document rules. */
     bool styled;
     tex_core_family face_family;
+    /* Whether cases' local \def\arraystretch{1.2} is in scope: it
+     * pierces every nested group, fence, and cell, so array-based
+     * environments opened anywhere inside build the stretched strut. */
+    bool array_stretched;
     /* GROUP and SCRIPT: byte offset of the opening brace. */
     size_t open;
     /* SCRIPT: the scripted atom in the parent frame's list, whether the
@@ -1338,6 +1350,7 @@ static void txc_frame_init(txc_frame *frame, txc_frame_role role, txc_frame *par
     frame->role = role;
     frame->styled = false;
     frame->face_family = TEX_CORE_FAMILY_MAIN;
+    frame->array_stretched = false;
     frame->open = 0;
     frame->target = NULL;
     frame->script = TXC_PENDING_NONE;
@@ -1633,6 +1646,7 @@ static tex_core_status txc_delimiter_arrived(
         txc_frame_init(inner, TXC_FRAME_FENCED, frame);
         inner->styled = frame->styled;
         inner->face_family = frame->face_family;
+        inner->array_stretched = frame->array_stretched;
         inner->open = frame->delim_command.begin;
         inner->fence_command = frame->delim_command;
         inner->fence_left = *delimiter;
@@ -1925,6 +1939,7 @@ tex_core_status txc_parse(
                     txc_frame_init(inner, TXC_FRAME_INDEX, frame);
                     inner->styled = frame->styled;
                     inner->face_family = frame->face_family;
+                    inner->array_stretched = frame->array_stretched;
                     inner->open = token.range.begin;
                     frame = inner;
                     depth += 1;
@@ -1984,6 +1999,7 @@ tex_core_status txc_parse(
                         inner->styled = frame->styled;
                         inner->face_family = frame->face_family;
                     }
+                    inner->array_stretched = frame->array_stretched;
                     if (frame->pending != TXC_PENDING_NONE) {
                         inner->role = TXC_FRAME_SCRIPT;
                         inner->target = frame->pending_target;
@@ -2418,6 +2434,7 @@ tex_core_status txc_parse(
                     txc_frame_init(inner, TXC_FRAME_CELL, frame);
                     inner->styled = frame->styled;
                     inner->face_family = frame->face_family;
+                    inner->array_stretched = frame->array_stretched || environment->sets_stretch;
                     inner->open = token.range.begin;
                     inner->env = environment;
                     inner->env_begin = whole;
@@ -2484,8 +2501,16 @@ tex_core_status txc_parse(
                     array->left_aligned = environment->left_aligned;
                     array->column_gap = environment->column_gap;
                     array->gap_after_first_column = environment->gap_after_first_column;
-                    array->strut_ascent = environment->strut_ascent;
-                    array->strut_descent = environment->strut_descent;
+                    /* An in-scope \arraystretch{1.2} — this environment's
+                     * own or an enclosing cases' — stretches the strut;
+                     * strutless environments stay strutless. */
+                    if (frame->array_stretched && environment->strut_ascent != 0) {
+                        array->strut_ascent = TXC_ENV_STRUT_ASCENT_STRETCHED;
+                        array->strut_descent = TXC_ENV_STRUT_DESCENT_STRETCHED;
+                    } else {
+                        array->strut_ascent = environment->strut_ascent;
+                        array->strut_descent = environment->strut_descent;
+                    }
                     array->interline_baselineskip = environment->interline_baselineskip;
                     array->interline_lineskip = environment->interline_lineskip;
                     array->interline_limit = environment->interline_limit;

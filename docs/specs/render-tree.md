@@ -413,7 +413,11 @@ Each environment's geometry is its amsmath definition exactly:
   ladder, and the null right delimiter published as its
   `\nulldelimiterspace` kern carrying the `\end{cases}` source. The
   `@{\quad}` rides the first column's template, so the alignment
-  reserves it even when no row ever opens the second column.
+  reserves it even when no row ever opens the second column. The
+  `\def\arraystretch{1.2}` is local to the whole cases body and
+  pierces every nested group, fence, and cell, so an array-based
+  environment opened anywhere inside cases builds the stretched strut
+  too.
 - `smallmatrix` is a bare `\ialign` inside `\vcenter` — centered
   script-style cells one text-mode `\thickspace` (`.2777 em` =
   181990 sp) apart, no strut, real interline glue (`\baselineskip`
