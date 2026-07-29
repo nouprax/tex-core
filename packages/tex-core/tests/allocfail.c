@@ -117,6 +117,13 @@ int main(void) {
     txc_sweep(&test, "\\hat{x}+\\widehat{y+z}^2", TEX_CORE_MODE_MATH_DISPLAY);
     /* Style switches rewrite in place; \text allocates its word list. */
     txc_sweep(&test, "\\mathbf{ab1}+\\text{on it}^2", TEX_CORE_MODE_MATH_DISPLAY);
+    /* Environments allocate the frame, cells, rows, the construct, the
+     * column and row scratch tables, every row box, and the fences. */
+    txc_sweep(
+        &test,
+        "\\begin{pmatrix}a&b\\\\c\\end{pmatrix}^2+\\begin{matrix}\\end{matrix}",
+        TEX_CORE_MODE_MATH_DISPLAY
+    );
     txc_allocation_limit(-1);
     return txc_test_finish(&test, "allocfail");
 }

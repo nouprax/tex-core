@@ -1,0 +1,2 @@
+render-error 5
+error status=unsupported src=17..18 message=unsupported row spacing

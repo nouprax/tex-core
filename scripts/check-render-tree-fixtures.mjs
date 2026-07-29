@@ -134,6 +134,7 @@ const nodes = (tree) =>
             y: pt("y"),
             width: pt("width"),
             ascent: pt("ascent"),
+            descent: pt("descent"),
             italic: pt("italic"),
             size: pt("size")
         };
@@ -148,6 +149,13 @@ const childrenOf = (all, index) => {
 const near = (left, right) => Math.abs(left - right) < 1e-9;
 const scriptBox = (all) =>
     all.map((node, index) => ({ node, index })).filter(({ node }) => node.kind === "hbox" && node.y !== 0);
+// Environment witnesses: LaTeX's \@arstrut floor of the 10pt text size
+// prints exactly these row extents; sums of independently print_scaled
+// values carry up to ~1e-5 of print rounding each, so pitch comparisons
+// use a scaled-print tolerance.
+const STRUT_WITNESS = /ascent=8\.39996pt descent=3\.60004pt/;
+const strutRow = (node) => node.kind === "hbox" && node.ascent === 8.39996 && node.descent === 3.60004;
+const nearScaledSum = (left, right) => Math.abs(left - right) < 1e-4;
 const treeStates = (validate) => (subject) => subject.outcome === "tree" && validate(nodes(subject.tree), subject);
 
 // A fraction box is witnessed structurally: an hbox whose direct children
@@ -620,7 +628,177 @@ const stateValidators = {
             (match) => Number(match[2]) > Number(match[1])
         ),
     "error.missingStyle": ({ outcome, tree }) =>
-        outcome === "error" && / message=missing (style|text) argument\n$/.test(tree)
+        outcome === "error" && / message=missing (style|text) argument\n$/.test(tree),
+    // Math alignment environments (milestone M2): the matrix family. The
+    // strut witness is the printed \@arstrut floor of the 10pt text size
+    // (.7/.3 of the 12pt \baselineskip); a strutted row wears exactly those
+    // extents. Row-pitch sums compare printed decimals, each rounded
+    // independently, so they use a scaled-print tolerance instead of
+    // near()'s exact 1e-9.
+    "environment.matrix": ({ outcome, source, tree }) =>
+        outcome === "tree" && /\\begin\{matrix\}/.test(source ?? "") && STRUT_WITNESS.test(tree),
+    "environment.paren": ({ outcome, source, tree }) =>
+        outcome === "tree" && /\\begin\{pmatrix\}/.test(source ?? "") && / cp=U\+0028 .*family=size[1-4] /.test(tree),
+    "environment.bracket": ({ outcome, source, tree }) =>
+        outcome === "tree" && /\\begin\{bmatrix\}/.test(source ?? "") && / cp=U\+005B .*family=size[1-4] /.test(tree),
+    "environment.brace": ({ outcome, source, tree }) =>
+        outcome === "tree" && /\\begin\{Bmatrix\}/.test(source ?? "") && / cp=U\+007B .*family=size[1-4] /.test(tree),
+    "environment.vert": ({ outcome, source, tree }) =>
+        outcome === "tree" && /\\begin\{vmatrix\}/.test(source ?? "") && / cp=U\+2223 .*family=size1 /.test(tree),
+    "environment.doubleVert": ({ outcome, source, tree }) =>
+        outcome === "tree" && /\\begin\{Vmatrix\}/.test(source ?? "") && / cp=U\+2225 .*family=size1 /.test(tree),
+    // A grid witnesses its column geometry: some row of at least two cell
+    // boxes keeps every adjacent pair 2\arraycolsep apart — the true
+    // invariant of centered columns, since each inset is non-negative.
+    "environment.grid": treeStates(
+        (all, { source }) =>
+            /\\begin\{/.test(source ?? "") &&
+            /&/.test(source ?? "") &&
+            /\\\\/.test(source ?? "") &&
+            all.some((node, index) => {
+                if (node.kind !== "hbox") return false;
+                const children = childrenOf(all, index);
+                const cells = children.filter((child) => child.kind === "hbox");
+                if (cells.length < 2 || cells.length !== children.length) return false;
+                return cells.slice(1).every((cell, at) => cell.x - (cells[at].x + cells[at].width) >= 10 - 1e-4);
+            })
+    ),
+    "environment.strut": ({ outcome, tree }) => outcome === "tree" && STRUT_WITNESS.test(tree),
+    "environment.baselineskip": treeStates((all) =>
+        all.some(
+            (node, index) =>
+                node.kind === "hbox" &&
+                all.some(
+                    (other, otherIndex) =>
+                        otherIndex !== index &&
+                        other.kind === "hbox" &&
+                        other.depth === node.depth &&
+                        nearScaledSum(node.y - other.y, 12)
+                )
+        )
+    ),
+    // \@array zeroes the interline glue, so a row taller than the strut
+    // abuts its neighbor exactly: the baseline distance is the pair's
+    // shared extents, exceeding the ordinary 12 pt pitch.
+    "environment.tallRows": treeStates((all) =>
+        all.some(
+            (upper, index) =>
+                upper.kind === "hbox" &&
+                all.some(
+                    (lower, lowerIndex) =>
+                        lowerIndex !== index &&
+                        lower.kind === "hbox" &&
+                        lower.depth === upper.depth &&
+                        upper.y > lower.y &&
+                        upper.y - lower.y > 12 + 1e-4 &&
+                        nearScaledSum(upper.y - lower.y, upper.descent + lower.ascent)
+                )
+        )
+    ),
+    // Ragged rows are witnessed structurally: sibling row boxes sharing the
+    // alignment width with differing cell counts.
+    "environment.raggedRows": treeStates((all) =>
+        all.some((node, index) => {
+            const rows = [];
+            for (let next = index + 1; next < all.length && all[next].depth > all[index].depth; next += 1) {
+                if (all[next].depth === all[index].depth + 1 && all[next].kind === "hbox") rows.push(next);
+            }
+            if (rows.length < 2 || !(all[rows[0]].width > 0)) return false;
+            const widths = new Set(rows.map((row) => all[row].width));
+            const counts = new Set(rows.map((row) => childrenOf(all, row).length));
+            return widths.size === 1 && counts.size >= 2;
+        })
+    ),
+    "environment.emptyCell": ({ outcome, tree }) =>
+        outcome === "tree" && /^ +hbox .*width=0\.0pt ascent=0\.0pt descent=0\.0pt src=(\d+)\.\.\1$/m.test(tree),
+    // The trailing terminator's witness is the absence of a published
+    // trailing row: no row box holds exactly one empty zero-extent cell.
+    "environment.trailingTerminator": treeStates(
+        (all, { source }) =>
+            /\\\\\s*\\end\{/.test(source ?? "") &&
+            !all.some((node, index) => {
+                if (node.kind !== "hbox") return false;
+                const children = childrenOf(all, index);
+                return (
+                    children.length === 1 &&
+                    children[0].kind === "hbox" &&
+                    children[0].width === 0 &&
+                    children[0].ascent === 0 &&
+                    children[0].descent === 0
+                );
+            })
+    ),
+    "environment.emptyBody": ({ outcome, source, tree }) =>
+        outcome === "tree" &&
+        /\\begin\{([A-Za-z]+)\}\s*\\end\{\1\}/.test(source ?? "") &&
+        /ascent=2\.5pt descent=-2\.5pt/.test(tree),
+    // Nesting is witnessed by strutted rows on two different depths.
+    "environment.nested": treeStates((all, { source }) => {
+        const begins = [...(source ?? "").matchAll(/\\begin\{/g)];
+        const end = (source ?? "").indexOf("\\end{");
+        const depths = new Set(all.filter(strutRow).map((node) => node.depth));
+        return begins.length >= 2 && end > begins[1].index && depths.size >= 2;
+    }),
+    // A scripted environment is a strut-rowed box whose next same-depth
+    // sibling is a shifted script box, exactly as fraction.scripted.
+    "environment.scripted": treeStates(
+        (all, { source }) =>
+            /\\end\{[A-Za-z]+\*?\}[\^_]/.test(source ?? "") &&
+            all.some((node, index) => {
+                if (node.kind !== "hbox") return false;
+                const children = [];
+                for (let next = index + 1; next < all.length && all[next].depth > node.depth; next += 1) {
+                    if (all[next].depth === node.depth + 1) children.push(all[next]);
+                }
+                if (!children.some(strutRow)) return false;
+                for (let next = index + 1; next < all.length; next += 1) {
+                    if (all[next].depth < node.depth) return false;
+                    if (all[next].depth === node.depth) return all[next].kind === "hbox" && all[next].y !== 0;
+                }
+                return false;
+            })
+    ),
+    // Cell scripts are witnessed inside a strutted row's subtree.
+    "environment.cellScripts": treeStates((all, { source }) => {
+        const text = source ?? "";
+        const begin = text.indexOf("\\begin{");
+        const end = text.indexOf("\\end{");
+        const marks = ["^", "_"].map((mark) => text.indexOf(mark)).filter((at) => at !== -1);
+        if (begin === -1 || !marks.some((at) => at > begin && at < end)) return false;
+        return all.some((row, index) => {
+            if (!strutRow(row)) return false;
+            for (let next = index + 1; next < all.length && all[next].depth > row.depth; next += 1) {
+                if (all[next].kind === "hbox" && all[next].y !== 0) return true;
+            }
+            return false;
+        });
+    }),
+    // The starred terminator is consumed like LaTeX's \\*: the tree keeps
+    // no Bin asterisk glyph.
+    "environment.starredTerminator": ({ outcome, source, tree }) =>
+        outcome === "tree" && /\\\\\*/.test(source ?? "") && !/ cp=U\+2217 /.test(tree),
+    "environment.styled": ({ outcome, source, tree }) =>
+        outcome === "tree" &&
+        /\\math(rm|bf|it|cal|bb|sf|tt)\{\s*\\begin\{/.test(source ?? "") &&
+        / family=(bold|textit|cal|bb|sans|mono) /.test(tree),
+    "environment.textCells": ({ mode, outcome, tree }) =>
+        outcome === "tree" && mode === "mathDisplay" && / cp=U\+2211 style=upright family=size1 /.test(tree),
+    "error.unsupportedEnvironment": ({ outcome, tree }) =>
+        outcome === "error" && / message=unsupported environment /.test(tree),
+    "error.missingEnvironmentName": ({ outcome, tree }) =>
+        outcome === "error" && / message=missing environment name\n$/.test(tree),
+    "error.mismatchedEnvironment": ({ outcome, tree }) =>
+        outcome === "error" && / message=mismatched \\end\{/.test(tree),
+    "error.unmatchedEnvironment": ({ outcome, tree }) => outcome === "error" && / message=unmatched \\end\{/.test(tree),
+    "error.missingEnvironmentEnd": ({ outcome, tree }) => outcome === "error" && / message=missing \\end\{/.test(tree),
+    "error.misplacedAlignmentTab": ({ outcome, tree }) =>
+        outcome === "error" && / message=misplaced alignment tab\n$/.test(tree),
+    "error.misplacedRowTerminator": ({ outcome, tree }) =>
+        outcome === "error" && / message=misplaced \\\\\n$/.test(tree),
+    "error.unsupportedRowSpacing": ({ outcome, tree }) =>
+        outcome === "error" && / message=unsupported row spacing\n$/.test(tree),
+    "error.extraAlignmentTab": ({ outcome, tree }) =>
+        outcome === "error" && / message=extra alignment tab\n$/.test(tree)
 };
 const orderValidators = {
     "root.hbox": ({ outcome, tree }) =>
