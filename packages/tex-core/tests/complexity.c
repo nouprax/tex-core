@@ -133,8 +133,8 @@ static int txc_run(const txc_complexity_case *test_case) {
     tex_core_options_init(&options);
     options.mode = test_case->mode;
 
-    double small_seconds;
-    double large_seconds;
+    double small_seconds = 0.0;
+    double large_seconds = 0.0;
     int failed = txc_measure(small, test_case->small_bytes, &options, "small", &small_seconds) != 0 ||
                  txc_measure(large, test_case->large_bytes, &options, "large", &large_seconds) != 0;
     free(small);
