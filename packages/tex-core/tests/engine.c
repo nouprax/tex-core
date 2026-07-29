@@ -1143,6 +1143,24 @@ static void txc_test_cases_smallmatrix(txc_test *test) {
     );
     tex_core_render_tree_free(tree);
 
+    /* cases' local \def\arraystretch{1.2} scopes over its whole body:
+     * a matrix nested inside builds the stretched strut too, while the
+     * same matrix outside keeps the base floors. */
+    tree = txc_compile(
+        test,
+        "\\begin{cases}\\begin{matrix}a\\\\b\\end{matrix}&x\\end{cases}",
+        TEX_CORE_MODE_MATH_INLINE,
+        "stretched nesting"
+    );
+    const tex_core_node *outer_row = tex_core_node_child(tex_core_node_child(tex_core_render_tree_root(tree), 0), 1);
+    const tex_core_node *inner_matrix = tex_core_node_child(tex_core_node_child(outer_row, 0), 0);
+    txc_check(
+        test,
+        tex_core_node_frame(tex_core_node_child(inner_matrix, 0)).ascent == txc_scaled_as_points(660598),
+        "a matrix nested in cases inherits the stretched strut"
+    );
+    tex_core_render_tree_free(tree);
+
     /* smallmatrix: script-size centered cells, real interline glue
      * (6\ex@ baselineskip, 1.5\ex@ lineskip and limit, \ex@ exactly
      * 1 pt at the 10 pt size), no strut, and the flanking \, folded

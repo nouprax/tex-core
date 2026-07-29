@@ -3419,6 +3419,35 @@
                     "children.sourceOrder"
                 ]
             }
+        },
+        {
+            "name": "math-cases-nested-matrix",
+            "input": "math-cases-nested-matrix.tex",
+            "expected": "math-cases-nested-matrix.tree",
+            "compileOptions": {
+                "mode": "mathInline"
+            },
+            "outcome": "tree",
+            "coverage": {
+                "kinds": [
+                    "hbox",
+                    "glyph",
+                    "kern"
+                ],
+                "states": [
+                    "mode.mathInline",
+                    "outcome.tree",
+                    "children.populated",
+                    "atom.lower",
+                    "environment.cases",
+                    "environment.casesStrut",
+                    "delim.sizeFace",
+                    "delim.null"
+                ],
+                "orders": [
+                    "root.hbox"
+                ]
+            }
         }
     ]
 }
