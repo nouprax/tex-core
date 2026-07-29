@@ -1104,6 +1104,92 @@ static void txc_test_environments(txc_test *test) {
     tex_core_render_tree_free(tree);
 }
 
+static void txc_test_cases_smallmatrix(txc_test *test) {
+    /* cases: \left\lbrace over two left-aligned text-style columns one
+     * \quad apart, rows floored by the 1.2-\arraystretch strut (TeX's
+     * factor arithmetic exactly: 660598 over 283117 sp), closed by the
+     * null right delimiter's 1.2 pt kern. */
+    tex_core_render_tree *tree =
+        txc_compile(test, "\\begin{cases}x&a\\\\-x&b\\end{cases}", TEX_CORE_MODE_MATH_INLINE, "cases");
+    const tex_core_node *fenced = tex_core_node_child(tex_core_render_tree_root(tree), 0);
+    txc_check_size(test, tex_core_node_child_count(fenced), 4, "cases holds brace, two rows, null kern");
+    const tex_core_node *first = tex_core_node_child(fenced, 1);
+    const tex_core_node *second = tex_core_node_child(fenced, 2);
+    txc_check(
+        test,
+        tex_core_node_frame(first).ascent == txc_scaled_as_points(660598),
+        "cases rows floor at the 1.2 strut ascent"
+    );
+    txc_check(
+        test,
+        tex_core_node_frame(first).descent == txc_scaled_as_points(283117),
+        "cases rows floor at the 1.2 strut descent"
+    );
+    tex_core_frame narrow = tex_core_node_frame(tex_core_node_child(first, 0));
+    tex_core_frame wide = tex_core_node_frame(tex_core_node_child(second, 0));
+    txc_check(test, narrow.x == 0.0 && wide.x == 0.0, "l columns set cells flush left");
+    txc_check(test, wide.width > narrow.width, "the flush cells differ in width");
+    txc_check(
+        test,
+        tex_core_node_frame(tex_core_node_child(first, 1)).x == wide.width + txc_scaled_as_points(655360),
+        "second column sits one \\quad after the first"
+    );
+    const tex_core_node *null_right = tex_core_node_child(fenced, 3);
+    txc_check_int(test, tex_core_node_get_kind(null_right), TEX_CORE_NODE_KERN, "the null right delimiter is a kern");
+    txc_check(
+        test,
+        tex_core_node_frame(null_right).width == txc_scaled_as_points(78643),
+        "the null right kern is \\nulldelimiterspace"
+    );
+    tex_core_render_tree_free(tree);
+
+    /* smallmatrix: script-size centered cells, real interline glue
+     * (6\ex@ baselineskip, 1.5\ex@ lineskip and limit, \ex@ exactly
+     * 1 pt at the 10 pt size), no strut, and the flanking \, folded
+     * into the box edges. */
+    tree = txc_compile(test, "\\begin{smallmatrix}a\\\\c\\end{smallmatrix}", TEX_CORE_MODE_MATH_INLINE, "small");
+    const tex_core_node *matrix = tex_core_node_child(tex_core_render_tree_root(tree), 0);
+    txc_check_size(test, tex_core_node_child_count(matrix), 2, "smallmatrix keeps its two rows");
+    const tex_core_node *row = tex_core_node_child(matrix, 0);
+    tex_core_frame row_frame = tex_core_node_frame(row);
+    txc_check(
+        test,
+        tex_core_node_glyph(tex_core_node_child(tex_core_node_child(row, 0), 0)).size == 7.0,
+        "smallmatrix cells are script size"
+    );
+    txc_check(
+        test,
+        row_frame.y - tex_core_node_frame(tex_core_node_child(matrix, 1)).y == txc_scaled_as_points(393216),
+        "short rows pitch at the 6 pt baselineskip"
+    );
+    txc_check(test, row_frame.x > 0.0, "the flanking thin space pads the rows");
+    txc_check(
+        test,
+        tex_core_node_frame(matrix).width == row_frame.width + 2.0 * row_frame.x,
+        "the box width carries both pads"
+    );
+    txc_check(
+        test,
+        tex_core_node_frame(row).ascent == tex_core_node_frame(tex_core_node_child(row, 0)).ascent,
+        "smallmatrix rows have no strut floor"
+    );
+    tex_core_render_tree_free(tree);
+
+    /* A row taller than the 6 pt pitch falls back to abutting extents
+     * plus the 1.5 pt lineskip. */
+    tree = txc_compile(test, "\\begin{smallmatrix}a&b\\\\c&d\\end{smallmatrix}", TEX_CORE_MODE_MATH_INLINE, "glue");
+    matrix = tex_core_node_child(tex_core_render_tree_root(tree), 0);
+    first = tex_core_node_child(matrix, 0);
+    second = tex_core_node_child(matrix, 1);
+    txc_check(
+        test,
+        tex_core_node_frame(first).y - tex_core_node_frame(second).y ==
+            tex_core_node_frame(first).descent + tex_core_node_frame(second).ascent + txc_scaled_as_points(98304),
+        "tall small rows abut plus \\lineskip"
+    );
+    tex_core_render_tree_free(tree);
+}
+
 int main(void) {
     txc_test test = {0, 0};
     txc_test_math_glyph(&test);
@@ -1124,6 +1210,7 @@ int main(void) {
     txc_test_text_face_protection(&test);
     txc_test_nested_styles(&test);
     txc_test_environments(&test);
+    txc_test_cases_smallmatrix(&test);
     txc_test_command_table(&test);
     txc_test_scaled_rounding(&test);
     txc_test_long_input(&test);

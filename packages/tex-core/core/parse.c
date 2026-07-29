@@ -816,50 +816,129 @@ static const txc_delimiter *txc_delimiter_command(const uint8_t *name, size_t na
     return NULL;
 }
 
-/* Math alignment environments (milestone M2): the amsmath matrix family.
- * Each row names the environment and the fence pair its amsmath
- * definition wraps around the array — matrix is bare, the others are
- * \left<delim> matrix \right<delim>. Delimiter values mirror the
- * TXC_DELIMITERS rows for the same spellings. */
+/* Math alignment environments (milestone M2): the amsmath matrix family,
+ * cases, and smallmatrix. Each row names the environment, the fence pair
+ * its amsmath definition wraps around the alignment, and its geometry:
+ *
+ * - The matrix family is \array{*{10}c} — centered text-style cells,
+ *   2\arraycolsep (10 pt) between columns with the outer -\arraycolsep
+ *   skips cancelling the edge padding, the \@arstrut floor (550500 over
+ *   235932 sp: .7/.3 of the 12 pt \baselineskip by TeX's decimal scan),
+ *   zeroed interline glue, and at most \c@MaxMatrixCols (10) columns.
+ *   The delimited variants are \left<delim> ... \right<delim>; delimiter
+ *   values mirror the TXC_DELIMITERS rows for the same spellings.
+ * - cases is \left\lbrace \def\arraystretch{1.2} \array{@{}l@{\quad}l@{}}
+ *   ... \right. — two left-aligned text-style columns exactly one \quad
+ *   (1 em = 655360 sp) apart with no edge padding, the strut scaled by
+ *   1.2 (TeX's factor arithmetic exactly: 660598 over 283117 sp), and
+ *   the null right delimiter.
+ * - smallmatrix is a bare \ialign inside \vcenter — centered script-style
+ *   cells one text-mode \thickspace (.2777 em = 181990 sp) apart, no
+ *   strut, real interline glue \baselineskip 6\ex@ over \lineskip and
+ *   \lineskiplimit 1.5\ex@ (amsgen's \ex@ is exactly 1 pt at the 10 pt
+ *   size: 393216, 98304, and 98304 sp), unbounded columns, and a thin
+ *   space of the surrounding size folded into each edge for the
+ *   flanking \, of its definition. */
 typedef struct txc_environment_row {
     const char *name;
     bool delimited;
     txc_delimiter left;
     txc_delimiter right;
+    txc_cell_style cell_style;
+    bool left_aligned;
+    txc_scaled column_gap;
+    bool gap_after_first_column;
+    txc_scaled strut_ascent;
+    txc_scaled strut_descent;
+    txc_scaled interline_baselineskip;
+    txc_scaled interline_lineskip;
+    txc_scaled interline_limit;
+    bool thin_padding;
+    /* Columns after which another `&` is an error; 0 is unbounded. */
+    size_t max_columns;
 } txc_environment_row;
+
+/* The matrix family's shared geometry columns. */
+#define TXC_ENV_MATRIX_GAP 655360
+#define TXC_ENV_STRUT_ASCENT 550500
+#define TXC_ENV_STRUT_DESCENT 235932
+#define TXC_ENV_MATRIX_COLUMNS 10
+/* cases: \arraystretch 1.2 over the strut, one \quad riding the first
+ * column's template — reserved even when no row has a second column. */
+#define TXC_ENV_CASES_GAP 655360
+#define TXC_ENV_CASES_STRUT_ASCENT 660598
+#define TXC_ENV_CASES_STRUT_DESCENT 283117
+/* smallmatrix: text-mode \thickspace columns, 6\ex@/1.5\ex@ glue. */
+#define TXC_ENV_SMALL_GAP 181990
+#define TXC_ENV_SMALL_BASELINESKIP 393216
+#define TXC_ENV_SMALL_LINESKIP 98304
+
+#define TXC_ENV_MATRIX_GEOMETRY                                                                                        \
+    TXC_CELL_TEXT, false, TXC_ENV_MATRIX_GAP, false, TXC_ENV_STRUT_ASCENT, TXC_ENV_STRUT_DESCENT, 0, 0, 0, false,      \
+        TXC_ENV_MATRIX_COLUMNS
 
 static const txc_environment_row TXC_ENVIRONMENTS[] = {
     {"Bmatrix",
      true,
      {0x007B, TXC_LADDER_LARGE, 0x23A7, 0x23AA, 0x23A9, 0x23A8, TEX_CORE_FAMILY_SIZE4},
-     {0x007D, TXC_LADDER_LARGE, 0x23AB, 0x23AA, 0x23AD, 0x23AC, TEX_CORE_FAMILY_SIZE4}},
+     {0x007D, TXC_LADDER_LARGE, 0x23AB, 0x23AA, 0x23AD, 0x23AC, TEX_CORE_FAMILY_SIZE4},
+     TXC_ENV_MATRIX_GEOMETRY},
     {"Vmatrix",
      true,
      {0x2225, TXC_LADDER_ALWAYS, 0x2225, 0x2225, 0x2225, TXC_NO_PIECE, TEX_CORE_FAMILY_SIZE1},
-     {0x2225, TXC_LADDER_ALWAYS, 0x2225, 0x2225, 0x2225, TXC_NO_PIECE, TEX_CORE_FAMILY_SIZE1}},
+     {0x2225, TXC_LADDER_ALWAYS, 0x2225, 0x2225, 0x2225, TXC_NO_PIECE, TEX_CORE_FAMILY_SIZE1},
+     TXC_ENV_MATRIX_GEOMETRY},
     {"bmatrix",
      true,
      {0x005B, TXC_LADDER_LARGE, 0x23A1, 0x23A2, 0x23A3, TXC_NO_PIECE, TEX_CORE_FAMILY_SIZE4},
-     {0x005D, TXC_LADDER_LARGE, 0x23A4, 0x23A5, 0x23A6, TXC_NO_PIECE, TEX_CORE_FAMILY_SIZE4}},
+     {0x005D, TXC_LADDER_LARGE, 0x23A4, 0x23A5, 0x23A6, TXC_NO_PIECE, TEX_CORE_FAMILY_SIZE4},
+     TXC_ENV_MATRIX_GEOMETRY},
+    {"cases",
+     true,
+     {0x007B, TXC_LADDER_LARGE, 0x23A7, 0x23AA, 0x23A9, 0x23A8, TEX_CORE_FAMILY_SIZE4},
+     {0, TXC_LADDER_NEVER, 0, 0, 0, 0, TEX_CORE_FAMILY_MAIN},
+     TXC_CELL_TEXT,
+     true,
+     TXC_ENV_CASES_GAP,
+     true,
+     TXC_ENV_CASES_STRUT_ASCENT,
+     TXC_ENV_CASES_STRUT_DESCENT,
+     0,
+     0,
+     0,
+     false,
+     2},
     {"matrix",
      false,
      {0, TXC_LADDER_NEVER, 0, 0, 0, 0, TEX_CORE_FAMILY_MAIN},
-     {0, TXC_LADDER_NEVER, 0, 0, 0, 0, TEX_CORE_FAMILY_MAIN}},
+     {0, TXC_LADDER_NEVER, 0, 0, 0, 0, TEX_CORE_FAMILY_MAIN},
+     TXC_ENV_MATRIX_GEOMETRY},
     {"pmatrix",
      true,
      {0x0028, TXC_LADDER_LARGE, 0x239B, 0x239C, 0x239D, TXC_NO_PIECE, TEX_CORE_FAMILY_SIZE4},
-     {0x0029, TXC_LADDER_LARGE, 0x239E, 0x239F, 0x23A0, TXC_NO_PIECE, TEX_CORE_FAMILY_SIZE4}},
+     {0x0029, TXC_LADDER_LARGE, 0x239E, 0x239F, 0x23A0, TXC_NO_PIECE, TEX_CORE_FAMILY_SIZE4},
+     TXC_ENV_MATRIX_GEOMETRY},
+    {"smallmatrix",
+     false,
+     {0, TXC_LADDER_NEVER, 0, 0, 0, 0, TEX_CORE_FAMILY_MAIN},
+     {0, TXC_LADDER_NEVER, 0, 0, 0, 0, TEX_CORE_FAMILY_MAIN},
+     TXC_CELL_SCRIPT,
+     false,
+     TXC_ENV_SMALL_GAP,
+     false,
+     0,
+     0,
+     TXC_ENV_SMALL_BASELINESKIP,
+     TXC_ENV_SMALL_LINESKIP,
+     TXC_ENV_SMALL_LINESKIP,
+     true,
+     0},
     {"vmatrix",
      true,
      {0x2223, TXC_LADDER_ALWAYS, 0x2223, 0x2223, 0x2223, TXC_NO_PIECE, TEX_CORE_FAMILY_SIZE1},
-     {0x2223, TXC_LADDER_ALWAYS, 0x2223, 0x2223, 0x2223, TXC_NO_PIECE, TEX_CORE_FAMILY_SIZE1}},
+     {0x2223, TXC_LADDER_ALWAYS, 0x2223, 0x2223, 0x2223, TXC_NO_PIECE, TEX_CORE_FAMILY_SIZE1},
+     TXC_ENV_MATRIX_GEOMETRY},
 };
-
-/* amsmath's \c@MaxMatrixCols: the matrix preamble repeats ten centered
- * columns, so the tenth alignment tab of a row — which would open an
- * eleventh column — is a structured error, exactly where amsmath stops
- * accepting. */
-#define TXC_MAX_MATRIX_COLUMNS 10
 
 static const txc_environment_row *txc_environment_find(const uint8_t *name, size_t name_length) {
     for (size_t index = 0; index < sizeof(TXC_ENVIRONMENTS) / sizeof(TXC_ENVIRONMENTS[0]); index++) {
@@ -2054,7 +2133,7 @@ tex_core_status txc_parse(
                     if (frame->role != TXC_FRAME_CELL) {
                         return txc_fail(error, TEX_CORE_STATUS_UNSUPPORTED, &token.range, "misplaced alignment tab");
                     }
-                    if (frame->env_cell_count + 1 == TXC_MAX_MATRIX_COLUMNS) {
+                    if (frame->env->max_columns != 0 && frame->env_cell_count + 1 == frame->env->max_columns) {
                         return txc_fail(error, TEX_CORE_STATUS_UNSUPPORTED, &token.range, "extra alignment tab");
                     }
                     status = txc_environment_cell(arena, frame, error);
@@ -2401,6 +2480,16 @@ tex_core_status txc_parse(
                     array->delimited = environment->delimited;
                     array->left = environment->left;
                     array->right = environment->right;
+                    array->cell_style = environment->cell_style;
+                    array->left_aligned = environment->left_aligned;
+                    array->column_gap = environment->column_gap;
+                    array->gap_after_first_column = environment->gap_after_first_column;
+                    array->strut_ascent = environment->strut_ascent;
+                    array->strut_descent = environment->strut_descent;
+                    array->interline_baselineskip = environment->interline_baselineskip;
+                    array->interline_lineskip = environment->interline_lineskip;
+                    array->interline_limit = environment->interline_limit;
+                    array->thin_padding = environment->thin_padding;
                     array->begin = frame->env_begin;
                     array->end = whole;
                     array->rows = frame->env_rows;

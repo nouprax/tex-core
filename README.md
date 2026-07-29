@@ -49,13 +49,15 @@ bold/italic/calligraphic/double-struck/sans/typewriter faces), laid out
 with TeX's inter-atom spacing over embedded Computer Modern metrics,
 with byte-identical canonical dumps on every platform. That completes
 the M1 math-core surface. M2 (math environments) has begun: the
-`\begin`/`\end` alignment environments of the matrix family (`matrix`
-through `Vmatrix`) set centered cells over LaTeX's array geometry —
-`\@arstrut` row floors with rows abutting on zeroed interline glue,
-`2\arraycolsep` column gaps, the stack `\vcenter`-ed on the math axis,
-the delimited variants fenced per rule 19. The remaining M2–M4 surface
-(`cases`/`aligned`, extensibles, text galley, domain notations) lands
-before `1.0.0`. Nothing usable is published yet.
+`\begin`/`\end` alignment environments cover the matrix family
+(`matrix` through `Vmatrix`), `cases`, and `smallmatrix`, each over
+its amsmath geometry — strut row floors and zeroed interline glue for
+the array-based environments, natural rows under real glue for
+smallmatrix, centered or left-aligned columns at their definition's
+gaps, the
+stack `\vcenter`-ed on the math axis, fences grown per rule 19. The
+remaining M2–M4 surface (`aligned`, extensibles, text galley, domain
+notations) lands before `1.0.0`. Nothing usable is published yet.
 
 Build and test the C core:
 
