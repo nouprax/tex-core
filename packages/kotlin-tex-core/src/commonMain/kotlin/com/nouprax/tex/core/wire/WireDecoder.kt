@@ -64,6 +64,27 @@ internal object WireDecoder {
 private class WireReader(
     private val payload: ByteArray,
 ) {
+    private data class NodeFields(
+        val kind: Int,
+        val x: Double,
+        val y: Double,
+        val width: Double,
+        val ascent: Double,
+        val descent: Double,
+        val italic: Double,
+        val codepoint: Int,
+        val style: GlyphStyle,
+        val family: GlyphFamily,
+        val size: Double,
+        val src: SourceRange,
+        val childCount: Int,
+    )
+
+    private data class DecodeFrame(
+        val fields: NodeFields,
+        val children: MutableList<RenderNode> = mutableListOf(),
+    )
+
     private var position = 0
     var decoded = 0
         private set
@@ -94,6 +115,34 @@ private class WireReader(
     }
 
     fun node(): RenderNode {
+        val root = nodeFields()
+        if (root.kind != 1) return finishNode(root, emptyList())
+
+        // Payload depth is input-controlled. Decode postorder over explicit
+        // frames so any tree the native bridge can emit is also safe to
+        // materialize on JVM, Android, and Kotlin/Native.
+        val stack = ArrayDeque<DecodeFrame>()
+        stack.addLast(DecodeFrame(root))
+        while (true) {
+            val top = stack.last()
+            if (top.children.size < top.fields.childCount) {
+                val child = nodeFields()
+                if (child.kind == 1) {
+                    stack.addLast(DecodeFrame(child))
+                } else {
+                    top.children.add(finishNode(child, emptyList()))
+                }
+                continue
+            }
+
+            val value = finishNode(top.fields, top.children)
+            stack.removeLast()
+            if (stack.isEmpty()) return value
+            stack.last().children.add(value)
+        }
+    }
+
+    private fun nodeFields(): NodeFields {
         decoded += 1
         val kind = u32()
         val x = f64()
@@ -108,7 +157,33 @@ private class WireReader(
         val size = f64()
         val src = SourceRange(u64(), u64())
         val childCount = u32()
+        require(childCount >= 0) { "wire payload child count exceeds the supported range" }
         require(kind == 1 || childCount == 0) { "wire payload gives a leaf node $childCount children" }
+        if (kind !in 1..4) {
+            error("wire payload contains an unknown node kind: $kind")
+        }
+        return NodeFields(
+            kind,
+            x,
+            y,
+            width,
+            ascent,
+            descent,
+            italic,
+            codepoint,
+            style,
+            family,
+            size,
+            src,
+            childCount,
+        )
+    }
+
+    private fun finishNode(
+        fields: NodeFields,
+        children: List<RenderNode>,
+    ): RenderNode {
+        val (kind, x, y, width, ascent, descent, italic, codepoint, style, family, size, src) = fields
         return when (kind) {
             2 -> {
                 Glyph(
@@ -142,7 +217,7 @@ private class WireReader(
                     ascent = ascent,
                     descent = descent,
                     src = src,
-                    children = immutableList(childCount) { node() },
+                    children = children,
                 )
             }
 

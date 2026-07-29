@@ -1,3 +1,5 @@
+import Foundation
+
 /// The failure category of a compile call, mirroring `tex_core_status`.
 public enum CompileStatus: Sendable, Hashable {
     /// A caller contract violation (for example a null source with a
@@ -36,4 +38,9 @@ public struct CompileError: Error, Sendable, Hashable, CustomStringConvertible {
         }
         return message
     }
+}
+
+extension CompileError: LocalizedError {
+    /// The structured engine message used by Foundation error presentation.
+    public var errorDescription: String? { description }
 }

@@ -100,6 +100,27 @@ function decodeCodepoint(codepoint: number): number {
     return codepoint;
 }
 
+interface NodeFields {
+    readonly kind: number;
+    readonly x: number;
+    readonly y: number;
+    readonly width: number;
+    readonly ascent: number;
+    readonly descent: number;
+    readonly italic: number;
+    readonly codepoint: number;
+    readonly style: GlyphStyle;
+    readonly family: GlyphFamily;
+    readonly size: number;
+    readonly src: SourceRange;
+    readonly childCount: number;
+}
+
+interface DecodeFrame {
+    readonly fields: NodeFields;
+    readonly children: RenderNode[];
+}
+
 class WireReader {
     private readonly view: DataView;
     private readonly bytes: Uint8Array;
@@ -144,6 +165,34 @@ class WireReader {
     }
 
     node(): RenderNode {
+        const root = this.nodeFields();
+        if (root.kind !== 1) return this.finishNode(root, []);
+
+        // Tree depth is controlled by the native payload, so decode
+        // postorder over explicit frames rather than the JavaScript call
+        // stack. A frame is complete once all of its direct children have
+        // been assembled.
+        const stack: DecodeFrame[] = [{ fields: root, children: [] }];
+        while (true) {
+            const top = stack[stack.length - 1]!;
+            if (top.children.length < top.fields.childCount) {
+                const child = this.nodeFields();
+                if (child.kind === 1) {
+                    stack.push({ fields: child, children: [] });
+                } else {
+                    top.children.push(this.finishNode(child, []));
+                }
+                continue;
+            }
+
+            const value = this.finishNode(top.fields, top.children);
+            stack.pop();
+            if (stack.length === 0) return value;
+            stack[stack.length - 1]!.children.push(value);
+        }
+    }
+
+    private nodeFields(): NodeFields {
         this.decoded += 1;
         const kind = this.u32();
         const x = this.f64();
@@ -161,6 +210,14 @@ class WireReader {
         if (kind !== 1 && childCount !== 0) {
             throw new Error(`wire payload gives a leaf node ${childCount} children`);
         }
+        if (kind < 1 || kind > 4) {
+            throw new Error(`wire payload contains an unknown node kind: ${kind}`);
+        }
+        return { kind, x, y, width, ascent, descent, italic, codepoint, style, family, size, src, childCount };
+    }
+
+    private finishNode(fields: NodeFields, children: RenderNode[]): RenderNode {
+        const { kind, x, y, width, ascent, descent, italic, codepoint, style, family, size, src } = fields;
         switch (kind) {
             case 2:
                 return Object.freeze({
@@ -184,8 +241,6 @@ class WireReader {
                 return rule;
             }
             case 1: {
-                const children: RenderNode[] = [];
-                for (let index = 0; index < childCount; index += 1) children.push(this.node());
                 const box: HBox = Object.freeze({
                     kind: "hbox",
                     x,

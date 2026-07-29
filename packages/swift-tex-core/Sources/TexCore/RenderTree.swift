@@ -256,7 +256,6 @@ public struct RenderTree: Sendable, Hashable {
     /// byte-identical across platforms for the same compiled tree.
     public func dump() -> String {
         var dumper = RenderDumper()
-        dumper.visit(root)
-        return dumper.output
+        return dumper.dump(root)
     }
 }

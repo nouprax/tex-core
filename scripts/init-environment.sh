@@ -217,7 +217,9 @@ check_core() {
     require_command unzip || true
     if command -v cmake >/dev/null 2>&1; then
         actual=$(cmake --version | sed -n '1s/.* //p')
-        version_at_least "$actual" 3.20 || fail "CMake 3.20 or later is required; found $actual"
+        # The floor matches cmakeMinimumRequired in CMakePresets.json: every
+        # documented root entry point configures through `cmake --preset`.
+        version_at_least "$actual" 3.21 || fail "CMake 3.21 or later is required; found $actual"
     fi
     [ "$failures" -ne "$before" ] || ok "C/C++ build tools"
     return 0
@@ -503,7 +505,8 @@ install_emscripten() {
     # Pin the emsdk manager itself to the immutable commit of the release
     # tag matching EMSCRIPTEN_VERSION: a moved tag or new default-branch
     # commit must never change the bytes this installer executes.
-    git -C "$directory" fetch --filter=blob:none origin "$EMSCRIPTEN_COMMIT"
+    git -C "$directory" rev-parse --quiet --verify "$EMSCRIPTEN_COMMIT^{commit}" >/dev/null \
+        || git -C "$directory" fetch --filter=blob:none origin "$EMSCRIPTEN_COMMIT"
     git -C "$directory" checkout --quiet "$EMSCRIPTEN_COMMIT"
     actual_commit=$(git -C "$directory" rev-parse HEAD)
     [ "$actual_commit" = "$EMSCRIPTEN_COMMIT" ] || {

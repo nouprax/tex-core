@@ -461,7 +461,9 @@ independently of a walk: incremental sessions (the 2.0.0 rung) may store
 anchor-relative positions internally and resolve absolute values during
 traversal, exactly as the dump (an O(n) walk) does. Consumers must treat a
 range as data obtained from a walk of a specific compiled tree, not as a
-stable node property across revisions.
+stable node property across revisions. The planned snapshot-owned batch
+resolver and its cache lifetime are specified in
+[`incremental-editing.md`](incremental-editing.md#source-range-resolver).
 
 ## Errors
 

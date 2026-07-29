@@ -76,6 +76,17 @@ make build && make test    # or: cmake --preset default && ctest --preset correc
 
 All packages release the same version from the same protected `vX.Y.Z` tag.
 
+The ES package is ESM-only:
+
+```js
+import { Document } from "@nouprax/es-tex-core";
+
+const tree = Document.compile("E = mc^2", { mode: "mathInline" });
+if (!tree.dump().startsWith("render-tree 5\n")) {
+    throw new Error("unexpected render-tree schema");
+}
+```
+
 ## Roadmap
 
 Capability grows along a fixed major-version ladder:
@@ -88,8 +99,10 @@ Capability grows along a fixed major-version ladder:
   is one continuous galley.
 - **2.0.0 — Incremental rendering.** Markdown-core-v2-style sessions: mutate
   the input and receive the updated render tree as fast as possible, with
-  immutable structurally-shared snapshots, deltas, and damage-proportional
-  commit cost.
+  immutable structurally-shared snapshots, deltas, snapshot-owned source
+  range resolution, and damage-proportional commit cost. The planned
+  session/resolver/cache contract is recorded in
+  [`docs/specs/incremental-editing.md`](docs/specs/incremental-editing.md).
 - **3.0.0 — Full TeXbook support.** The programmable TeX layer, modules,
   multi-file projects, references, and page building: a product-ready core
   for a TeX project editor.
@@ -107,6 +120,9 @@ Capability grows along a fixed major-version ladder:
   [`docs/specs/render-tree-dump.md`](docs/specs/render-tree-dump.md) as its
   deterministic textual form and [`specs/render-tree/`](specs/render-tree/)
   as the executable cross-platform conformance corpus.
+- [`docs/specs/incremental-editing.md`](docs/specs/incremental-editing.md) —
+  the planned `2.0.0` session, source-range resolver, cache ownership, and
+  damage-proportional cost contract.
 - [`docs/specs/c-naming.md`](docs/specs/c-naming.md) — C naming
   conventions for the engine and its test tree.
 

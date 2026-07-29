@@ -16,6 +16,7 @@ import org.jetbrains.kotlin.gradle.dsl.KotlinVersion
 import org.jetbrains.kotlin.gradle.plugin.mpp.KotlinNativeTarget
 import org.jetbrains.kotlin.gradle.targets.jvm.KotlinJvmTarget
 import org.jetbrains.kotlin.gradle.targets.native.tasks.KotlinNativeTest
+import java.io.DataInputStream
 import java.util.zip.ZipFile
 
 // Generates the common-test conformance data from the shared render-tree
@@ -186,12 +187,24 @@ abstract class GenerateRenderTreeFixtures : DefaultTask() {
 plugins {
     alias(libs.plugins.kotlin.multiplatform)
     alias(libs.plugins.android.kotlin.multiplatform.library)
+    alias(libs.plugins.dokka)
     alias(libs.plugins.ktlint)
     `maven-publish`
 }
 
 group = "com.nouprax"
 version = rootProject.file("VERSION").readText().trim()
+
+dokka {
+    dokkaSourceSets.configureEach {
+        // Public API is defined in commonMain. Platform source sets contain
+        // internal actuals only, and both Native targets share one source
+        // root that should not be rendered twice.
+        if (name != "commonMain") {
+            suppress.set(true)
+        }
+    }
+}
 
 dependencyLocking {
     lockAllConfigurations()
@@ -203,28 +216,51 @@ val generatedRenderTreeSource =
     layout.buildDirectory.file(
         "generated/renderTreeCommonTest/kotlin/com/nouprax/tex/core/RenderTreeCases.kt",
     )
-val hostOs = System.getProperty("os.name").lowercase()
-val hostArchitecture = System.getProperty("os.arch").lowercase()
-val androidManagedDeviceTestAbi =
-    when (hostArchitecture) {
-        "aarch64", "arm64" -> "arm64-v8a"
-        "amd64", "x86_64" -> "x86_64"
-        else -> error("Unsupported Android managed-device host architecture: $hostArchitecture")
+
+// One closed model drives every host-dependent output and task selection.
+// An unsupported host stops configuration instead of silently publishing
+// a payload under a compatible-looking label.
+data class HostTriple(
+    val os: String,
+    val architecture: String,
+) {
+    val platform: String get() = "$os-$architecture"
+    val kotlinNativeTarget: String get() = if (os == "macos") "macosArm64" else "linuxX64"
+    val managedDeviceAbi: String get() = if (architecture == "arm64") "arm64-v8a" else "x86_64"
+    val nativeLibraryFileName: String
+        get() = if (os == "macos") "libtex_core_kotlin.dylib" else "libtex_core_kotlin.so"
+}
+
+val supportedHostTriples = setOf(HostTriple("macos", "arm64"), HostTriple("linux", "x64"))
+val hostTriple =
+    run {
+        val osName = System.getProperty("os.name").lowercase()
+        val architectureName = System.getProperty("os.arch").lowercase()
+        val os =
+            when {
+                osName.contains("mac") -> "macos"
+                osName.contains("linux") -> "linux"
+                osName.contains("windows") -> "windows"
+                else -> osName
+            }
+        val architecture =
+            when (architectureName) {
+                "aarch64", "arm64" -> "arm64"
+                "amd64", "x86_64" -> "x64"
+                else -> architectureName
+            }
+        val triple = HostTriple(os, architecture)
+        require(triple in supportedHostTriples) {
+            "Unsupported build host: $osName/$architectureName. Supported hosts: " +
+                supportedHostTriples.joinToString { it.platform } + "."
+        }
+        triple
     }
+val hostOs = hostTriple.os
+val androidManagedDeviceTestAbi = hostTriple.managedDeviceAbi
 val jvmNativeBuildDirectory = layout.buildDirectory.dir("native/jvm")
 val jvmNativeResourceDirectory = layout.buildDirectory.dir("generated/jvmResources")
-// The one desktop JNI support table: exactly the OS/architecture tuples the
-// release actually publishes (linux-x64 from the Linux lane, macos-arm64
-// from the macOS lane — see scripts/merge-maven-publications.mjs). The
-// runtime loader in CBridge.jvm.kt accepts the same tuples and no others;
-// any other host fails here, at configuration, instead of mislabeling a
-// payload or failing after deployment.
-val desktopPlatform =
-    when {
-        hostOs.contains("mac") && hostArchitecture in setOf("aarch64", "arm64") -> "macos-arm64"
-        hostOs.contains("linux") && hostArchitecture in setOf("x86_64", "amd64") -> "linux-x64"
-        else -> error("Unsupported desktop JNI platform: $hostOs/$hostArchitecture (supported: macos-arm64, linux-x64)")
-    }
+val desktopPlatform = hostTriple.platform
 // The Apple support floor (Package.swift declares macOS 15): every native
 // artifact built on a macOS host pins this deployment target so a newer
 // toolchain cannot silently raise the artifact's minimum OS.
@@ -326,18 +362,8 @@ fun KotlinNativeTarget.configureNativeBridge() {
     }
 }
 
-val hostNativeTest =
-    when {
-        hostOs.contains("mac") -> "macosArm64Test"
-        hostOs.contains("linux") -> "linuxX64Test"
-        else -> null
-    }
-val hostNativeConformanceTest =
-    when {
-        hostOs.contains("mac") -> "macosArm64ConformanceTest"
-        hostOs.contains("linux") -> "linuxX64ConformanceTest"
-        else -> null
-    }
+val hostNativeTest = "${hostTriple.kotlinNativeTarget}Test"
+val hostNativeConformanceTest = "${hostTriple.kotlinNativeTarget}ConformanceTest"
 
 val configureJvmNative =
     tasks.register<Exec>("configureJvmNative") {
@@ -628,6 +654,9 @@ afterEvaluate {
 val javadocJar =
     tasks.register<Jar>("javadocJar") {
         archiveClassifier.set("javadoc")
+        // Publish actual generated API reference; the spec and package
+        // guide remain supplementary documentation.
+        from(tasks.named("dokkaGeneratePublicationHtml"))
         from(repositoryRoot.file("docs/specs/render-tree.md"))
         from(layout.projectDirectory.file("README.md"))
         // Attached to every publication, so each Maven artifact set carries
@@ -687,10 +716,149 @@ tasks.withType<com.android.build.gradle.internal.tasks.ManagedDeviceInstrumentat
     testedAbi.set(androidManagedDeviceTestAbi)
 }
 
+// Freeze the ordinary Java-visible JVM surface. Kotlin `internal`
+// declarations can still compile to public bytecode, so inspect every
+// public class plus public/protected non-synthetic member. The class
+// hierarchy is part of the ABI as well as the member descriptors.
+val verifyJvmAbi =
+    tasks.register("verifyJvmAbi") {
+        group = "verification"
+        description = "Compares the JVM jar's public ABI against the checked-in snapshot."
+        dependsOn("jvmJar")
+        val jarFile = tasks.named<Jar>("jvmJar").flatMap { it.archiveFile }
+        val snapshotFile = layout.projectDirectory.file("jvm-abi.txt").asFile
+        val write = providers.gradleProperty("writeJvmAbi").isPresent
+        inputs.file(jarFile)
+
+        doLast {
+            fun utf8At(
+                pool: Array<Any?>,
+                index: Int,
+            ): String = pool[index] as? String ?: error("constant pool index $index is not utf8")
+
+            fun classSurface(bytes: ByteArray): kotlin.collections.List<String> {
+                val input = DataInputStream(bytes.inputStream())
+                require(input.readInt() == -0x35014542) { "not a class file" }
+                input.readUnsignedShort()
+                input.readUnsignedShort()
+                val poolCount = input.readUnsignedShort()
+                val pool = arrayOfNulls<Any?>(poolCount)
+                val classRefs = IntArray(poolCount)
+                var slot = 1
+                while (slot < poolCount) {
+                    when (val tag = input.readUnsignedByte()) {
+                        1 -> {
+                            pool[slot] = input.readUTF()
+                        }
+
+                        7 -> {
+                            classRefs[slot] = input.readUnsignedShort()
+                        }
+
+                        8, 16, 19, 20 -> {
+                            input.skipBytes(2)
+                        }
+
+                        15 -> {
+                            input.skipBytes(3)
+                        }
+
+                        3, 4, 9, 10, 11, 12, 17, 18 -> {
+                            input.skipBytes(4)
+                        }
+
+                        5, 6 -> {
+                            input.skipBytes(8)
+                            slot += 1
+                        }
+
+                        else -> {
+                            error("unsupported constant pool tag $tag")
+                        }
+                    }
+                    slot += 1
+                }
+                val access = input.readUnsignedShort()
+                val thisClass = input.readUnsignedShort()
+                val className = utf8At(pool, classRefs[thisClass])
+                if ((access and 0x0001) == 0 || (access and 0x1000) != 0) {
+                    return emptyList()
+                }
+                val superName =
+                    input.readUnsignedShort().let { index ->
+                        if (index == 0) "-" else utf8At(pool, classRefs[index])
+                    }
+                val interfaces =
+                    (0 until input.readUnsignedShort())
+                        .map { utf8At(pool, classRefs[input.readUnsignedShort()]) }
+                        .sorted()
+                val hierarchy =
+                    buildString {
+                        append("class $className extends $superName")
+                        if (interfaces.isNotEmpty()) {
+                            append(" implements ${interfaces.joinToString(",")}")
+                        }
+                    }
+                val surface = mutableListOf(hierarchy)
+                for (section in listOf("field", "method")) {
+                    repeat(input.readUnsignedShort()) {
+                        val memberAccess = input.readUnsignedShort()
+                        val name = utf8At(pool, input.readUnsignedShort())
+                        val descriptor = utf8At(pool, input.readUnsignedShort())
+                        repeat(input.readUnsignedShort()) {
+                            input.skipBytes(2)
+                            input.skipBytes(input.readInt())
+                        }
+                        val visible = (memberAccess and 0x0005) != 0
+                        val synthetic = (memberAccess and 0x1000) != 0
+                        if (visible && !synthetic) {
+                            surface += "  $section $className.$name $descriptor"
+                        }
+                    }
+                }
+                return surface
+            }
+
+            val lines = mutableListOf<String>()
+            ZipFile(jarFile.get().asFile).use { archive ->
+                for (entry in archive.entries()) {
+                    if (entry.name.endsWith(".class") && entry.name.startsWith("com/nouprax/")) {
+                        lines += classSurface(archive.getInputStream(entry).use { it.readBytes() })
+                    }
+                }
+            }
+            val rendered = lines.sorted().joinToString("\n") + "\n"
+            if (write) {
+                snapshotFile.writeText(rendered)
+                logger.lifecycle("Wrote JVM ABI snapshot: ${snapshotFile.absolutePath}")
+                return@doLast
+            }
+            check(snapshotFile.isFile) {
+                "jvm-abi.txt is missing; generate it with " +
+                    "./gradlew :packages:kotlin-tex-core:verifyJvmAbi -PwriteJvmAbi"
+            }
+            val expected = snapshotFile.readText()
+            check(rendered == expected) {
+                val actualLines = rendered.lines().toSet()
+                val expectedLines = expected.lines().toSet()
+                val added = (actualLines - expectedLines).sorted().joinToString("\n")
+                val removed = (expectedLines - actualLines).sorted().joinToString("\n")
+                "JVM public ABI drifted from jvm-abi.txt.\nAdded:\n$added\nRemoved:\n$removed\n" +
+                    "If the change is intentional, regenerate with -PwriteJvmAbi."
+            }
+        }
+    }
+
 tasks.register("kotlinTest") {
     group = "verification"
     description = "Runs JVM, Android host, and the current host's Kotlin/Native correctness suites."
-    dependsOn(listOfNotNull("jvmTest", "testAndroidHostTest", hostNativeTest, "verifyKotlinNativePackaging"))
+    dependsOn(
+        "jvmTest",
+        "testAndroidHostTest",
+        hostNativeTest,
+        "verifyKotlinNativePackaging",
+        verifyJvmAbi,
+    )
 }
 
 tasks.register("allKotlinTests") {
@@ -708,6 +876,7 @@ tasks.register("allKotlinTests") {
             hostNativeConformanceTest,
             "texCoreApi36Page4kAndroidDeviceTest",
             "texCoreApi36Page16kAndroidDeviceTest",
+            verifyJvmAbi,
         ),
     )
 }
@@ -716,36 +885,87 @@ tasks.register("verifyKotlinNativePackaging") {
     group = "verification"
     description = "Verifies the current desktop JNI payload and all supported Android ABIs."
     dependsOn("jvmJar", ":packages:kotlin-tex-core:android-runtime:assembleRelease")
-    val runtimeAarFile = androidRuntimeAar.get().asFile
-    val desktopOutputDirectory = nativeOutputDirectory.get().asFile
+    // Keep artifact locations as providers. Resolving them at configuration
+    // time guesses plugin-owned outputs too early and makes the task harder
+    // to reuse safely from the configuration cache.
+    val runtimeAarFile = androidRuntimeAar
     val expectedDesktopPlatform = desktopPlatform
+    val expectedDesktopArchitecture =
+        if (hostTriple.os == "macos") "macho-${hostTriple.architecture}" else "elf-${hostTriple.architecture}"
+    val desktopLibraryName = hostTriple.nativeLibraryFileName
+    val desktopLibraryFile =
+        nativeOutputDirectory.map { directory ->
+            directory.file(desktopLibraryName)
+        }
     inputs.file(runtimeAarFile)
+    inputs.file(desktopLibraryFile)
 
     doLast {
-        val expectedAndroidEntries =
-            setOf("arm64-v8a", "armeabi-v7a", "x86", "x86_64").map {
-                "jni/$it/libtex_core_kotlin.so"
-            }
-        ZipFile(runtimeAarFile).use { archive ->
-            val entries =
-                archive
-                    .entries()
-                    .asSequence()
-                    .map { it.name }
-                    .toSet()
-            check(entries.containsAll(expectedAndroidEntries)) {
-                "Android runtime AAR is missing: ${expectedAndroidEntries - entries}"
+        // Read enough of each ELF or Mach-O header to verify the actual
+        // machine architecture, not merely an ABI-shaped filename.
+        fun binaryArchitecture(bytes: ByteArray): String {
+            require(bytes.size >= 20) { "native library header is truncated" }
+
+            fun u16(offset: Int) = (bytes[offset].toInt() and 0xff) or ((bytes[offset + 1].toInt() and 0xff) shl 8)
+
+            fun u32(offset: Int) =
+                (bytes[offset].toInt() and 0xff) or ((bytes[offset + 1].toInt() and 0xff) shl 8) or
+                    ((bytes[offset + 2].toInt() and 0xff) shl 16) or
+                    ((bytes[offset + 3].toInt() and 0xff) shl 24)
+
+            return when {
+                bytes[0] == 0x7f.toByte() && bytes[1] == 'E'.code.toByte() &&
+                    bytes[2] == 'L'.code.toByte() && bytes[3] == 'F'.code.toByte() -> {
+                    when (u16(18)) {
+                        0x3e -> "elf-x64"
+                        0xb7 -> "elf-arm64"
+                        0x28 -> "elf-arm32"
+                        0x03 -> "elf-x86"
+                        else -> "elf-unknown-${u16(18)}"
+                    }
+                }
+
+                u32(0) == 0xfeedfacf.toInt() -> {
+                    when (u32(4)) {
+                        0x0100000c -> "macho-arm64"
+                        0x01000007 -> "macho-x64"
+                        else -> "macho-unknown-${u32(4)}"
+                    }
+                }
+
+                else -> {
+                    "unknown"
+                }
             }
         }
 
-        val desktopLibrary =
-            when {
-                expectedDesktopPlatform.startsWith("macos") -> "libtex_core_kotlin.dylib"
-                else -> "libtex_core_kotlin.so"
+        val expectedAndroidArchitectures =
+            mapOf(
+                "arm64-v8a" to "elf-arm64",
+                "armeabi-v7a" to "elf-arm32",
+                "x86" to "elf-x86",
+                "x86_64" to "elf-x64",
+            )
+        ZipFile(runtimeAarFile.get().asFile).use { archive ->
+            for ((abi, expectedArchitecture) in expectedAndroidArchitectures) {
+                val entry =
+                    archive.getEntry("jni/$abi/libtex_core_kotlin.so")
+                        ?: error("Android runtime AAR is missing jni/$abi/libtex_core_kotlin.so")
+                val architecture = archive.getInputStream(entry).use { binaryArchitecture(it.readNBytes(20)) }
+                check(architecture == expectedArchitecture) {
+                    "Android $abi payload has architecture $architecture, expected $expectedArchitecture"
+                }
             }
-        val payload = desktopOutputDirectory.resolve(desktopLibrary)
+        }
+
+        val payload = desktopLibraryFile.get().asFile
         check(payload.isFile) {
             "JVM native payload is missing for $expectedDesktopPlatform"
+        }
+        val desktopArchitecture = binaryArchitecture(payload.inputStream().use { it.readNBytes(20) })
+        check(desktopArchitecture == expectedDesktopArchitecture) {
+            "JVM native payload for $expectedDesktopPlatform has architecture " +
+                "$desktopArchitecture, expected $expectedDesktopArchitecture"
         }
         if (expectedDesktopPlatform.startsWith("macos")) {
             // The artifact's Mach-O minimum OS must not exceed the declared
@@ -774,8 +994,8 @@ tasks.register("verifyKotlinNativePackaging") {
 
 tasks.withType<org.gradle.api.publish.maven.tasks.PublishToMavenLocal>().configureEach {
     when {
-        name.contains("LinuxX64") && !hostOs.contains("linux") -> enabled = false
-        name.contains("MacosArm64") && !hostOs.contains("mac") -> enabled = false
+        name.contains("LinuxX64") && hostTriple.os != "linux" -> enabled = false
+        name.contains("MacosArm64") && hostTriple.os != "macos" -> enabled = false
     }
 }
 
@@ -786,11 +1006,7 @@ tasks.register("publishKotlinToMavenLocal") {
         "publishKotlinMultiplatformPublicationToMavenLocal",
         "publishJvmPublicationToMavenLocal",
         "publishAndroidPublicationToMavenLocal",
-        if (hostOs.contains("mac")) {
-            "publishMacosArm64PublicationToMavenLocal"
-        } else {
-            "publishLinuxX64PublicationToMavenLocal"
-        },
+        "publish${hostTriple.kotlinNativeTarget.replaceFirstChar { it.uppercase() }}PublicationToMavenLocal",
         ":packages:kotlin-tex-core:android-runtime:publishToMavenLocal",
     )
 }
