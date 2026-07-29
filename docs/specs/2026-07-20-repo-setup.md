@@ -842,7 +842,7 @@ reviewed change-set per §5.5, with fixtures first.
 | M3 | Text-mode galley: paragraphs with Knuth–Plass line breaking, font/style commands, sectioning headings, lists, `tabular`, `verbatim`, quotes, document skeleton (`\documentclass` subset, `\begin{document}`, title block) rendered as one continuous galley | blocks `1.0.0` |
 | M4 | Domain notation coverage as built-in commands: chemistry (`\ce`, mhchem subset), physics (units/braket subsets), extended math alphabets, symbol-coverage sweep with a pinned coverage inventory tied to fixtures | blocks `1.0.0` |
 | M5 | Error-tolerant mode (structured error boxes in-tree, KaTeX-style opt-in) | 1.x minor, post-`1.0.0` |
-| M6 | Incremental sessions: spec first (sessions-and-deltas style), session API on all platforms, dump-equality with a from-scratch compile under replay/random-edit/coverage-guided fuzzing, damage-proportional cost gates | blocks `2.0.0` |
+| M6 | Incremental sessions: freeze the [`incremental-editing.md`](incremental-editing.md) session/scope-resolver/cache contract first, then add the session API on all platforms, dump-equality with a from-scratch compile under replay/random-edit/coverage-guided fuzzing, and damage-proportional cost gates | blocks `2.0.0` |
 | M7 | The programmable TeX layer: `\def`/`\newcommand`, expansion engine, conditionals, registers, catcode changes, `\halign` core | blocks `3.0.0` |
 | M8 | Project features: multi-file input (`\input`/`\include`), package/module model, reference and citation resolution (`\label`/`\ref`/`\cite` with aux-equivalent fixpoint), counters, page building and output routines; editor-product contract (stable node identity, complete source mapping) | blocks `3.0.0` |
 
