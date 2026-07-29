@@ -910,15 +910,14 @@ static tex_core_status txc_fenced_box(
  * pads every column on both sides; the matrix family's outer
  * -\arraycolsep skips cancel the edge padding exactly, so columns sit
  * 2\arraycolsep apart with none outside and no kerns are published.
- * Rows pitch their baselines \baselineskip (12 pt) apart, falling back
- * to \lineskip (1 pt) of clearance when a row pair reaches
- * \lineskiplimit (0 pt), exactly as TeX's vpack. LaTeX's \@arstrut
- * floors every row at .7 and .3 of \baselineskip — by TeX's decimal
- * scan those coefficients are 45875/65536 and 19661/65536, so the strut
- * is exactly 550500 sp over 235932 sp. */
+ * \@array zeroes \baselineskip and \lineskip before the alignment
+ * (lttab.dtx), so consecutive rows abut exactly on their extents and
+ * the \@arstrut alone pitches ordinary rows: it floors every row at
+ * .7 and .3 of the 12 pt \baselineskip — by TeX's decimal scan those
+ * coefficients are 45875/65536 and 19661/65536, so the strut is
+ * exactly 550500 sp over 235932 sp, and strut-floored baselines sit
+ * 12 pt apart while taller rows meet with no added clearance. */
 #define TXC_ARRAY_COLSEP 327680
-#define TXC_ARRAY_BASELINESKIP 786432
-#define TXC_ARRAY_LINESKIP 65536
 #define TXC_ARRAY_STRUT_ASCENT 550500
 #define TXC_ARRAY_STRUT_DESCENT 235932
 
@@ -928,12 +927,12 @@ static tex_core_status txc_fenced_box(
  * inside a script keeps full-size entries, exactly as LaTeX. Each
  * column takes its widest cell's width with cells centered by half the
  * excess; each row is an hbox of the full alignment width whose
- * extents are floored by the array strut (the one deliberate excess
- * over its children besides the operator-limits assembly); the stacked
- * rows are centered on the math axis exactly as \vcenter (tex.web
- * section 736), and the delimited variants grow their fences to the
- * rule-19 target of the centered box's reach, exactly as
- * \left/\right. */
+ * extents are floored by the array strut (a deliberate excess over
+ * its children, like the operator-limits assembly); consecutive rows
+ * abut on those extents; the stacked rows are centered on the math
+ * axis exactly as \vcenter (tex.web section 736), and the delimited
+ * variants grow their fences to the rule-19 target of the centered
+ * box's reach, exactly as \left/\right. */
 static tex_core_status txc_array_box(
     txc_arena *arena,
     const txc_array *array,
@@ -1012,16 +1011,14 @@ static tex_core_status txc_array_box(
         width += column_widths[column];
     }
 
-    /* Row baselines by TeX's interline glue, then the \vcenter split
-     * around the axis of the surrounding style's size. */
+    /* Rows abut on their strutted extents (\@array zeroes the interline
+     * glue), then the \vcenter split centers the stack around the axis
+     * of the surrounding style's size. */
     txc_scaled axis = txc_param(TXC_PARAMETER_AXIS_HEIGHT, txc_style_size(style));
     txc_scaled depth_below_first = 0;
     for (size_t index = 0; index < array->row_count; index++) {
         if (index > 0) {
-            txc_scaled gap = TXC_ARRAY_BASELINESKIP - row_descents[index - 1] - row_ascents[index];
-            txc_scaled distance =
-                gap >= 0 ? TXC_ARRAY_BASELINESKIP : row_descents[index - 1] + row_ascents[index] + TXC_ARRAY_LINESKIP;
-            depth_below_first += distance;
+            depth_below_first += row_descents[index - 1] + row_ascents[index];
         }
     }
     txc_scaled stack_height = array->row_count > 0 ? row_ascents[0] : 0;
@@ -1036,10 +1033,7 @@ static tex_core_status txc_array_box(
     for (size_t index = 0; index < array->row_count; index++) {
         txc_node *row_box = row_boxes[index];
         if (index > 0) {
-            txc_scaled gap = TXC_ARRAY_BASELINESKIP - row_descents[index - 1] - row_ascents[index];
-            txc_scaled distance =
-                gap >= 0 ? TXC_ARRAY_BASELINESKIP : row_descents[index - 1] + row_ascents[index] + TXC_ARRAY_LINESKIP;
-            baseline -= distance;
+            baseline -= row_descents[index - 1] + row_ascents[index];
         }
         row_box->y = baseline;
         row_box->width = width;

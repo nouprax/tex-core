@@ -383,12 +383,13 @@ common baseline; its ascent and descent are floored by LaTeX's
 `\@arstrut` — `.7\baselineskip` over `.3\baselineskip` of the 10 pt
 text size's 12 pt `\baselineskip`, by TeX's decimal scan exactly
 550500 sp over 235932 sp — a deliberate extent excess over the box's
-children, like the operator-limits assembly's pads. Consecutive
-baselines sit `\baselineskip` apart, falling back to `\lineskip`
-(1 pt) of clearance when the pair's clearance would fall below
-`\lineskiplimit` (0 pt) — strictly below, exactly as TeX's vpack, so
-strut-floored rows keep the 12 pt pitch; the stacked rows then center
-on the math axis of the surrounding style's size — the stack's ascent
+children, like the operator-limits assembly's pads. LaTeX's `\@array`
+zeroes `\baselineskip` and `\lineskip` before the alignment, so
+consecutive rows abut exactly on their strutted extents: each baseline
+sits the previous row's descent plus its own ascent below the last —
+the strut floors alone pitch ordinary rows 12 pt apart, and taller
+rows meet with no added clearance. The stacked rows then center on
+the math axis of the surrounding style's size — the stack's ascent
 is `axisHeight + half(total)`, its descent the rest, so a zero-row
 `matrix` publishes ascent `axisHeight` and descent `-axisHeight` (a
 delimited variant still maxes its fence extents into the published

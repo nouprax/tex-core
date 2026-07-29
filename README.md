@@ -51,7 +51,7 @@ with byte-identical canonical dumps on every platform. That completes
 the M1 math-core surface. M2 (math environments) has begun: the
 `\begin`/`\end` alignment environments of the matrix family (`matrix`
 through `Vmatrix`) set centered cells over LaTeX's array geometry —
-`\@arstrut` row floors, `\baselineskip`/`\lineskip` row pitch,
+`\@arstrut` row floors with rows abutting on zeroed interline glue,
 `2\arraycolsep` column gaps, the stack `\vcenter`-ed on the math axis,
 the delimited variants fenced per rule 19. The remaining M2–M4 surface
 (`cases`/`aligned`, extensibles, text galley, domain notations) lands

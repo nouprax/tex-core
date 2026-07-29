@@ -12,10 +12,11 @@ not promised to remain compatible between releases.
   bodies have zero rows, ragged rows and empty cells are legal), and
   lay them out over LaTeX's array geometry — columns take their widest
   cell with centered entries `2\arraycolsep` apart, rows floor at the
-  `\@arstrut` (550500/235932 sp) and pitch their baselines
-  `\baselineskip` apart with the `\lineskip` fallback, the stack
-  centers on the math axis exactly as `\vcenter`, and the delimited
-  variants grow their fences through the rule-19 ladder. Cells are
+  `\@arstrut` (550500/235932 sp) and abut exactly — `\@array` zeroes
+  the interline glue, so the strut alone pitches ordinary rows
+  `\baselineskip` apart — the stack centers on the math axis exactly
+  as `\vcenter`, and the delimited variants grow their fences through
+  the rule-19 ladder. Cells are
   their own inline math lists set in text style whatever the
   surrounding style, faces rewrite through cells, and scripts attach
   to the environment's atom. LaTeX's `\\*` no-page-break terminator is

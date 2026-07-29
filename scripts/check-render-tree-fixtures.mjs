@@ -677,7 +677,10 @@ const stateValidators = {
                 )
         )
     ),
-    "environment.lineskip": treeStates((all) =>
+    // \@array zeroes the interline glue, so a row taller than the strut
+    // abuts its neighbor exactly: the baseline distance is the pair's
+    // shared extents, exceeding the ordinary 12 pt pitch.
+    "environment.tallRows": treeStates((all) =>
         all.some(
             (upper, index) =>
                 upper.kind === "hbox" &&
@@ -687,7 +690,8 @@ const stateValidators = {
                         lower.kind === "hbox" &&
                         lower.depth === upper.depth &&
                         upper.y > lower.y &&
-                        nearScaledSum(upper.y - lower.y, upper.descent + lower.ascent + 1)
+                        upper.y - lower.y > 12 + 1e-4 &&
+                        nearScaledSum(upper.y - lower.y, upper.descent + lower.ascent)
                 )
         )
     ),
