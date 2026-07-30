@@ -114,7 +114,7 @@ else
     note "complexity gates are isolated and included in Release correctness"
 fi
 
-node --input-type=module <<'NODE' || fail "sanitizer presets do not exclude wall-clock complexity gates"
+node --input-type=module <<'NODE' || fail "sanitizer presets do not exclude timing-based complexity gates"
 import fs from "node:fs";
 const presets = JSON.parse(fs.readFileSync("CMakePresets.json", "utf8")).testPresets;
 for (const name of ["correctness-asan", "correctness-ubsan", "correctness-tsan"]) {
@@ -124,7 +124,7 @@ for (const name of ["correctness-asan", "correctness-ubsan", "correctness-tsan"]
     }
 }
 NODE
-note "sanitizer presets exclude wall-clock complexity gates"
+note "sanitizer presets exclude timing-based complexity gates"
 
 # 4. Platform suite discovery stays non-empty. The Swift source assertion
 # runs on every host, including the required Linux health-check runner; the

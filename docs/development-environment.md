@@ -70,9 +70,11 @@ make libFuzzer      # explicit non-default fuzz smoke campaign
 The Release correctness preset also runs two compile-complexity gates. Each
 small and large endpoint is warmed once before timing; short endpoints use
 median-of-three adaptive samples, while a first post-warmup bucket containing
-one long compile is used directly. The gate compares time per input byte and
-does not enforce an absolute wall-clock threshold. Sanitizer presets exclude
-these timing-sensitive tests.
+one long compile is used directly. The gate compares process user+kernel CPU
+time per input byte, excluding hosted-runner descheduling without excluding
+compiler work, and does not enforce an absolute time threshold. Benchmarks
+separately retain monotonic wall-clock timing because they measure user-visible
+latency. Sanitizer presets exclude these timing-sensitive tests.
 
 The equivalent pnpm lanes are `build:c`, `test:c-host`, and
 `benchmark:c-host`. Build trees live under `build/` (`cmake`, `asan`,
