@@ -6,18 +6,28 @@
  * use the median of three >=25 ms buckets; when the first post-warmup bucket
  * already contains one long compile, that complete compile is the sample.
  *
- * The gate checks an asymptotic ratio, never an absolute wall-clock limit. */
+ * The gate checks a normalized process-CPU ratio, never an absolute time
+ * limit. Process CPU excludes time while a hosted runner deschedules the test
+ * without hiding allocator, parser, layout, or render-tree work. */
 
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+
+#if defined(_WIN32)
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN
+#endif
+#include <windows.h>
+#else
 #include <time.h>
+#endif
 
 #include "tex_core.h"
 
 #define TXC_COMPLEXITY_REPEATS 3
-#define TXC_MIN_SAMPLE_NS 25000000u
+#define TXC_MIN_SAMPLE_CPU_NS 25000000u
 #define TXC_MAX_NORMALIZED_SLOWDOWN 4.0
 
 typedef struct {
@@ -33,14 +43,29 @@ static const txc_complexity_case TXC_COMPLEXITY_CASES[] = {
     {"math", TEX_CORE_MODE_MATH_DISPLAY, "a+b+c+d+", 4u * 1024u, 64u * 1024u},
 };
 
-static uint64_t txc_now_ns(void) {
-    struct timespec now;
+static uint64_t txc_process_cpu_ns(void) {
 #if defined(_WIN32)
-    timespec_get(&now, TIME_UTC);
+    FILETIME created;
+    FILETIME exited;
+    FILETIME kernel;
+    FILETIME user;
+    ULARGE_INTEGER kernel_ticks;
+    ULARGE_INTEGER user_ticks;
+    if (!GetProcessTimes(GetCurrentProcess(), &created, &exited, &kernel, &user)) {
+        abort();
+    }
+    kernel_ticks.LowPart = kernel.dwLowDateTime;
+    kernel_ticks.HighPart = kernel.dwHighDateTime;
+    user_ticks.LowPart = user.dwLowDateTime;
+    user_ticks.HighPart = user.dwHighDateTime;
+    return (kernel_ticks.QuadPart + user_ticks.QuadPart) * UINT64_C(100);
 #else
-    clock_gettime(CLOCK_MONOTONIC, &now);
+    struct timespec now;
+    if (clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &now) != 0) {
+        abort();
+    }
+    return (uint64_t)now.tv_sec * UINT64_C(1000000000) + (uint64_t)now.tv_nsec;
 #endif
-    return (uint64_t)now.tv_sec * 1000000000u + (uint64_t)now.tv_nsec;
 }
 
 static int txc_compare_double(const void *left, const void *right) {
@@ -93,7 +118,7 @@ static int txc_measure(
     }
 
     for (size_t repeat = 0; repeat < TXC_COMPLEXITY_REPEATS; repeat++) {
-        uint64_t started = txc_now_ns();
+        uint64_t started = txc_process_cpu_ns();
         uint64_t elapsed;
         size_t iterations = 0;
         do {
@@ -101,13 +126,13 @@ static int txc_measure(
                 return 1;
             }
             iterations++;
-            elapsed = txc_now_ns() - started;
-        } while (elapsed < TXC_MIN_SAMPLE_NS);
+            elapsed = txc_process_cpu_ns() - started;
+        } while (elapsed < TXC_MIN_SAMPLE_CPU_NS);
 
         samples[repeat] = (double)elapsed / (1e9 * (double)iterations);
         /* Classify from the first post-warmup bucket. A single compile is
-         * already a long sample; later single-compile buckets can be scheduler
-         * outliers and remain covered by the median path. */
+         * already a long sample; later single-compile buckets can be cache or
+         * allocator outliers and remain covered by the median path. */
         if (repeat == 0 && iterations == 1) {
             *seconds = samples[repeat];
             return 0;

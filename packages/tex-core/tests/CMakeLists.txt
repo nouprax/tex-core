@@ -5,7 +5,7 @@
 #   benchmark
 #
 # The default correctness preset excludes conformance and benchmark; the
-# sanitizer correctness presets also exclude wall-clock complexity gates.
+# sanitizer correctness presets also exclude timing-based complexity gates.
 # Every suite is native C; the test tree has no scripting-language
 # dependency and never touches the network.
 
@@ -31,7 +31,7 @@ tex_core_add_suite(allocfail)
 
 # Complexity: one process per input family so each endpoint gets a fresh,
 # explicit warmup before adaptive sampling. These are Release-only
-# wall-clock gates; sanitizer presets exclude the `complexity` label.
+# process-CPU gates; sanitizer presets exclude the `complexity` label.
 add_executable(tex-core-test-complexity complexity.c)
 target_link_libraries(tex-core-test-complexity PRIVATE libtex-core_static)
 foreach(case_name document math)
